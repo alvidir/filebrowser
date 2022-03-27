@@ -1,29 +1,7 @@
-version: '3.8'
-
 services:
-    redis:
-        container_name: redis
-        image: docker.io/redis:latest
-        restart: always
-        ports:
-            - "6379:6379"
-        networks: 
-            - cache
-
     filebrowser:
         container_name: filebrowser-server
         image: localhost/alvidir/filebrowser:0.1.0
         restart: always
-        volumes:
-            - .config:/app/.config
-        networks: 
-            - cache
-        depends_on:
-            - redis
         env_file:
             - .env
-
-networks:
-    cache:
-        name: cache
-        driver: bridge
