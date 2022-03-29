@@ -1,7 +1,33 @@
 services:
-    filebrowser:
-        container_name: filebrowser-server
-        image: localhost/alvidir/filebrowser:0.1.0
+    mongo:
+        container_name: filebrowser-mongo
+        image: docker.io/mongo:latest
         restart: always
+        ports:
+            - 9090:27017
+        volumes:
+            - dbdata:/data/db
+        security_opt:
+            label: disable
         env_file:
             - .env
+
+    # redis:
+    #     container_name: filebrowser-redis
+    #     image: docker.io/redis:alpine3.15
+    #     restart: always
+    #     volumes:
+    #         - ./redis:/usr/local/etc/redis:ro
+    #     security_opt:
+    #         label: disable
+    #     command: "redis-server /usr/local/etc/redis/redis.conf"
+
+    # filebrowser:
+    #     container_name: filebrowser-server
+    #     image: localhost/alvidir/filebrowser:0.1.0
+    #     restart: always
+    #     env_file:
+    #         - .env
+
+volumes:
+    dbdata:
