@@ -1,4 +1,4 @@
-name: go-test
+name: tests
 
 # Controls when the action will run. 
 on:
