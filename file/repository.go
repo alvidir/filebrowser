@@ -5,6 +5,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+const (
+	MongoFileCollectionName = "files"
+)
+
 type MongoFile struct {
 	ID          fb.MongoId           `bson:"_id"`
 	Name        string               `bson:"name"`
@@ -15,5 +19,11 @@ type MongoFile struct {
 }
 
 type MongoFileRepository struct {
-	conn *mongo.Database
+	conn *mongo.Collection
+}
+
+func NewMongoFileRepository(db *mongo.Database) *MongoFileRepository {
+	return &MongoFileRepository{
+		conn: db.Collection(MongoFileCollectionName),
+	}
 }

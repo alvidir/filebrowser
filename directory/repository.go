@@ -5,17 +5,23 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-type MongoUser struct {
-	ID     fb.MongoId `bson:"_id"`
-	UserID int32      `bson:"user_id"`
-}
+const (
+	mongoDirectoryCollectionName = "directories"
+)
 
 type MongoDirectory struct {
-	ID     fb.MongoId            `bson:"_id"`
+	ID     fb.MongoId            `bson:"_id;omitempty"`
+	UserID int32                 `bson:"user_id"`
 	Shared map[string]fb.MongoId `bson:"shared"`
 	Hosted map[string]fb.MongoId `bson:"hosted"`
 }
 
 type MongoDirectoryRepository struct {
-	conn *mongo.Database
+	conn *mongo.Collection
+}
+
+func NewMongoDirectoryRepository(db *mongo.Database) *MongoDirectoryRepository {
+	return &MongoDirectoryRepository{
+		conn: db.Collection(mongoDirectoryCollectionName),
+	}
 }

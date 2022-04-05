@@ -6,10 +6,10 @@ build:
 	podman build -t ${REPO}/${PROJECT}:${VERSION} -f ./container/filebrowser/containerfile .
 
 deploy:
-	podman-compose -f container-compose.yaml up --remove-orphans
+	podman-compose -f compose.yaml up --remove-orphans -d
 
 undeploy:
-	podman-compose -f container-compose.yaml down
+	podman-compose -f compose.yaml down
 
 run:
 	go run cmd/filebrowser/main.go
