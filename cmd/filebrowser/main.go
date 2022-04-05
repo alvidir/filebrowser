@@ -34,8 +34,8 @@ func main() {
 		return
 	}
 
-	if _, err := filebrowser.NewMongoRepository(uri, database); err != nil {
-		logger.Error("establishing connection with %s: %s", uri, err)
+	if _, err := filebrowser.NewMongoDBConn(uri, database); err != nil {
+		logger.Errorf("establishing connection with %s: %s", uri, err)
 		return
 	} else {
 		logger.Info("connection with mongo cluster established")
