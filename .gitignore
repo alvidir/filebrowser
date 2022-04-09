@@ -15,6 +15,3 @@
 # vendor/
 
 .env
-
-# protocol buffers
-proto/*.pb.go

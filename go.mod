@@ -4,7 +4,6 @@ go 1.18
 
 require (
 	github.com/joho/godotenv v1.4.0
-	github.com/sirupsen/logrus v1.8.1
 	go.mongodb.org/mongo-driver v1.8.4
 	go.uber.org/zap v1.21.0
 	google.golang.org/grpc v1.45.0
