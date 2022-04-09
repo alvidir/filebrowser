@@ -2,11 +2,9 @@ package directory
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/alvidir/filebrowser"
-	fb "github.com/alvidir/filebrowser"
 	"go.uber.org/zap"
 )
 
@@ -61,18 +59,5 @@ func TestDirectoryApplication_create(t *testing.T) {
 
 	if got := dir.id; got != mockDirectoryId {
 		t.Errorf("got directory.id = %v, want = %v", got, mockDirectoryId)
-	}
-}
-
-func TestDirectoryApplication_create_already_exists(t *testing.T) {
-	logger, _ := zap.NewProduction()
-	defer logger.Sync()
-
-	repo := &directoryRepositoryMock{}
-	app := NewDirectoryApplication(repo, logger)
-
-	_, err := app.Create(context.Background(), 999)
-	if !errors.Is(err, fb.ErrAlreadyExists) {
-		t.Errorf("got no error when already exists, want error = %v", fb.ErrAlreadyExists)
 	}
 }
