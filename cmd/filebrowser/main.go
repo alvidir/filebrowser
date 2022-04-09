@@ -15,6 +15,7 @@ import (
 const (
 	ENV_SERVICE_PORT   = "SERVICE_PORT"
 	ENV_SERVICE_NETW   = "SERVICE_NETW"
+	ENV_AUTH_HEADER    = "AUTH_HEADER"
 	ENV_MONGO_DSN      = "MONGO_DSN"
 	ENV_MONGO_DATABASE = "MONGO_INITDB_DATABASE"
 )
@@ -22,6 +23,7 @@ const (
 var (
 	servicePort = "8000"
 	serviceNetw = "tcp"
+	authHeader  = "X-Auth"
 )
 
 func buildGrpcServer(logger *zap.Logger) *grpc.Server {
@@ -44,9 +46,9 @@ func buildGrpcServer(logger *zap.Logger) *grpc.Server {
 		logger.Info("connection with mongodb cluster established")
 	}
 
-	directoryRepo := dir.NewMongoDirectoryRepository(mongoConn)
+	directoryRepo := dir.NewMongoDirectoryRepository(mongoConn, logger)
 	directoryApp := dir.NewDirectoryApplication(directoryRepo, logger)
-	directoryServer := dir.NewDirectoryServer(directoryApp, logger)
+	directoryServer := dir.NewDirectoryServer(directoryApp, logger, authHeader)
 
 	grpcSrv := grpc.NewServer()
 	proto.RegisterDirectoryServer(grpcSrv, directoryServer)
@@ -69,6 +71,10 @@ func main() {
 
 	if netw, exists := os.LookupEnv(ENV_SERVICE_NETW); exists {
 		serviceNetw = netw
+	}
+
+	if header, exists := os.LookupEnv(ENV_AUTH_HEADER); exists {
+		authHeader = header
 	}
 
 	lis, err := net.Listen(serviceNetw, servicePort)
