@@ -23,11 +23,21 @@ jobs:
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - uses: wizhi/setup-buf@v1
+        with:
+          version: '0.36.0'
+      - uses: arduino/setup-protoc@v1
+        with:
+          version: '3.x'
       - name: Install Go
         uses: actions/setup-go@v2
         with:
           go-version: ${{ matrix.go-version }}
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - name: Install protoc-gen-go
+        run: make install
+      - name: Generate protos
+        run: make proto -B
       - name: Test
         run: go test -v -race ./...
