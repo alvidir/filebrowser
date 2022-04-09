@@ -3,13 +3,9 @@ package directory
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	fb "github.com/alvidir/filebrowser"
-)
-
-var (
-	ErrAlreadyExists = errors.New("already exists")
+	"go.uber.org/zap"
 )
 
 type DirectoryRepository interface {
@@ -18,22 +14,31 @@ type DirectoryRepository interface {
 }
 
 type DirectoryApplication struct {
-	DirectoryRepo DirectoryRepository
-	Logger        fb.Logger
+	directoryRepo DirectoryRepository
+	logger        *zap.Logger
 }
 
-func (app *DirectoryApplication) Create(ctx context.Context, userId int32) error {
-	app.Logger.Infof("processing a \"create\" directory request for user %s", userId)
+func NewDirectoryApplication(repo DirectoryRepository, logger *zap.Logger) *DirectoryApplication {
+	return &DirectoryApplication{
+		directoryRepo: repo,
+		logger:        logger,
+	}
+}
 
-	if _, err := app.DirectoryRepo.FindByUserId(ctx, userId); err == nil {
-		return fmt.Errorf("directory with user id %d: %w", userId, ErrAlreadyExists)
+func (app *DirectoryApplication) Create(ctx context.Context, userId int32) (*Directory, error) {
+	app.logger.Info("processing a \"create\" directory request",
+		zap.Int32("user", userId))
+
+	if _, err := app.directoryRepo.FindByUserId(ctx, userId); err == nil {
+		return nil, fb.ErrAlreadyExists
+	} else if !errors.Is(err, fb.ErrNotFound) {
+		return nil, err
 	}
 
 	directory := NewDirectory(userId)
-	if err := app.DirectoryRepo.Create(ctx, directory); err != nil {
-		app.Logger.Errorf("creating directory for user %s: %s", userId, err)
-		return err
+	if err := app.directoryRepo.Create(ctx, directory); err != nil {
+		return nil, err
 	}
 
-	return nil
+	return directory, nil
 }

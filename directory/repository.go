@@ -1,6 +1,8 @@
 package directory
 
 import (
+	"context"
+
 	fb "github.com/alvidir/filebrowser"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -24,4 +26,12 @@ func NewMongoDirectoryRepository(db *mongo.Database) *MongoDirectoryRepository {
 	return &MongoDirectoryRepository{
 		conn: db.Collection(mongoDirectoryCollectionName),
 	}
+}
+
+func (repo *MongoDirectoryRepository) FindByUserId(ctx context.Context, userId int32) (*Directory, error) {
+	return nil, nil
+}
+
+func (repo *MongoDirectoryRepository) Create(ctx context.Context, directory *Directory) error {
+	return nil
 }

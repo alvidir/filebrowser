@@ -7,17 +7,17 @@ import (
 type Path string
 
 type Directory struct {
-	Id     string
-	UserId int32
-	Shared map[Path]*file.File
-	Hosted map[Path]*file.File
+	id     string
+	userId int32
+	shared map[Path]*file.File
+	hosted map[Path]*file.File
 }
 
 func NewDirectory(userId int32) *Directory {
 	return &Directory{
-		Id:     "",
-		UserId: userId,
-		Shared: make(map[Path]*file.File),
-		Hosted: make(map[Path]*file.File),
+		id:     "",
+		userId: userId,
+		shared: make(map[Path]*file.File),
+		hosted: make(map[Path]*file.File),
 	}
 }
