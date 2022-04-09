@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	fb "github.com/alvidir/filebrowser"
-	proto "github.com/alvidir/filebrowser/proto"
+	"github.com/alvidir/filebrowser/proto"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
 )
@@ -25,7 +25,7 @@ func NewDirectoryServer(app *DirectoryApplication, logger *zap.Logger, authHeade
 	}
 }
 
-func (server *DirectoryServer) Create(ctx context.Context, req *proto.Empty) (*proto.Empty, error) {
+func (server *DirectoryServer) Create(ctx context.Context, req *proto.CreateDirRequest) (*proto.CreateDirResponse, error) {
 	var userId int32
 	if meta, exists := metadata.FromIncomingContext(ctx); !exists {
 		return nil, fb.ErrUnauthorized
@@ -44,5 +44,5 @@ func (server *DirectoryServer) Create(ctx context.Context, req *proto.Empty) (*p
 		return nil, err
 	}
 
-	return &proto.Empty{}, nil
+	return &proto.CreateDirResponse{}, nil
 }

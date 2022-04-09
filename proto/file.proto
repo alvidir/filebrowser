@@ -1,0 +1,20 @@
+syntax = "proto3";
+option go_package = "github.com/alvidir/filebrowser/proto";
+
+package proto;
+
+message CreateFileRequest {
+    string name = 1;
+    map<string, string> metadata = 2;
+    map<int32, uint32> permissions = 3;
+    uint32 flags = 4;
+    bytes Value = 5;
+}
+
+message CreateFileResponse {
+    string id = 1;
+}
+
+service File {
+    rpc Create(CreateFileRequest) returns (CreateFileResponse); 
+}

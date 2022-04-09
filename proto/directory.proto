@@ -1,10 +1,11 @@
 syntax = "proto3";
 option go_package = "github.com/alvidir/filebrowser/proto";
 
-package directory;
+package proto;
 
-message Empty {}
+message CreateDirRequest {}
+message CreateDirResponse {}
 
 service Directory {
-    rpc Create(Empty) returns (Empty); 
+    rpc Create(CreateDirRequest) returns (CreateDirResponse); 
 }
