@@ -10,7 +10,7 @@ const (
 )
 
 type Metadata map[string]string
-type Permissions map[string]uint8
+type Permissions map[int32]uint8
 
 type File struct {
 	id          string
@@ -18,5 +18,16 @@ type File struct {
 	metadata    Metadata
 	permissions Permissions
 	flags       uint8
-	value       []byte
+	data        []byte
+}
+
+func NewFile(filename string, data []byte, perm Permissions, meta Metadata) *File {
+	return &File{
+		id:          "",
+		name:        filename,
+		metadata:    meta,
+		permissions: perm,
+		flags:       Private,
+		data:        data,
+	}
 }

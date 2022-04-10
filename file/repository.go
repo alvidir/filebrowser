@@ -13,23 +13,23 @@ const (
 	MongoFileCollectionName = "files"
 )
 
-type MongoFile struct {
-	ID          string            `bson:"_id"`
+type mongoFile struct {
+	ID          string            `bson:"_id,omitempty"`
 	Name        string            `bson:"name"`
 	Flags       uint8             `bson:"flags"`
-	Permissions map[string]uint8  `bson:"permissions"`
+	Permissions map[int32]uint8   `bson:"permissions,omitempty"`
 	Metadata    map[string]string `bson:"metadata,omitempty"`
-	Value       []byte            `bson:"value,omitempty"`
+	Data        []byte            `bson:"data,omitempty"`
 }
 
-func newMongoFile(f *File) *MongoFile {
-	return &MongoFile{
+func newMongoFile(f *File) *mongoFile {
+	return &mongoFile{
 		ID:          f.id,
 		Name:        f.name,
 		Flags:       f.flags,
 		Permissions: f.permissions,
 		Metadata:    f.metadata,
-		Value:       f.value,
+		Data:        f.data,
 	}
 }
 
@@ -38,9 +38,10 @@ type MongoFileRepository struct {
 	logger *zap.Logger
 }
 
-func NewMongoFileRepository(db *mongo.Database) *MongoFileRepository {
+func NewMongoFileRepository(db *mongo.Database, logger *zap.Logger) *MongoFileRepository {
 	return &MongoFileRepository{
-		conn: db.Collection(MongoFileCollectionName),
+		conn:   db.Collection(MongoFileCollectionName),
+		logger: logger,
 	}
 }
 
@@ -56,7 +57,7 @@ func (repo *MongoFileRepository) Create(ctx context.Context, file *File) error {
 	}
 
 	if fileId, ok := res.InsertedID.(primitive.ObjectID); ok {
-		file.id = fileId.String()
+		file.id = fileId.Hex()
 		return nil
 	}
 

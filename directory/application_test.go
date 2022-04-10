@@ -16,6 +16,7 @@ const (
 type directoryRepositoryMock struct {
 	findByUserId func(ctx context.Context, userId int32) (*Directory, error)
 	create       func(ctx context.Context, dir *Directory) error
+	save         func(ctx context.Context, dir *Directory) error
 }
 
 func (mock *directoryRepositoryMock) FindByUserId(ctx context.Context, userId int32) (*Directory, error) {
@@ -31,6 +32,15 @@ func (mock *directoryRepositoryMock) FindByUserId(ctx context.Context, userId in
 func (mock *directoryRepositoryMock) Create(ctx context.Context, dir *Directory) error {
 	if mock.create != nil {
 		return mock.create(ctx, dir)
+	}
+
+	dir.id = mockDirectoryId
+	return nil
+}
+
+func (mock *directoryRepositoryMock) Save(ctx context.Context, dir *Directory) error {
+	if mock.create != nil {
+		return mock.save(ctx, dir)
 	}
 
 	dir.id = mockDirectoryId

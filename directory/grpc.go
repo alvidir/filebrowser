@@ -10,29 +10,26 @@ import (
 
 type DirectoryServer struct {
 	proto.UnimplementedDirectoryServer
-	directoryApp *DirectoryApplication
-	logger       *zap.Logger
-	authHeader   string
+	app    *DirectoryApplication
+	logger *zap.Logger
+	header string
 }
 
 func NewDirectoryServer(app *DirectoryApplication, logger *zap.Logger, authHeader string) *DirectoryServer {
 	return &DirectoryServer{
-		directoryApp: app,
-		logger:       logger,
-		authHeader:   authHeader,
+		app:    app,
+		logger: logger,
+		header: authHeader,
 	}
 }
 
 func (server *DirectoryServer) Create(ctx context.Context, req *proto.CreateDirRequest) (*proto.CreateDirResponse, error) {
-	ctx, err := fb.WithAuth(ctx, server.authHeader)
+	ctx, err := fb.WithAuth(ctx, server.header, server.logger)
 	if err != nil {
-		server.logger.Warn("getting users authentication",
-			zap.String("header", server.authHeader),
-			zap.Error(err))
 		return nil, err
 	}
 
-	if _, err := server.directoryApp.Create(ctx); err != nil {
+	if _, err := server.app.Create(ctx); err != nil {
 		return nil, err
 	}
 
