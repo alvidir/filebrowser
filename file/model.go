@@ -9,14 +9,14 @@ const (
 	Owner   = 0x32
 )
 
-type Flags uint8
-
-type Permissions map[int32]uint8
+type Metadata map[string]string
+type Permissions map[string]uint8
 
 type File struct {
-	Name        string
-	Metadata    map[string]string
-	Permissions Permissions
-	Flags       Flags
-	Value       []byte
+	id          string
+	name        string
+	metadata    Metadata
+	permissions Permissions
+	flags       uint8
+	value       []byte
 }

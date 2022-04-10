@@ -2,12 +2,10 @@ package directory
 
 import (
 	"context"
-	"strconv"
 
 	fb "github.com/alvidir/filebrowser"
 	"github.com/alvidir/filebrowser/proto"
 	"go.uber.org/zap"
-	"google.golang.org/grpc/metadata"
 )
 
 type DirectoryServer struct {
@@ -26,21 +24,15 @@ func NewDirectoryServer(app *DirectoryApplication, logger *zap.Logger, authHeade
 }
 
 func (server *DirectoryServer) Create(ctx context.Context, req *proto.CreateDirRequest) (*proto.CreateDirResponse, error) {
-	var userId int32
-	if meta, exists := metadata.FromIncomingContext(ctx); !exists {
-		return nil, fb.ErrUnauthorized
-	} else if values := meta.Get(server.authHeader); len(values) == 0 {
-		return nil, fb.ErrUnauthorized
-	} else if raw, err := strconv.ParseInt(values[0], 10, 32); err != nil {
-		server.logger.Warn("parsing header into int32",
+	ctx, err := fb.WithAuth(ctx, server.authHeader)
+	if err != nil {
+		server.logger.Warn("getting users authentication",
 			zap.String("header", server.authHeader),
-			zap.String("value", values[0]))
-		return nil, fb.ErrInvalidHeader
-	} else {
-		userId = int32(raw)
+			zap.Error(err))
+		return nil, err
 	}
 
-	if _, err := server.directoryApp.Create(ctx, userId); err != nil {
+	if _, err := server.directoryApp.Create(ctx); err != nil {
 		return nil, err
 	}
 

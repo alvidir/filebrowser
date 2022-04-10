@@ -8,8 +8,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
-type MongoId string
-
 func NewMongoDBConn(uri, database string) (*mongo.Database, error) {
 	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(uri))
 	if err != nil {

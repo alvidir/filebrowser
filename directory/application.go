@@ -3,6 +3,7 @@ package directory
 import (
 	"context"
 
+	fb "github.com/alvidir/filebrowser"
 	"go.uber.org/zap"
 )
 
@@ -22,11 +23,18 @@ func NewDirectoryApplication(repo DirectoryRepository, logger *zap.Logger) *Dire
 	}
 }
 
-func (app *DirectoryApplication) Create(ctx context.Context, userId int32) (*Directory, error) {
+func (app *DirectoryApplication) Create(ctx context.Context) (*Directory, error) {
 	app.logger.Info("processing a \"create\" directory request",
-		zap.Int32("user", userId))
+		zap.Any(fb.AuthKey, ctx.Value(fb.AuthKey)))
 
-	directory := NewDirectory(userId)
+	uid, ok := ctx.Value(fb.AuthKey).(int32)
+	if !ok {
+		app.logger.Error("asserting authentication id",
+			zap.Any(fb.AuthKey, ctx.Value(fb.AuthKey)))
+		return nil, fb.ErrUnauthorized
+	}
+
+	directory := NewDirectory(uid)
 	if err := app.directoryRepo.Create(ctx, directory); err != nil {
 		return nil, err
 	}

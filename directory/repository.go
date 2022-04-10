@@ -16,10 +16,10 @@ const (
 )
 
 type MongoDirectory struct {
-	ID     fb.MongoId            `bson:"_id,omitempty"`
-	UserID int32                 `bson:"user_id"`
-	Shared map[string]fb.MongoId `bson:"shared"`
-	Hosted map[string]fb.MongoId `bson:"hosted"`
+	ID     string            `bson:"_id,omitempty"`
+	UserID int32             `bson:"user_id"`
+	Shared map[string]string `bson:"shared"`
+	Hosted map[string]string `bson:"hosted"`
 }
 
 type MongoDirectoryRepository struct {
