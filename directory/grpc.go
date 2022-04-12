@@ -23,15 +23,18 @@ func NewDirectoryServer(app *DirectoryApplication, logger *zap.Logger, authHeade
 	}
 }
 
-func (server *DirectoryServer) Create(ctx context.Context, req *proto.CreateDirRequest) (*proto.CreateDirResponse, error) {
+func (server *DirectoryServer) Create(ctx context.Context, req *proto.NewDirectory) (*proto.DirectoryDescriptor, error) {
 	ctx, err := fb.WithAuth(ctx, server.header, server.logger)
 	if err != nil {
 		return nil, err
 	}
 
-	if _, err := server.app.Create(ctx); err != nil {
+	dir, err := server.app.Create(ctx)
+	if err != nil {
 		return nil, err
 	}
 
-	return &proto.CreateDirResponse{}, nil
+	return &proto.DirectoryDescriptor{
+		Id: dir.id,
+	}, nil
 }

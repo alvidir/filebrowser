@@ -3,6 +3,7 @@ module github.com/alvidir/filebrowser
 go 1.18
 
 require (
+	github.com/asaskevich/EventBus v0.0.0-20200907212545-49d423059eef
 	github.com/joho/godotenv v1.4.0
 	go.mongodb.org/mongo-driver v1.8.4
 	go.uber.org/zap v1.21.0

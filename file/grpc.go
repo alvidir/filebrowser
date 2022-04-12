@@ -12,7 +12,6 @@ type FileServer struct {
 	proto.UnimplementedFileServer
 	app    *FileApplication
 	logger *zap.Logger
-	dirBus chan<- interface{}
 	header string
 }
 
@@ -20,25 +19,11 @@ func NewFileServer(app *FileApplication, authHeader string, logger *zap.Logger) 
 	return &FileServer{
 		app:    app,
 		logger: logger,
-		dirBus: nil,
 		header: authHeader,
 	}
 }
 
-func (server *FileServer) sendFileCreatedEvent(ctx context.Context, fileId, path string) {
-	if server.dirBus == nil {
-		return
-	}
-
-	ctx = context.WithValue(context.Background(), fb.AuthKey, ctx.Value(fb.AuthKey))
-	server.dirBus <- newFileCreatedEvent(ctx, fileId, path)
-}
-
-func (server *FileServer) RegisterDirectoryEventBus(out chan<- interface{}) {
-	server.dirBus = out
-}
-
-func (server *FileServer) Create(ctx context.Context, req *proto.CreateFileRequest) (*proto.CreateFileResponse, error) {
+func (server *FileServer) Create(ctx context.Context, req *proto.NewFile) (*proto.FileDescriptor, error) {
 	ctx, err := fb.WithAuth(ctx, server.header, server.logger)
 	if err != nil {
 		return nil, err
@@ -49,8 +34,11 @@ func (server *FileServer) Create(ctx context.Context, req *proto.CreateFileReque
 		return nil, err
 	}
 
-	server.sendFileCreatedEvent(ctx, file.id, req.Path)
-	return &proto.CreateFileResponse{
+	return &proto.FileDescriptor{
 		Id: file.id,
 	}, nil
+}
+
+func (server *FileServer) Read(ctx context.Context, req *proto.FileDescriptor) (*proto.FileDescriptor, error) {
+	return nil, nil
 }

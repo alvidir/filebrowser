@@ -3,9 +3,12 @@ option go_package = "github.com/alvidir/filebrowser/proto";
 
 package proto;
 
-message CreateDirRequest {}
-message CreateDirResponse {}
+message NewDirectory {}
+
+message DirectoryDescriptor {
+    string id = 1;
+}
 
 service Directory {
-    rpc Create(CreateDirRequest) returns (CreateDirResponse); 
+    rpc Create(NewDirectory) returns (DirectoryDescriptor); 
 }

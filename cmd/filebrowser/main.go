@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"net"
 	"os"
 	"strconv"
@@ -54,17 +53,16 @@ func startServer(lis net.Listener, logger *zap.Logger) {
 	directoryRepo := dir.NewMongoDirectoryRepository(mongoConn, logger)
 	directoryApp := dir.NewDirectoryApplication(directoryRepo, logger)
 	directoryServer := dir.NewDirectoryServer(directoryApp, logger, authHeader)
-	directoryHandler := dir.NewDirectoryEventHandler(directoryApp, logger)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	dirBus := directoryHandler.Run(ctx, chanSize)
 
 	fileRepo := file.NewMongoFileRepository(mongoConn, logger)
 	fileApp := file.NewFileApplication(fileRepo, logger)
 	fileServer := file.NewFileServer(fileApp, authHeader, logger)
-	fileServer.RegisterDirectoryEventBus(dirBus)
+
+	directoryHandler := dir.NewDirectoryEventHandler(directoryApp, logger)
+	if err := fileApp.Subscribe(directoryHandler); err != nil {
+		logger.Fatal("failed subscribing directory to files events",
+			zap.Error(err))
+	}
 
 	grpcSrv := grpc.NewServer()
 	proto.RegisterDirectoryServer(grpcSrv, directoryServer)
