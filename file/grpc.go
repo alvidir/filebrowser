@@ -24,12 +24,12 @@ func NewFileServer(app *FileApplication, authHeader string, logger *zap.Logger) 
 }
 
 func (server *FileServer) Create(ctx context.Context, req *proto.NewFile) (*proto.FileDescriptor, error) {
-	ctx, err := fb.WithAuth(ctx, server.header, server.logger)
+	uid, err := fb.GetUid(ctx, server.header, server.logger)
 	if err != nil {
 		return nil, err
 	}
 
-	file, err := server.app.Create(ctx, req.Path, req.Data, req.Metadata)
+	file, err := server.app.Create(ctx, uid, req.Path, req.Data, req.Metadata)
 	if err != nil {
 		return nil, err
 	}

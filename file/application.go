@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	fb "github.com/alvidir/filebrowser"
 	eb "github.com/asaskevich/EventBus"
 	"go.uber.org/zap"
 )
@@ -21,7 +20,7 @@ type FileRepository interface {
 }
 
 type FileEventHandler interface {
-	OnFileCreated(ctx context.Context, fileId, path string)
+	OnFileCreated(uid int32, fileId, path string)
 }
 
 type FileApplication struct {
@@ -38,19 +37,18 @@ func NewFileApplication(repo FileRepository, logger *zap.Logger) *FileApplicatio
 	}
 }
 
+func (app *FileApplication) publishEvent(topic string, args ...interface{}) {
+	app.bus.Publish(eventFileCreated, args...)
+}
+
 func (app *FileApplication) Subscribe(handler FileEventHandler) error {
 	return app.bus.SubscribeAsync(eventFileCreated, handler.OnFileCreated, false)
 }
 
-func (app *FileApplication) Create(ctx context.Context, fpath string, data []byte, meta Metadata) (*File, error) {
+func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string, data []byte, meta Metadata) (*File, error) {
 	app.logger.Info("processing a \"create\" file request",
-		zap.Any(fb.AuthKey, ctx.Value(fb.AuthKey)),
-		zap.String("path", fpath))
-
-	uid, err := fb.GetUid(ctx, app.logger)
-	if err != nil {
-		return nil, err
-	}
+		zap.String("path", fpath),
+		zap.Any("uid", uid))
 
 	permissions := make(Permissions)
 	permissions[uid] = Read | Write | Share | Owner
@@ -66,6 +64,6 @@ func (app *FileApplication) Create(ctx context.Context, fpath string, data []byt
 		return nil, err
 	}
 
-	app.bus.Publish(eventFileCreated, ctx, file.id, fpath)
+	app.publishEvent(eventFileCreated, uid, file.id, fpath)
 	return file, nil
 }

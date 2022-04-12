@@ -3,7 +3,6 @@ package directory
 import (
 	"context"
 
-	fb "github.com/alvidir/filebrowser"
 	"go.uber.org/zap"
 )
 
@@ -19,9 +18,10 @@ func NewDirectoryEventHandler(app *DirectoryApplication, logger *zap.Logger) *Di
 	}
 }
 
-func (handler *DirectoryEventHandler) OnFileCreated(ctx context.Context, fileId, path string) {
+func (handler *DirectoryEventHandler) OnFileCreated(uid int32, fileId, path string) {
 	handler.logger.Info("processing a \"file created\" event",
-		zap.Any(fb.AuthKey, ctx.Value(fb.AuthKey)))
+		zap.Any("uid", uid))
 
-	handler.app.AddFile(ctx, fileId, path, false)
+	ctx := context.Background()
+	handler.app.AddFile(ctx, uid, fileId, path, false)
 }

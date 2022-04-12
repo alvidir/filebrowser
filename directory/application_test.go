@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/alvidir/filebrowser"
-	fb "github.com/alvidir/filebrowser"
 	"go.uber.org/zap"
 )
 
@@ -59,8 +58,7 @@ func TestDirectoryApplication_create(t *testing.T) {
 	app := NewDirectoryApplication(repo, logger)
 
 	var want int32 = 999
-	ctx := context.WithValue(context.TODO(), fb.AuthKey, want)
-	dir, err := app.Create(ctx)
+	dir, err := app.Create(context.TODO(), want)
 	if err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
 	}

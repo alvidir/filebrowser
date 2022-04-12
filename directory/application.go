@@ -3,7 +3,6 @@ package directory
 import (
 	"context"
 
-	fb "github.com/alvidir/filebrowser"
 	"go.uber.org/zap"
 )
 
@@ -25,14 +24,9 @@ func NewDirectoryApplication(repo DirectoryRepository, logger *zap.Logger) *Dire
 	}
 }
 
-func (app *DirectoryApplication) Create(ctx context.Context) (*Directory, error) {
+func (app *DirectoryApplication) Create(ctx context.Context, uid int32) (*Directory, error) {
 	app.logger.Info("processing a \"create\" directory request",
-		zap.Any(fb.AuthKey, ctx.Value(fb.AuthKey)))
-
-	uid, err := fb.GetUid(ctx, app.logger)
-	if err != nil {
-		return nil, err
-	}
+		zap.Any("uid", uid))
 
 	directory := NewDirectory(uid)
 	if err := app.repo.Create(ctx, directory); err != nil {
@@ -42,14 +36,9 @@ func (app *DirectoryApplication) Create(ctx context.Context) (*Directory, error)
 	return directory, nil
 }
 
-func (app *DirectoryApplication) AddFile(ctx context.Context, fileId, path string, shared bool) error {
+func (app *DirectoryApplication) AddFile(ctx context.Context, uid int32, fileId, path string, shared bool) error {
 	app.logger.Info("processing an \"add file\" request",
-		zap.Any(fb.AuthKey, ctx.Value(fb.AuthKey)))
-
-	uid, err := fb.GetUid(ctx, app.logger)
-	if err != nil {
-		return err
-	}
+		zap.Any("uid", uid))
 
 	dir, err := app.repo.FindByUserId(ctx, uid)
 	if err != nil {

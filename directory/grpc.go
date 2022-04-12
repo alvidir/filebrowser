@@ -24,12 +24,12 @@ func NewDirectoryServer(app *DirectoryApplication, logger *zap.Logger, authHeade
 }
 
 func (server *DirectoryServer) Create(ctx context.Context, req *proto.NewDirectory) (*proto.DirectoryDescriptor, error) {
-	ctx, err := fb.WithAuth(ctx, server.header, server.logger)
+	uid, err := fb.GetUid(ctx, server.header, server.logger)
 	if err != nil {
 		return nil, err
 	}
 
-	dir, err := server.app.Create(ctx)
+	dir, err := server.app.Create(ctx, uid)
 	if err != nil {
 		return nil, err
 	}
