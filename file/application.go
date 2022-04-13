@@ -59,7 +59,7 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 
 	meta[metaCreatedAtKey] = strconv.FormatInt(time.Now().Unix(), 16)
 
-	file := NewFile(path.Base(fpath), data, permissions, meta)
+	file := NewFile("", path.Base(fpath), data, permissions, meta)
 	if err := app.repo.Create(ctx, file); err != nil {
 		return nil, err
 	}

@@ -2,7 +2,9 @@ package directory
 
 import (
 	"context"
+	"path"
 
+	"github.com/alvidir/filebrowser/file"
 	"go.uber.org/zap"
 )
 
@@ -36,7 +38,7 @@ func (app *DirectoryApplication) Create(ctx context.Context, uid int32) (*Direct
 	return directory, nil
 }
 
-func (app *DirectoryApplication) AddFile(ctx context.Context, uid int32, fileId, path string, shared bool) error {
+func (app *DirectoryApplication) AddFile(ctx context.Context, uid int32, fileId, fpath string, shared bool) error {
 	app.logger.Info("processing an \"add file\" request",
 		zap.Any("uid", uid))
 
@@ -45,6 +47,9 @@ func (app *DirectoryApplication) AddFile(ctx context.Context, uid int32, fileId,
 		return err
 	}
 
-	dir.addFile(fileId, path, shared)
+	base := path.Base(fpath)
+	file := file.NewFile(fileId, base, nil, nil, nil)
+	dir.AddFile(file, fpath)
+
 	return app.repo.Save(ctx, dir)
 }

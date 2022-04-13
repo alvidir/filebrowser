@@ -3,8 +3,10 @@ package directory
 import (
 	"context"
 	"errors"
+	"path"
 
 	fb "github.com/alvidir/filebrowser"
+	"github.com/alvidir/filebrowser/file"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -18,8 +20,7 @@ const (
 type mongoDirectory struct {
 	ID     primitive.ObjectID            `bson:"_id,omitempty"`
 	UserID int32                         `bson:"user_id"`
-	Shared map[string]primitive.ObjectID `bson:"shared"`
-	Hosted map[string]primitive.ObjectID `bson:"hosted"`
+	Files  map[string]primitive.ObjectID `bson:"files"`
 }
 
 func newMongoDirectory(dir *Directory, logger *zap.Logger) (*mongoDirectory, error) {
@@ -36,38 +37,22 @@ func newMongoDirectory(dir *Directory, logger *zap.Logger) (*mongoDirectory, err
 	mongoDir := &mongoDirectory{
 		ID:     oid,
 		UserID: dir.userId,
-		Shared: make(map[string]primitive.ObjectID),
-		Hosted: make(map[string]primitive.ObjectID),
+		Files:  make(map[string]primitive.ObjectID),
 	}
 
-	for fpath, fileId := range dir.shared {
-		oid, err := primitive.ObjectIDFromHex(fileId)
+	for fpath, file := range dir.files {
+		oid, err := primitive.ObjectIDFromHex(file.Id())
 		if err != nil {
 			logger.Error("parsing file id to ObjectID",
 				zap.String("directory", dir.id),
-				zap.String("file", fileId),
+				zap.String("file", file.Id()),
 				zap.Int32("user", dir.userId),
 				zap.Error(err))
 
 			continue
 		}
 
-		mongoDir.Shared[fpath] = oid
-	}
-
-	for fpath, fileId := range dir.hosted {
-		oid, err := primitive.ObjectIDFromHex(fileId)
-		if err != nil {
-			logger.Error("parsing file id to ObjectID",
-				zap.String("directory", dir.id),
-				zap.String("file", fileId),
-				zap.Int32("user", dir.userId),
-				zap.Error(err))
-
-			continue
-		}
-
-		mongoDir.Hosted[fpath] = oid
+		mongoDir.Files[fpath] = oid
 	}
 
 	return mongoDir, nil
@@ -77,16 +62,12 @@ func (mdir *mongoDirectory) build() *Directory {
 	dir := &Directory{
 		id:     mdir.ID.Hex(),
 		userId: mdir.UserID,
-		shared: make(map[string]string),
-		hosted: make(map[string]string),
+		files:  make(map[string]*file.File),
 	}
 
-	for fpath, oid := range mdir.Shared {
-		dir.shared[fpath] = oid.Hex()
-	}
-
-	for fpath, oid := range mdir.Hosted {
-		dir.hosted[fpath] = oid.Hex()
+	for fpath, oid := range mdir.Files {
+		base := path.Base(fpath)
+		dir.files[fpath] = file.NewFile(oid.Hex(), base, nil, nil, nil)
 	}
 
 	return dir

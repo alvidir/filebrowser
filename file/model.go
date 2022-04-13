@@ -21,13 +21,21 @@ type File struct {
 	data        []byte
 }
 
-func NewFile(filename string, data []byte, perm Permissions, meta Metadata) *File {
+func NewFile(id string, filename string, data []byte, perm Permissions, meta Metadata) *File {
 	return &File{
-		id:          "",
+		id:          id,
 		name:        filename,
 		metadata:    meta,
 		permissions: perm,
 		flags:       Private,
 		data:        data,
 	}
+}
+
+func (file *File) Id() string {
+	return file.id
+}
+
+func (file *File) Name() string {
+	return file.name
 }
