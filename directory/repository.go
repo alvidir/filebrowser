@@ -67,8 +67,7 @@ func (mdir *mongoDirectory) build() *Directory {
 
 	for fpath, oid := range mdir.Files {
 		base := path.Base(fpath)
-		dir.files[fpath] = file.NewFile(base, nil)
-		dir.files[fpath].SetId(oid.Hex())
+		dir.files[fpath] = file.NewFile(oid.Hex(), base, nil)
 	}
 
 	return dir
@@ -101,8 +100,8 @@ func (repo *MongoDirectoryRepository) FindByUserId(ctx context.Context, userId i
 }
 
 func (repo *MongoDirectoryRepository) Create(ctx context.Context, dir *Directory) error {
-	var mongoDirectory mongoDirectory
-	err := repo.conn.FindOne(ctx, bson.M{"user_id": dir.userId}).Decode(&mongoDirectory)
+	var d mongoDirectory
+	err := repo.conn.FindOne(ctx, bson.M{"user_id": dir.userId}).Decode(&d)
 	if err == nil {
 		return fb.ErrAlreadyExists
 	}
@@ -115,8 +114,12 @@ func (repo *MongoDirectoryRepository) Create(ctx context.Context, dir *Directory
 		return fb.ErrUnknown
 	}
 
-	mongoDirectory.UserID = dir.userId
-	res, err := repo.conn.InsertOne(ctx, mongoDirectory)
+	mdir, err := newMongoDirectory(dir, repo.logger)
+	if err != nil {
+		return err
+	}
+
+	res, err := repo.conn.InsertOne(ctx, mdir)
 	if err != nil {
 		repo.logger.Error("performing insert one on mongo",
 			zap.Int32("user", dir.userId),

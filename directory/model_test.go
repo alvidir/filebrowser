@@ -11,8 +11,7 @@ func TestDirectoryModel_AddFile(t *testing.T) {
 	subject := NewDirectory(0)
 	dest := "path/to/filename"
 
-	f := file.NewFile("test", nil)
-	f.SetId("111")
+	f := file.NewFile("111", "test", nil)
 
 	want := dest
 	if got := subject.AddFile(f, dest); got != want {

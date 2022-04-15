@@ -23,7 +23,7 @@ func NewDirectoryServer(app *DirectoryApplication, logger *zap.Logger, authHeade
 	}
 }
 
-func (server *DirectoryServer) Create(ctx context.Context, req *proto.NewDirectory) (*proto.DirectoryDescriptor, error) {
+func (server *DirectoryServer) Create(ctx context.Context, req *proto.Empty) (*proto.DirectoryDescriptor, error) {
 	uid, err := fb.GetUid(ctx, server.header, server.logger)
 	if err != nil {
 		return nil, err
@@ -34,7 +34,29 @@ func (server *DirectoryServer) Create(ctx context.Context, req *proto.NewDirecto
 		return nil, err
 	}
 
-	return &proto.DirectoryDescriptor{
-		Id: dir.id,
-	}, nil
+	descriptor := &proto.DirectoryDescriptor{
+		Id:    dir.id,
+		Files: dir.List(),
+	}
+
+	return descriptor, nil
+}
+
+func (server *DirectoryServer) Get(ctx context.Context, req *proto.Empty) (*proto.DirectoryDescriptor, error) {
+	uid, err := fb.GetUid(ctx, server.header, server.logger)
+	if err != nil {
+		return nil, err
+	}
+
+	dir, err := server.app.Get(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+
+	descriptor := &proto.DirectoryDescriptor{
+		Id:    dir.id,
+		Files: dir.List(),
+	}
+
+	return descriptor, nil
 }

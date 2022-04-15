@@ -52,6 +52,7 @@ func (handler *fileEventHandlerMock) OnFileCreated(file *File, uid int32, path s
 
 type fileRepositoryMock struct {
 	create func(ctx context.Context, dir *File) error
+	find   func(ctx context.Context, id string) (*File, error)
 }
 
 func (mock *fileRepositoryMock) Create(ctx context.Context, file *File) error {
@@ -61,6 +62,10 @@ func (mock *fileRepositoryMock) Create(ctx context.Context, file *File) error {
 
 	file.id = mockFileId
 	return nil
+}
+
+func (mock *fileRepositoryMock) Find(ctx context.Context, id string) (*File, error) {
+	return nil, nil
 }
 
 func TestFileApplication_create(t *testing.T) {

@@ -39,6 +39,28 @@ func (server *FileServer) Create(ctx context.Context, req *proto.NewFile) (*prot
 	}, nil
 }
 
-func (server *FileServer) Read(ctx context.Context, req *proto.FileDescriptor) (*proto.FileDescriptor, error) {
-	return nil, nil
+func (server *FileServer) Get(ctx context.Context, req *proto.FileDescriptor) (*proto.FileDescriptor, error) {
+	uid, err := fb.GetUid(ctx, server.header, server.logger)
+	if err != nil {
+		return nil, err
+	}
+
+	file, err := server.app.Get(ctx, uid, req.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	descriptor := &proto.FileDescriptor{
+		Id:          file.id,
+		Name:        file.name,
+		Metadata:    file.metadata,
+		Permissions: make(map[int32]int32),
+		Data:        file.data,
+	}
+
+	for uid, perm := range file.permissions {
+		descriptor.Permissions[uid] = int32(perm)
+	}
+
+	return descriptor, nil
 }

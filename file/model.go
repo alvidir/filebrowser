@@ -1,12 +1,11 @@
 package file
 
 const (
-	Public  = 0x01
-	Private = 0x02
-	Read    = 0x04
-	Write   = 0x08
-	Share   = 0x16
-	Owner   = 0x32
+	Public = 0x01
+	Read   = 0x02
+	Write  = 0x04
+	Grant  = 0x08
+	Owner  = 0x16
 )
 
 type Metadata map[string]string
@@ -21,13 +20,13 @@ type File struct {
 	data        []byte
 }
 
-func NewFile(filename string, data []byte) *File {
+func NewFile(id string, filename string, data []byte) *File {
 	return &File{
-		id:          "",
+		id:          id,
 		name:        filename,
 		metadata:    make(Metadata),
 		permissions: make(Permissions),
-		flags:       Private,
+		flags:       0,
 		data:        data,
 	}
 }
@@ -49,7 +48,7 @@ func (file *File) Value(key string) (value string, exists bool) {
 }
 
 func (file *File) Permissions(uid int32) (perm uint8) {
-	if file.permissions == nil {
+	if file.permissions != nil {
 		perm = file.permissions[uid]
 	}
 
@@ -57,15 +56,19 @@ func (file *File) Permissions(uid int32) (perm uint8) {
 }
 
 func (file *File) AddPermissions(uid int32, perm uint8) {
+	if file.permissions == nil {
+		file.permissions = make(Permissions)
+	}
+
 	file.permissions[uid] |= perm
 }
 
 func (file *File) AddValue(key string, value string) (old string, exists bool) {
+	if file.metadata != nil {
+		file.metadata = make(Metadata)
+	}
+
 	old, exists = file.metadata[key]
 	file.metadata[key] = value
 	return
-}
-
-func (file *File) SetId(id string) {
-	file.id = id
 }

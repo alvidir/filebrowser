@@ -39,3 +39,16 @@ func (dir *Directory) AddFile(file *file.File, path string) string {
 	dir.files[path] = file
 	return path
 }
+
+func (dir *Directory) List() map[string]string {
+	list := make(map[string]string)
+	if dir.files == nil {
+		return list
+	}
+
+	for path, file := range dir.files {
+		list[path] = file.Id()
+	}
+
+	return list
+}

@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	fb "github.com/alvidir/filebrowser"
 	eb "github.com/asaskevich/EventBus"
 	"go.uber.org/zap"
 )
@@ -17,6 +18,7 @@ const (
 
 type FileRepository interface {
 	Create(ctx context.Context, file *File) error
+	Find(context.Context, string) (*File, error)
 }
 
 type FileEventHandler interface {
@@ -56,14 +58,43 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 
 	meta[metaCreatedAtKey] = strconv.FormatInt(time.Now().Unix(), 16)
 
-	file := NewFile(path.Base(fpath), data)
+	file := NewFile("", path.Base(fpath), data)
 	file.metadata = meta
 
 	if err := app.repo.Create(ctx, file); err != nil {
 		return nil, err
 	}
 
-	file.AddPermissions(uid, Read|Write|Share|Owner)
+	file.AddPermissions(uid, Read|Write|Grant|Owner)
 	app.publishEvent(eventFileCreated, file, uid, fpath)
+	return file, nil
+}
+
+func (app *FileApplication) Get(ctx context.Context, uid int32, fid string) (*File, error) {
+	app.logger.Info("processing a \"get\" file request",
+		zap.String("fileid", fid),
+		zap.Any("uid", uid))
+
+	file, err := app.repo.Find(ctx, fid)
+	if err != nil {
+		return nil, err
+	}
+
+	perm := file.Permissions(uid)
+	if file.flags&Public == 0 && (perm&Read == 0 || perm&Owner == 0) {
+		return nil, fb.ErrNotAvailable
+	}
+
+	if perm&Owner > 0 || perm&Grant > 0 {
+		return file, nil
+	}
+
+	for uid, p := range file.permissions {
+		// list non-owner users if, and only if, the client has Grant permission
+		if p&Owner == 0 && perm&Grant == 0 {
+			delete(file.permissions, uid)
+		}
+	}
+
 	return file, nil
 }

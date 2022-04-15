@@ -37,6 +37,18 @@ func (app *DirectoryApplication) Create(ctx context.Context, uid int32) (*Direct
 	return directory, nil
 }
 
+func (app *DirectoryApplication) Get(ctx context.Context, uid int32) (*Directory, error) {
+	app.logger.Info("processing a \"get\" directory request",
+		zap.Any("uid", uid))
+
+	dir, err := app.repo.FindByUserId(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+
+	return dir, nil
+}
+
 func (app *DirectoryApplication) addFile(ctx context.Context, file *file.File, uid int32, fpath string) error {
 	app.logger.Info("processing an \"add file\" request",
 		zap.Any("uid", uid))
