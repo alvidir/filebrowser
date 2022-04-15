@@ -78,6 +78,10 @@ func TestFileApplication_create(t *testing.T) {
 	data := []byte{1, 2, 3, 4}
 	meta := make(Metadata)
 
+	customFieldKey := "custom_field"
+	customFieldValue := "custom value"
+	meta[customFieldKey] = customFieldValue
+
 	before := time.Now().Unix()
 	file, err := app.Create(context.Background(), userId, fpath, data, meta)
 	after := time.Now().Unix()
@@ -101,6 +105,13 @@ func TestFileApplication_create(t *testing.T) {
 		t.Errorf("got error = %v, want = %v", err, nil)
 	} else if unixCreatedAt < before || unixCreatedAt > after {
 		t.Errorf("got created_at = %v, want > %v && < %v", unixCreatedAt, before, after)
+	}
+
+	customField, exists := file.Value(customFieldKey)
+	if !exists {
+		t.Errorf("metadata custom_field does not exists")
+	} else if customField != customFieldValue {
+		t.Errorf("got custom field = %v, want = %v", customField, customFieldValue)
 	}
 
 	ticker := time.NewTicker(10 * time.Second)
