@@ -27,7 +27,7 @@ func (dir *Directory) getAvailablePath(dest string) string {
 
 	counter := 1
 	for _, exists := dir.files[dest]; exists; _, exists = dir.files[dest] {
-		dest = path.Join(directory, fmt.Sprintf("%s_%v", filename, counter))
+		dest = path.Join(directory, fmt.Sprintf("%s (%v)", filename, counter))
 		counter++
 	}
 

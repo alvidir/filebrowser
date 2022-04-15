@@ -24,12 +24,12 @@ func TestDirectoryModel_AddFile(t *testing.T) {
 		t.Errorf("got file name = %s, want = %v", got, f.Name())
 	}
 
-	want = fmt.Sprintf("%s_1", dest)
+	want = fmt.Sprintf("%s (1)", dest)
 	if got := subject.AddFile(f, dest); got != want {
 		t.Errorf("got available destination = %s, want = %v", got, want)
 	}
 
-	want = fmt.Sprintf("%s_2", dest)
+	want = fmt.Sprintf("%s (2)", dest)
 	if got := subject.AddFile(f, dest); got != want {
 		t.Errorf("got available destination = %s, want = %v", got, want)
 	}
