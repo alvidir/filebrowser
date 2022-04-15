@@ -63,11 +63,11 @@ func TestDirectoryApplication_create(t *testing.T) {
 		t.Errorf("got error = %v, want = %v", err, nil)
 	}
 
-	if got := dir.userId; got != want {
-		t.Errorf("got directory.userId = %v, want = %v", got, want)
-	}
-
 	if got := dir.id; got != mockDirectoryId {
 		t.Errorf("got directory.id = %v, want = %v", got, mockDirectoryId)
+	}
+
+	if got := dir.userId; got != want {
+		t.Errorf("got directory.userId = %v, want = %v", got, want)
 	}
 }

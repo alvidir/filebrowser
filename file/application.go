@@ -20,7 +20,7 @@ type FileRepository interface {
 }
 
 type FileEventHandler interface {
-	OnFileCreated(uid int32, fileId, path string)
+	OnFileCreated(file *File, uid int32, path string)
 }
 
 type FileApplication struct {
@@ -50,20 +50,20 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 		zap.String("path", fpath),
 		zap.Any("uid", uid))
 
-	permissions := make(Permissions)
-	permissions[uid] = Read | Write | Share | Owner
-
 	if meta == nil {
 		meta = make(Metadata)
 	}
 
 	meta[metaCreatedAtKey] = strconv.FormatInt(time.Now().Unix(), 16)
 
-	file := NewFile("", path.Base(fpath), data, permissions, meta)
+	file := NewFile(path.Base(fpath), data)
+	file.metadata = meta
+
 	if err := app.repo.Create(ctx, file); err != nil {
 		return nil, err
 	}
 
-	app.publishEvent(eventFileCreated, uid, file.id, fpath)
+	file.AddPermissions(uid, Read|Write|Share|Owner)
+	app.publishEvent(eventFileCreated, file, uid, fpath)
 	return file, nil
 }

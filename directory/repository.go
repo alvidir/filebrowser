@@ -67,7 +67,8 @@ func (mdir *mongoDirectory) build() *Directory {
 
 	for fpath, oid := range mdir.Files {
 		base := path.Base(fpath)
-		dir.files[fpath] = file.NewFile(oid.Hex(), base, nil, nil, nil)
+		dir.files[fpath] = file.NewFile(base, nil)
+		dir.files[fpath].SetId(oid.Hex())
 	}
 
 	return dir

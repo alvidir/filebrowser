@@ -21,12 +21,12 @@ type File struct {
 	data        []byte
 }
 
-func NewFile(id string, filename string, data []byte, perm Permissions, meta Metadata) *File {
+func NewFile(filename string, data []byte) *File {
 	return &File{
-		id:          id,
+		id:          "",
 		name:        filename,
-		metadata:    meta,
-		permissions: perm,
+		metadata:    make(Metadata),
+		permissions: make(Permissions),
 		flags:       Private,
 		data:        data,
 	}
@@ -38,4 +38,34 @@ func (file *File) Id() string {
 
 func (file *File) Name() string {
 	return file.name
+}
+
+func (file *File) Value(key string) (value string, exists bool) {
+	if file.metadata != nil {
+		value, exists = file.metadata[key]
+	}
+
+	return
+}
+
+func (file *File) Permissions(uid int32) (perm uint8) {
+	if file.permissions == nil {
+		perm = file.permissions[uid]
+	}
+
+	return
+}
+
+func (file *File) AddPermissions(uid int32, perm uint8) {
+	file.permissions[uid] |= perm
+}
+
+func (file *File) AddValue(key string, value string) (old string, exists bool) {
+	old, exists = file.metadata[key]
+	file.metadata[key] = value
+	return
+}
+
+func (file *File) SetId(id string) {
+	file.id = id
 }

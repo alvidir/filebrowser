@@ -2,13 +2,20 @@ package directory
 
 import (
 	"context"
+	"time"
 
+	"github.com/alvidir/filebrowser/file"
 	"go.uber.org/zap"
 )
 
+const (
+	defaultTimeout = 10_000 * time.Millisecond
+)
+
 type DirectoryEventHandler struct {
-	app    *DirectoryApplication
-	logger *zap.Logger
+	Timeout time.Duration
+	app     *DirectoryApplication
+	logger  *zap.Logger
 }
 
 func NewDirectoryEventHandler(app *DirectoryApplication, logger *zap.Logger) *DirectoryEventHandler {
@@ -18,10 +25,12 @@ func NewDirectoryEventHandler(app *DirectoryApplication, logger *zap.Logger) *Di
 	}
 }
 
-func (handler *DirectoryEventHandler) OnFileCreated(uid int32, fileId, path string) {
+func (handler *DirectoryEventHandler) OnFileCreated(file *file.File, uid int32, path string) {
 	handler.logger.Info("processing a \"file created\" event",
 		zap.Any("uid", uid))
 
-	ctx := context.Background()
-	handler.app.AddFile(ctx, uid, fileId, path, false)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	handler.app.addFile(ctx, file, uid, path)
 }

@@ -9,8 +9,10 @@ import (
 
 func TestDirectoryModel_AddFile(t *testing.T) {
 	subject := NewDirectory(0)
-	f := file.NewFile("111", "test", nil, nil, nil)
 	dest := "path/to/filename"
+
+	f := file.NewFile("test", nil)
+	f.SetId("111")
 
 	want := dest
 	if got := subject.AddFile(f, dest); got != want {
