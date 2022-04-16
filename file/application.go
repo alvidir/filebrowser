@@ -73,7 +73,7 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 func (app *FileApplication) Get(ctx context.Context, uid int32, fid string) (*File, error) {
 	app.logger.Info("processing a \"get\" file request",
 		zap.String("fileid", fid),
-		zap.Any("uid", uid))
+		zap.Int32("uid", uid))
 
 	file, err := app.repo.Find(ctx, fid)
 	if err != nil {
@@ -81,18 +81,18 @@ func (app *FileApplication) Get(ctx context.Context, uid int32, fid string) (*Fi
 	}
 
 	perm := file.Permissions(uid)
-	if file.flags&Public == 0 && (perm&Read == 0 || perm&Owner == 0) {
+	if file.flags&Public == 0 && perm&Read == 0 && perm&Owner == 0 {
 		return nil, fb.ErrNotAvailable
 	}
 
-	if perm&Owner > 0 || perm&Grant > 0 {
+	if file.flags&Public > 0 || perm&Owner > 0 || perm&Grant > 0 {
 		return file, nil
 	}
 
-	for uid, p := range file.permissions {
+	for id, p := range file.permissions {
 		// list non-owner users if, and only if, the client has Grant permission
-		if p&Owner == 0 && perm&Grant == 0 {
-			delete(file.permissions, uid)
+		if id != uid && p&Owner == 0 && perm&Grant == 0 {
+			delete(file.permissions, id)
 		}
 	}
 

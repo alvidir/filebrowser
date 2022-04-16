@@ -27,7 +27,7 @@ func NewDirectoryApplication(repo DirectoryRepository, logger *zap.Logger) *Dire
 
 func (app *DirectoryApplication) Create(ctx context.Context, uid int32) (*Directory, error) {
 	app.logger.Info("processing a \"create\" directory request",
-		zap.Any("uid", uid))
+		zap.Int32("uid", uid))
 
 	directory := NewDirectory(uid)
 	if err := app.repo.Create(ctx, directory); err != nil {

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	fb "github.com/alvidir/filebrowser"
 	"go.uber.org/zap"
 )
 
@@ -65,7 +66,11 @@ func (mock *fileRepositoryMock) Create(ctx context.Context, file *File) error {
 }
 
 func (mock *fileRepositoryMock) Find(ctx context.Context, id string) (*File, error) {
-	return nil, nil
+	if mock.find != nil {
+		return mock.find(ctx, id)
+	}
+
+	return nil, fb.ErrNotFound
 }
 
 func TestFileApplication_create(t *testing.T) {
@@ -136,4 +141,71 @@ func TestFileApplication_create(t *testing.T) {
 	case <-ticker.C:
 		t.Errorf("timeout exceed")
 	}
+}
+
+func TestFileApplication_get(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	f := &File{
+		id:          "123",
+		name:        "example.test",
+		metadata:    make(Metadata),
+		permissions: Permissions{111: Owner, 222: Read, 333: Grant | Read},
+		data:        []byte{},
+		flags:       0,
+	}
+
+	repo := &fileRepositoryMock{
+		find: func(ctx context.Context, id string) (*File, error) {
+			return f, nil
+		},
+	}
+
+	app := NewFileApplication(repo, logger)
+	file, err := app.Get(context.Background(), 111, "")
+	if err != nil {
+		t.Errorf("got error = %v, want = %v", err, nil)
+		return
+	}
+
+	if len(file.permissions) != len(f.permissions) {
+		t.Errorf("got permissions = %+v, want = %+v", file.permissions, f.permissions)
+	}
+
+	file, err = app.Get(context.Background(), 333, "")
+	if err != nil {
+		t.Errorf("got error = %v, want = %v", err, nil)
+		return
+	}
+
+	if len(file.permissions) != len(f.permissions) {
+		t.Errorf("got permissions = %+v, want = %+v", file.permissions, f.permissions)
+	}
+
+	file, err = app.Get(context.Background(), 222, "")
+	if err != nil {
+		t.Errorf("got error = %v, want = %v", err, nil)
+		return
+	}
+
+	want := Permissions{111: Owner, 222: Read}
+	if _, exists := file.permissions[333]; exists {
+		t.Errorf("got permission = %v, want = %v", file.permissions, want)
+	}
+
+	file.flags = Public
+	file, err = app.Get(context.Background(), 444, "")
+	if err != nil {
+		t.Errorf("got error = %v, want = %v", err, nil)
+		return
+	}
+
+	file.flags = 0
+	file, err = app.Get(context.Background(), 444, "")
+	if err == nil {
+		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)
+		return
+	}
+
 }

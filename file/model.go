@@ -5,7 +5,7 @@ const (
 	Read   = 0x02
 	Write  = 0x04
 	Grant  = 0x08
-	Owner  = 0x16
+	Owner  = 0x10
 )
 
 type Metadata map[string]string
@@ -64,7 +64,7 @@ func (file *File) AddPermissions(uid int32, perm uint8) {
 }
 
 func (file *File) AddValue(key string, value string) (old string, exists bool) {
-	if file.metadata != nil {
+	if file.metadata == nil {
 		file.metadata = make(Metadata)
 	}
 
