@@ -52,13 +52,14 @@ func (handler *fileEventHandlerMock) OnFileCreated(file *File, uid int32, path s
 }
 
 type fileRepositoryMock struct {
-	create func(ctx context.Context, dir *File) error
-	find   func(ctx context.Context, id string) (*File, error)
+	create func(repo *fileRepositoryMock, ctx context.Context, dir *File) error
+	find   func(repo *fileRepositoryMock, ctx context.Context, id string) (*File, error)
+	flags  uint8
 }
 
 func (mock *fileRepositoryMock) Create(ctx context.Context, file *File) error {
 	if mock.create != nil {
-		return mock.create(ctx, file)
+		return mock.create(mock, ctx, file)
 	}
 
 	file.id = mockFileId
@@ -67,7 +68,7 @@ func (mock *fileRepositoryMock) Create(ctx context.Context, file *File) error {
 
 func (mock *fileRepositoryMock) Find(ctx context.Context, id string) (*File, error) {
 	if mock.find != nil {
-		return mock.find(ctx, id)
+		return mock.find(mock, ctx, id)
 	}
 
 	return nil, fb.ErrNotFound
@@ -147,18 +148,16 @@ func TestFileApplication_get(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 
-	f := &File{
-		id:          "123",
-		name:        "example.test",
-		metadata:    make(Metadata),
-		permissions: Permissions{111: Owner, 222: Read, 333: Grant | Read},
-		data:        []byte{},
-		flags:       0,
-	}
-
 	repo := &fileRepositoryMock{
-		find: func(ctx context.Context, id string) (*File, error) {
-			return f, nil
+		find: func(repo *fileRepositoryMock, ctx context.Context, id string) (*File, error) {
+			return &File{
+				id:          "123",
+				name:        "example.test",
+				metadata:    make(Metadata),
+				permissions: Permissions{111: Owner, 222: Read, 333: Grant | Read},
+				data:        []byte{},
+				flags:       repo.flags,
+			}, nil
 		},
 	}
 
@@ -169,8 +168,9 @@ func TestFileApplication_get(t *testing.T) {
 		return
 	}
 
-	if len(file.permissions) != len(f.permissions) {
-		t.Errorf("got permissions = %+v, want = %+v", file.permissions, f.permissions)
+	want := Permissions{111: Owner, 222: Read, 333: Grant | Read}
+	if len(file.permissions) != len(want) {
+		t.Errorf("got permissions = %+v, want = %+v", file.permissions, want)
 	}
 
 	file, err = app.Get(context.Background(), 333, "")
@@ -179,8 +179,8 @@ func TestFileApplication_get(t *testing.T) {
 		return
 	}
 
-	if len(file.permissions) != len(f.permissions) {
-		t.Errorf("got permissions = %+v, want = %+v", file.permissions, f.permissions)
+	if len(file.permissions) != len(want) {
+		t.Errorf("got permissions = %+v, want = %+v", file.permissions, want)
 	}
 
 	file, err = app.Get(context.Background(), 222, "")
@@ -189,19 +189,24 @@ func TestFileApplication_get(t *testing.T) {
 		return
 	}
 
-	want := Permissions{111: Owner, 222: Read}
+	want = Permissions{111: Owner, 222: Read}
 	if _, exists := file.permissions[333]; exists {
 		t.Errorf("got permission = %v, want = %v", file.permissions, want)
 	}
 
-	file.flags = Public
+	repo.flags = Public
 	file, err = app.Get(context.Background(), 444, "")
 	if err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
 		return
 	}
 
-	file.flags = 0
+	want = Permissions{111: Owner}
+	if len(file.permissions) != len(want) {
+		t.Errorf("got permissions = %+v, want = %+v", file.permissions, want)
+	}
+
+	repo.flags = 0
 	file, err = app.Get(context.Background(), 444, "")
 	if err == nil {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)

@@ -85,7 +85,7 @@ func (app *FileApplication) Get(ctx context.Context, uid int32, fid string) (*Fi
 		return nil, fb.ErrNotAvailable
 	}
 
-	if file.flags&Public > 0 || perm&Owner > 0 || perm&Grant > 0 {
+	if perm&Owner > 0 || perm&Grant > 0 {
 		return file, nil
 	}
 
