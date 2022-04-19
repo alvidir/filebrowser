@@ -81,7 +81,7 @@ func (app *FileApplication) Get(ctx context.Context, uid int32, fid string) (*Fi
 	}
 
 	perm := file.Permissions(uid)
-	if file.flags&Public == 0 && perm&Read == 0 && perm&Owner == 0 {
+	if file.flags&Public == 0 && perm&(Read|Owner) == 0 {
 		return nil, fb.ErrNotAvailable
 	}
 

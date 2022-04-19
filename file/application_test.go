@@ -194,6 +194,12 @@ func TestFileApplication_get(t *testing.T) {
 		t.Errorf("got permission = %v, want = %v", file.permissions, want)
 	}
 
+	file, err = app.Get(context.Background(), 444, "")
+	if err == nil {
+		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)
+		return
+	}
+
 	repo.flags = Public
 	file, err = app.Get(context.Background(), 444, "")
 	if err != nil {
@@ -205,12 +211,4 @@ func TestFileApplication_get(t *testing.T) {
 	if len(file.permissions) != len(want) {
 		t.Errorf("got permissions = %+v, want = %+v", file.permissions, want)
 	}
-
-	repo.flags = 0
-	file, err = app.Get(context.Background(), 444, "")
-	if err == nil {
-		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)
-		return
-	}
-
 }
