@@ -90,8 +90,7 @@ func (app *FileApplication) Get(ctx context.Context, uid int32, fid string) (*Fi
 	}
 
 	for id, p := range file.permissions {
-		// list non-owner users if, and only if, the client has Grant permission
-		if id != uid && p&Owner == 0 && perm&Grant == 0 {
+		if id != uid && p&Owner == 0 {
 			delete(file.permissions, id)
 		}
 	}
