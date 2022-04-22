@@ -13,12 +13,14 @@ import (
 
 const (
 	metaCreatedAtKey = "created_at"
+	metaUpdatedAtKey = "updated_at"
 	eventFileCreated = "file::created"
 )
 
 type FileRepository interface {
 	Create(ctx context.Context, file *File) error
 	Find(context.Context, string) (*File, error)
+	Save(ctx context.Context, file *File) error
 }
 
 type FileEventHandler interface {
@@ -49,14 +51,15 @@ func (app *FileApplication) Subscribe(handler FileEventHandler) error {
 
 func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string, data []byte, meta Metadata) (*File, error) {
 	app.logger.Info("processing a \"create\" file request",
-		zap.String("path", fpath),
-		zap.Any("uid", uid))
+		zap.String("file_path", fpath),
+		zap.Any("user_id", uid))
 
 	if meta == nil {
 		meta = make(Metadata)
 	}
 
 	meta[metaCreatedAtKey] = strconv.FormatInt(time.Now().Unix(), 16)
+	meta[metaUpdatedAtKey] = meta[metaCreatedAtKey]
 
 	file := NewFile("", path.Base(fpath), data)
 	file.metadata = meta
@@ -70,10 +73,10 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 	return file, nil
 }
 
-func (app *FileApplication) Get(ctx context.Context, uid int32, fid string) (*File, error) {
-	app.logger.Info("processing a \"get\" file request",
-		zap.String("fileid", fid),
-		zap.Int32("uid", uid))
+func (app *FileApplication) Read(ctx context.Context, uid int32, fid string) (*File, error) {
+	app.logger.Info("processing a \"read\" file request",
+		zap.String("file_id", fid),
+		zap.Int32("user_id", uid))
 
 	file, err := app.repo.Find(ctx, fid)
 	if err != nil {
@@ -93,6 +96,35 @@ func (app *FileApplication) Get(ctx context.Context, uid int32, fid string) (*Fi
 		if id != uid && p&Owner == 0 {
 			delete(file.permissions, id)
 		}
+	}
+
+	return file, nil
+}
+
+func (app *FileApplication) Write(ctx context.Context, uid int32, fid string, data []byte, meta Metadata) (*File, error) {
+	app.logger.Info("processing a \"write\" file request",
+		zap.String("file_id", fid),
+		zap.Int32("user_id", uid))
+
+	file, err := app.repo.Find(ctx, fid)
+	if err != nil {
+		return nil, err
+	}
+
+	if file.Permissions(uid)&(Write|Owner) == 0 {
+		return nil, fb.ErrNotAvailable
+	}
+
+	file.data = data
+	if meta != nil {
+		meta[metaCreatedAtKey] = file.metadata[metaCreatedAtKey]
+		file.metadata = meta
+	}
+
+	file.metadata[metaUpdatedAtKey] = strconv.FormatInt(time.Now().Unix(), 16)
+
+	if err := app.repo.Save(ctx, file); err != nil {
+		return nil, err
 	}
 
 	return file, nil

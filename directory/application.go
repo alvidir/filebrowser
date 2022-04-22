@@ -27,7 +27,7 @@ func NewDirectoryApplication(repo DirectoryRepository, logger *zap.Logger) *Dire
 
 func (app *DirectoryApplication) Create(ctx context.Context, uid int32) (*Directory, error) {
 	app.logger.Info("processing a \"create\" directory request",
-		zap.Int32("uid", uid))
+		zap.Int32("user_id", uid))
 
 	directory := NewDirectory(uid)
 	if err := app.repo.Create(ctx, directory); err != nil {
@@ -37,9 +37,9 @@ func (app *DirectoryApplication) Create(ctx context.Context, uid int32) (*Direct
 	return directory, nil
 }
 
-func (app *DirectoryApplication) Get(ctx context.Context, uid int32) (*Directory, error) {
-	app.logger.Info("processing a \"get\" directory request",
-		zap.Any("uid", uid))
+func (app *DirectoryApplication) Describe(ctx context.Context, uid int32) (*Directory, error) {
+	app.logger.Info("processing a \"describe\" directory request",
+		zap.Any("user_id", uid))
 
 	dir, err := app.repo.FindByUserId(ctx, uid)
 	if err != nil {
@@ -49,9 +49,9 @@ func (app *DirectoryApplication) Get(ctx context.Context, uid int32) (*Directory
 	return dir, nil
 }
 
-func (app *DirectoryApplication) addFile(ctx context.Context, file *file.File, uid int32, fpath string) error {
+func (app *DirectoryApplication) AddFile(ctx context.Context, file *file.File, uid int32, fpath string) error {
 	app.logger.Info("processing an \"add file\" request",
-		zap.Any("uid", uid))
+		zap.Any("user_id", uid))
 
 	dir, err := app.repo.FindByUserId(ctx, uid)
 	if err != nil {

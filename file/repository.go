@@ -75,7 +75,7 @@ func (repo *MongoFileRepository) Create(ctx context.Context, file *File) error {
 	res, err := repo.conn.InsertOne(ctx, mongoFile)
 	if err != nil {
 		repo.logger.Error("performing insert one on mongo",
-			zap.String("filename", file.name),
+			zap.String("file_name", file.name),
 			zap.Error(err))
 
 		return fb.ErrUnknown
@@ -87,7 +87,7 @@ func (repo *MongoFileRepository) Create(ctx context.Context, file *File) error {
 	}
 
 	repo.logger.Error("performing insert one on mongo",
-		zap.String("filename", file.name),
+		zap.String("file_name", file.name),
 		zap.Error(err))
 
 	return fb.ErrUnknown
@@ -100,11 +100,34 @@ func (repo *MongoFileRepository) Find(ctx context.Context, id string) (*File, er
 	err := repo.conn.FindOne(ctx, bson.M{"_id": objID}).Decode(&mfile)
 	if err != nil {
 		repo.logger.Error("performing find one on mongo",
-			zap.String("fileid", id),
+			zap.String("file_id", id),
 			zap.Error(err))
 
 		return nil, fb.ErrUnknown
 	}
 
 	return mfile.build(), nil
+}
+
+func (repo *MongoFileRepository) Save(ctx context.Context, file *File) error {
+	objID, _ := primitive.ObjectIDFromHex(file.id)
+
+	result, err := repo.conn.ReplaceOne(ctx, bson.M{"_id": objID}, file)
+	if err != nil {
+		repo.logger.Error("performing replace one on mongo",
+			zap.String("file_id", file.id),
+			zap.Error(err))
+
+		return fb.ErrUnknown
+	}
+
+	if result.ModifiedCount == 0 {
+		repo.logger.Error("performing replace one on mongo",
+			zap.String("file_id", file.id),
+			zap.Int64("modified_count", result.ModifiedCount))
+
+		return fb.ErrUnknown
+	}
+
+	return nil
 }

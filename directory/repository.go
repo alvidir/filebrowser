@@ -90,7 +90,7 @@ func (repo *MongoDirectoryRepository) FindByUserId(ctx context.Context, userId i
 	err := repo.conn.FindOne(ctx, bson.M{"user_id": userId}).Decode(&mongoDirectory)
 	if err != nil {
 		repo.logger.Error("performing find by user id on mongo",
-			zap.Int32("user", userId),
+			zap.Int32("user_id", userId),
 			zap.Error(err))
 
 		return nil, fb.ErrUnknown
@@ -108,7 +108,7 @@ func (repo *MongoDirectoryRepository) Create(ctx context.Context, dir *Directory
 
 	if !errors.Is(err, mongo.ErrNoDocuments) {
 		repo.logger.Error("performing find by user id on mongo",
-			zap.Int32("user", dir.userId),
+			zap.Int32("user_id", dir.userId),
 			zap.Error(err))
 
 		return fb.ErrUnknown
@@ -122,7 +122,7 @@ func (repo *MongoDirectoryRepository) Create(ctx context.Context, dir *Directory
 	res, err := repo.conn.InsertOne(ctx, mdir)
 	if err != nil {
 		repo.logger.Error("performing insert one on mongo",
-			zap.Int32("user", dir.userId),
+			zap.Int32("user_id", dir.userId),
 			zap.Error(err))
 
 		return fb.ErrUnknown
@@ -134,7 +134,7 @@ func (repo *MongoDirectoryRepository) Create(ctx context.Context, dir *Directory
 	}
 
 	repo.logger.Error("performing insert one on mongo",
-		zap.Int32("user", dir.userId),
+		zap.Int32("user_id", dir.userId),
 		zap.Error(err))
 
 	return fb.ErrUnknown
@@ -148,7 +148,7 @@ func (repo *MongoDirectoryRepository) Save(ctx context.Context, dir *Directory) 
 
 	if _, err = repo.conn.ReplaceOne(ctx, bson.M{"user_id": mdir.UserID}, mdir); err != nil {
 		repo.logger.Error("performing replace one on mongo",
-			zap.Int32("user", dir.userId),
+			zap.Int32("user_id", dir.userId),
 			zap.Error(err))
 
 		return fb.ErrUnknown

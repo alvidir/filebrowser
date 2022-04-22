@@ -12,5 +12,5 @@ message DirectoryDescriptor {
 
 service Directory {
     rpc Create(Empty) returns (DirectoryDescriptor);
-    rpc Get(Empty) returns (DirectoryDescriptor);
+    rpc Describe(Empty) returns (DirectoryDescriptor);
 }

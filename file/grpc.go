@@ -39,13 +39,13 @@ func (server *FileServer) Create(ctx context.Context, req *proto.NewFile) (*prot
 	}, nil
 }
 
-func (server *FileServer) Get(ctx context.Context, req *proto.FileDescriptor) (*proto.FileDescriptor, error) {
+func (server *FileServer) Read(ctx context.Context, req *proto.FileDescriptor) (*proto.FileDescriptor, error) {
 	uid, err := fb.GetUid(ctx, server.header, server.logger)
 	if err != nil {
 		return nil, err
 	}
 
-	file, err := server.app.Get(ctx, uid, req.Id)
+	file, err := server.app.Read(ctx, uid, req.Id)
 	if err != nil {
 		return nil, err
 	}
@@ -63,4 +63,8 @@ func (server *FileServer) Get(ctx context.Context, req *proto.FileDescriptor) (*
 	}
 
 	return descriptor, nil
+}
+
+func (server *FileServer) Write(ctx context.Context, req *proto.FileDescriptor) (*proto.FileDescriptor, error) {
+	return nil, nil
 }

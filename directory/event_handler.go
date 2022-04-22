@@ -27,10 +27,10 @@ func NewDirectoryEventHandler(app *DirectoryApplication, logger *zap.Logger) *Di
 
 func (handler *DirectoryEventHandler) OnFileCreated(file *file.File, uid int32, path string) {
 	handler.logger.Info("processing a \"file created\" event",
-		zap.Any("uid", uid))
+		zap.Any("user_id", uid))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	handler.app.addFile(ctx, file, uid, path)
+	handler.app.AddFile(ctx, file, uid, path)
 }

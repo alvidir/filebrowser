@@ -3,7 +3,6 @@ package main
 import (
 	"net"
 	"os"
-	"strconv"
 
 	fb "github.com/alvidir/filebrowser"
 	dir "github.com/alvidir/filebrowser/directory"
@@ -18,7 +17,6 @@ const (
 	ENV_SERVICE_PORT   = "SERVICE_PORT"
 	ENV_SERVICE_NETW   = "SERVICE_NETW"
 	ENV_AUTH_HEADER    = "AUTH_HEADER"
-	ENV_EVENT_BUS_SIZE = "EVENT_BUS_SIZE"
 	ENV_MONGO_DSN      = "MONGO_DSN"
 	ENV_MONGO_DATABASE = "MONGO_INITDB_DATABASE"
 )
@@ -27,7 +25,6 @@ var (
 	servicePort = "8000"
 	serviceNetw = "tcp"
 	authHeader  = "X-Auth"
-	chanSize    = 1024
 )
 
 func startServer(lis net.Listener, logger *zap.Logger) {
@@ -93,18 +90,6 @@ func main() {
 
 	if header, exists := os.LookupEnv(ENV_AUTH_HEADER); exists {
 		authHeader = header
-	}
-
-	if strSize, exists := os.LookupEnv(ENV_EVENT_BUS_SIZE); exists {
-		size, err := strconv.ParseInt(strSize, 10, 32)
-		if err != nil {
-			logger.Error("parsing environment variable to int",
-				zap.String("variable", ENV_EVENT_BUS_SIZE),
-				zap.String("value", strSize),
-				zap.Error(err))
-		} else {
-			chanSize = int(size)
-		}
 	}
 
 	lis, err := net.Listen(serviceNetw, servicePort)

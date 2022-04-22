@@ -54,6 +54,7 @@ func (handler *fileEventHandlerMock) OnFileCreated(file *File, uid int32, path s
 type fileRepositoryMock struct {
 	create func(repo *fileRepositoryMock, ctx context.Context, dir *File) error
 	find   func(repo *fileRepositoryMock, ctx context.Context, id string) (*File, error)
+	save   func(repo *fileRepositoryMock, ctx context.Context, dir *File) error
 	flags  uint8
 }
 
@@ -72,6 +73,14 @@ func (mock *fileRepositoryMock) Find(ctx context.Context, id string) (*File, err
 	}
 
 	return nil, fb.ErrNotFound
+}
+
+func (mock *fileRepositoryMock) Save(ctx context.Context, file *File) error {
+	if mock.save != nil {
+		return mock.save(mock, ctx, file)
+	}
+
+	return fb.ErrUnknown
 }
 
 func TestFileApplication_create(t *testing.T) {
@@ -144,7 +153,7 @@ func TestFileApplication_create(t *testing.T) {
 	}
 }
 
-func TestFileApplication_get(t *testing.T) {
+func TestFileApplication_read(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 
@@ -162,7 +171,7 @@ func TestFileApplication_get(t *testing.T) {
 	}
 
 	app := NewFileApplication(repo, logger)
-	file, err := app.Get(context.Background(), 111, "")
+	file, err := app.Read(context.Background(), 111, "")
 	if err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
 		return
@@ -173,7 +182,7 @@ func TestFileApplication_get(t *testing.T) {
 		t.Errorf("got permissions = %+v, want = %+v", file.permissions, want)
 	}
 
-	file, err = app.Get(context.Background(), 333, "")
+	file, err = app.Read(context.Background(), 333, "")
 	if err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
 		return
@@ -183,7 +192,7 @@ func TestFileApplication_get(t *testing.T) {
 		t.Errorf("got permissions = %+v, want = %+v", file.permissions, want)
 	}
 
-	file, err = app.Get(context.Background(), 222, "")
+	file, err = app.Read(context.Background(), 222, "")
 	if err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
 		return
@@ -194,14 +203,14 @@ func TestFileApplication_get(t *testing.T) {
 		t.Errorf("got permission = %v, want = %v", file.permissions, want)
 	}
 
-	file, err = app.Get(context.Background(), 444, "")
+	file, err = app.Read(context.Background(), 444, "")
 	if err == nil {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)
 		return
 	}
 
 	repo.flags = Public
-	file, err = app.Get(context.Background(), 444, "")
+	file, err = app.Read(context.Background(), 444, "")
 	if err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
 		return

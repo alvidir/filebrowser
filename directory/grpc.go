@@ -42,13 +42,13 @@ func (server *DirectoryServer) Create(ctx context.Context, req *proto.Empty) (*p
 	return descriptor, nil
 }
 
-func (server *DirectoryServer) Get(ctx context.Context, req *proto.Empty) (*proto.DirectoryDescriptor, error) {
+func (server *DirectoryServer) Describe(ctx context.Context, req *proto.Empty) (*proto.DirectoryDescriptor, error) {
 	uid, err := fb.GetUid(ctx, server.header, server.logger)
 	if err != nil {
 		return nil, err
 	}
 
-	dir, err := server.app.Get(ctx, uid)
+	dir, err := server.app.Describe(ctx, uid)
 	if err != nil {
 		return nil, err
 	}

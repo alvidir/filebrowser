@@ -19,5 +19,6 @@ message FileDescriptor {
 
 service File {
     rpc Create(NewFile) returns (FileDescriptor); 
-    rpc Get(FileDescriptor) returns (FileDescriptor); 
+    rpc Read(FileDescriptor) returns (FileDescriptor);
+    rpc Write(FileDescriptor) returns (FileDescriptor);
 }
