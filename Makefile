@@ -17,7 +17,10 @@ build:
 	podman build -t ${REPO}/${PROJECT}:${VERSION} -f ./container/filebrowser/containerfile .
 
 deploy:
-	podman-compose -f compose.yaml up --remove-orphans
+	podman-compose -f compose.yaml up -d
+
+follow:
+	podman logs --follow --names filebrowser-server
 
 undeploy:
 	podman-compose -f compose.yaml down
