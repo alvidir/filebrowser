@@ -29,7 +29,7 @@ func (server *FileServer) Create(ctx context.Context, req *proto.NewFile) (*prot
 		return nil, err
 	}
 
-	file, err := server.app.Create(ctx, uid, req.Path, req.Data, req.Metadata)
+	file, err := server.app.Create(ctx, uid, req.GetPath(), req.GetData(), req.GetMetadata())
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func (server *FileServer) Read(ctx context.Context, req *proto.FileDescriptor) (
 		return nil, err
 	}
 
-	file, err := server.app.Read(ctx, uid, req.Id)
+	file, err := server.app.Read(ctx, uid, req.GetId())
 	if err != nil {
 		return nil, err
 	}
@@ -66,5 +66,27 @@ func (server *FileServer) Read(ctx context.Context, req *proto.FileDescriptor) (
 }
 
 func (server *FileServer) Write(ctx context.Context, req *proto.FileDescriptor) (*proto.FileDescriptor, error) {
-	return nil, nil
+	uid, err := fb.GetUid(ctx, server.header, server.logger)
+	if err != nil {
+		return nil, err
+	}
+
+	file, err := server.app.Write(ctx, uid, req.GetId(), req.GetData(), req.GetMetadata())
+	if err != nil {
+		return nil, err
+	}
+
+	descriptor := &proto.FileDescriptor{
+		Id:          file.id,
+		Name:        file.name,
+		Metadata:    file.metadata,
+		Permissions: make(map[int32]int32),
+		Data:        file.data,
+	}
+
+	for uid, perm := range file.permissions {
+		descriptor.Permissions[uid] = int32(perm)
+	}
+
+	return descriptor, nil
 }

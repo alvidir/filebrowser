@@ -1,23 +1,23 @@
 services:
-    # mongo:
-    #     container_name: filebrowser-mongo
-    #     image: docker.io/mongo:latest
-    #     restart: always
-    #     ports:
-    #         - 27017:27017
-    #     volumes:
-    #         - dbdata:/data/db
-    #     security_opt:
-    #         label: disable
-    #     env_file:
-    #         - .env
+    mongo:
+        container_name: filebrowser-mongo
+        image: docker.io/mongo:latest
+        restart: always
+        ports:
+            - 27017:27017
+        volumes:
+            - dbdata:/data/db
+        security_opt:
+            label: disable
+        env_file:
+            - .env
 
-    # filebrowser:
-    #     container_name: filebrowser-server
-    #     image: localhost/alvidir/filebrowser:0.1.0
-    #     restart: always
-    #     env_file:
-    #         - .env
+    filebrowser:
+        container_name: filebrowser-server
+        image: localhost/alvidir/filebrowser:0.1.0
+        restart: always
+        env_file:
+            - .env
 
 volumes:
     dbdata:
