@@ -58,7 +58,7 @@ func newMongoDirectory(dir *Directory, logger *zap.Logger) (*mongoDirectory, err
 	return mongoDir, nil
 }
 
-func (mdir *mongoDirectory) build() *Directory {
+func (mdir *mongoDirectory) build(logger *zap.Logger) *Directory {
 	dir := &Directory{
 		id:     mdir.ID.Hex(),
 		userId: mdir.UserID,
@@ -67,7 +67,19 @@ func (mdir *mongoDirectory) build() *Directory {
 
 	for fpath, oid := range mdir.Files {
 		base := path.Base(fpath)
-		dir.files[fpath] = file.NewFile(oid.Hex(), base, nil)
+		file, err := file.NewFile(oid.Hex(), base, nil)
+		if err != nil {
+			logger.Error("building file",
+				zap.String("directory", dir.id),
+				zap.String("file", file.Id()),
+				zap.String("filename", base),
+				zap.Int32("user", dir.userId),
+				zap.Error(err))
+
+			continue
+		}
+
+		dir.files[fpath] = file
 	}
 
 	return dir
@@ -96,7 +108,7 @@ func (repo *MongoDirectoryRepository) FindByUserId(ctx context.Context, userId i
 		return nil, fb.ErrUnknown
 	}
 
-	return mongoDirectory.build(), nil
+	return mongoDirectory.build(repo.logger), nil
 }
 
 func (repo *MongoDirectoryRepository) Create(ctx context.Context, dir *Directory) error {

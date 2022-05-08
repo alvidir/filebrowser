@@ -1,11 +1,23 @@
 package file
 
+import (
+	"regexp"
+
+	fb "github.com/alvidir/filebrowser"
+)
+
 const (
 	Public = 0x01
 	Read   = 0x02
 	Write  = 0x04
 	Grant  = 0x08
 	Owner  = 0x10
+
+	FilenameRegex = "^[^/]+$"
+)
+
+var (
+	r, _ = regexp.Compile(FilenameRegex)
 )
 
 type Metadata map[string]string
@@ -20,7 +32,11 @@ type File struct {
 	data        []byte
 }
 
-func NewFile(id string, filename string, data []byte) *File {
+func NewFile(id string, filename string, data []byte) (*File, error) {
+	if !r.MatchString(filename) {
+		return nil, fb.ErrInvalidFormat
+	}
+
 	return &File{
 		id:          id,
 		name:        filename,
@@ -28,7 +44,7 @@ func NewFile(id string, filename string, data []byte) *File {
 		permissions: make(Permissions),
 		flags:       0,
 		data:        data,
-	}
+	}, nil
 }
 
 func (file *File) Id() string {

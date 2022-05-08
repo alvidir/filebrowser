@@ -108,6 +108,7 @@ func TestFileApplication_create(t *testing.T) {
 
 	if err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
+		return
 	}
 
 	if got := file.Id(); got != mockFileId {

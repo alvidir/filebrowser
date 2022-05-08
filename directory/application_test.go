@@ -46,7 +46,7 @@ func (mock *directoryRepositoryMock) Save(ctx context.Context, dir *Directory) e
 	return nil
 }
 
-func TestDirectoryApplication_create(t *testing.T) {
+func TestDirectoryApplication_Create(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 
