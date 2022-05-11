@@ -34,3 +34,13 @@ func (handler *DirectoryEventHandler) OnFileCreated(file *file.File, uid int32, 
 
 	handler.app.AddFile(ctx, file, uid, path)
 }
+
+func (handler *DirectoryEventHandler) OnFileDeleted(file *file.File, uid int32) {
+	handler.logger.Info("processing a \"file deleted\" event",
+		zap.Any("user_id", uid))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	handler.app.DeleteFile(ctx, file, uid)
+}

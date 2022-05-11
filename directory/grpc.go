@@ -23,7 +23,7 @@ func NewDirectoryServer(app *DirectoryApplication, logger *zap.Logger, authHeade
 	}
 }
 
-func (server *DirectoryServer) Create(ctx context.Context, req *proto.Empty) (*proto.DirectoryDescriptor, error) {
+func (server *DirectoryServer) Create(ctx context.Context, req *proto.DirectoryLocator) (*proto.DirectoryDescriptor, error) {
 	uid, err := fb.GetUid(ctx, server.header, server.logger)
 	if err != nil {
 		return nil, err
@@ -42,7 +42,7 @@ func (server *DirectoryServer) Create(ctx context.Context, req *proto.Empty) (*p
 	return descriptor, nil
 }
 
-func (server *DirectoryServer) Describe(ctx context.Context, req *proto.Empty) (*proto.DirectoryDescriptor, error) {
+func (server *DirectoryServer) Describe(ctx context.Context, req *proto.DirectoryLocator) (*proto.DirectoryDescriptor, error) {
 	uid, err := fb.GetUid(ctx, server.header, server.logger)
 	if err != nil {
 		return nil, err

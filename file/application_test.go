@@ -17,6 +17,7 @@ const (
 
 type fileEventHandlerMock struct {
 	onFileCreated func(file *File, uid int32, path string)
+	onFileDeleted func(file *File, uid int32)
 	ch            chan struct {
 		file *File
 		uid  int32
@@ -51,10 +52,24 @@ func (handler *fileEventHandlerMock) OnFileCreated(file *File, uid int32, path s
 	}{file, uid, path}
 }
 
+func (handler *fileEventHandlerMock) OnFileDeleted(file *File, uid int32) {
+	if handler.onFileDeleted != nil {
+		handler.onFileDeleted(file, uid)
+		return
+	}
+
+	handler.ch <- struct {
+		file *File
+		uid  int32
+		path string
+	}{file, uid, ""}
+}
+
 type fileRepositoryMock struct {
-	create func(repo *fileRepositoryMock, ctx context.Context, dir *File) error
+	create func(repo *fileRepositoryMock, ctx context.Context, file *File) error
 	find   func(repo *fileRepositoryMock, ctx context.Context, id string) (*File, error)
-	save   func(repo *fileRepositoryMock, ctx context.Context, dir *File) error
+	save   func(repo *fileRepositoryMock, ctx context.Context, file *File) error
+	delete func(repo *fileRepositoryMock, ctx context.Context, file *File) error
 	flags  uint8
 }
 
@@ -83,6 +98,14 @@ func (mock *fileRepositoryMock) Save(ctx context.Context, file *File) error {
 	return fb.ErrUnknown
 }
 
+func (mock *fileRepositoryMock) Delete(ctx context.Context, file *File) error {
+	if mock.delete != nil {
+		return mock.delete(mock, ctx, file)
+	}
+
+	return fb.ErrUnknown
+}
+
 func TestFileApplication_create(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
@@ -95,7 +118,6 @@ func TestFileApplication_create(t *testing.T) {
 
 	userId := int32(999)
 	fpath := "path/to/example.test"
-	data := []byte{1, 2, 3, 4}
 	meta := make(Metadata)
 
 	customFieldKey := "custom_field"
@@ -103,7 +125,7 @@ func TestFileApplication_create(t *testing.T) {
 	meta[customFieldKey] = customFieldValue
 
 	before := time.Now().Unix()
-	file, err := app.Create(context.Background(), userId, fpath, data, meta)
+	file, err := app.Create(context.Background(), userId, fpath, meta)
 	after := time.Now().Unix()
 
 	if err != nil {
@@ -136,6 +158,8 @@ func TestFileApplication_create(t *testing.T) {
 	}
 
 	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
 	select {
 	case v := <-handler.ch:
 		if v.file != file {

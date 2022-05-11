@@ -3,10 +3,10 @@ option go_package = "github.com/alvidir/filebrowser/proto";
 
 package proto;
 
-message NewFile {
-    string path = 1;
-    map<string, string> metadata = 2;
-    bytes data = 5;
+message FileLocator {
+    string id = 1;
+    string path = 2;
+    map<string, string> metadata = 3;
 }
 
 message FileDescriptor {
@@ -18,7 +18,8 @@ message FileDescriptor {
 }
 
 service File {
-    rpc Create(NewFile) returns (FileDescriptor); 
-    rpc Read(FileDescriptor) returns (FileDescriptor);
+    rpc Create(FileLocator) returns (FileDescriptor); 
+    rpc Read(FileLocator) returns (FileDescriptor);
     rpc Write(FileDescriptor) returns (FileDescriptor);
+    rpc Delete(FileLocator) returns (FileDescriptor);
 }

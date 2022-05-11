@@ -32,7 +32,7 @@ type File struct {
 	data        []byte
 }
 
-func NewFile(id string, filename string, data []byte) (*File, error) {
+func NewFile(id string, filename string) (*File, error) {
 	if !r.MatchString(filename) {
 		return nil, fb.ErrInvalidFormat
 	}
@@ -43,7 +43,7 @@ func NewFile(id string, filename string, data []byte) (*File, error) {
 		metadata:    make(Metadata),
 		permissions: make(Permissions),
 		flags:       0,
-		data:        data,
+		data:        make([]byte, 0),
 	}, nil
 }
 

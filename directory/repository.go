@@ -2,7 +2,6 @@ package directory
 
 import (
 	"context"
-	"errors"
 	"path"
 
 	fb "github.com/alvidir/filebrowser"
@@ -67,7 +66,7 @@ func (mdir *mongoDirectory) build(logger *zap.Logger) *Directory {
 
 	for fpath, oid := range mdir.Files {
 		base := path.Base(fpath)
-		file, err := file.NewFile(oid.Hex(), base, nil)
+		file, err := file.NewFile(oid.Hex(), base)
 		if err != nil {
 			logger.Error("building file",
 				zap.String("directory", dir.id),
@@ -112,20 +111,6 @@ func (repo *MongoDirectoryRepository) FindByUserId(ctx context.Context, userId i
 }
 
 func (repo *MongoDirectoryRepository) Create(ctx context.Context, dir *Directory) error {
-	var d mongoDirectory
-	err := repo.conn.FindOne(ctx, bson.M{"user_id": dir.userId}).Decode(&d)
-	if err == nil {
-		return fb.ErrAlreadyExists
-	}
-
-	if !errors.Is(err, mongo.ErrNoDocuments) {
-		repo.logger.Error("performing find by user id on mongo",
-			zap.Int32("user_id", dir.userId),
-			zap.Error(err))
-
-		return fb.ErrUnknown
-	}
-
 	mdir, err := newMongoDirectory(dir, repo.logger)
 	if err != nil {
 		return err
@@ -152,13 +137,13 @@ func (repo *MongoDirectoryRepository) Create(ctx context.Context, dir *Directory
 	return fb.ErrUnknown
 }
 
-func (repo *MongoDirectoryRepository) Save(ctx context.Context, dir *Directory) (err error) {
+func (repo *MongoDirectoryRepository) Save(ctx context.Context, dir *Directory) error {
 	mdir, err := newMongoDirectory(dir, repo.logger)
 	if err != nil {
 		return err
 	}
 
-	if _, err = repo.conn.ReplaceOne(ctx, bson.M{"user_id": mdir.UserID}, mdir); err != nil {
+	if _, err = repo.conn.ReplaceOne(ctx, bson.M{"_id": mdir.ID}, mdir); err != nil {
 		repo.logger.Error("performing replace one on mongo",
 			zap.Int32("user_id", dir.userId),
 			zap.Error(err))
@@ -166,5 +151,28 @@ func (repo *MongoDirectoryRepository) Save(ctx context.Context, dir *Directory) 
 		return fb.ErrUnknown
 	}
 
-	return
+	return nil
+}
+
+func (repo *MongoDirectoryRepository) Delete(ctx context.Context, dir *Directory) error {
+	objID, _ := primitive.ObjectIDFromHex(dir.id)
+
+	result, err := repo.conn.DeleteOne(ctx, bson.M{"_id": objID})
+	if err != nil {
+		repo.logger.Error("performing replace one on mongo",
+			zap.Int32("user_id", dir.userId),
+			zap.Error(err))
+
+		return fb.ErrUnknown
+	}
+
+	if result.DeletedCount == 0 {
+		repo.logger.Error("performing delete one on mongo",
+			zap.String("directory_id", dir.id),
+			zap.Int64("deleted_count", result.DeletedCount))
+
+		return fb.ErrUnknown
+	}
+
+	return nil
 }

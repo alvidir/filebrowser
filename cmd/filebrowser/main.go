@@ -47,13 +47,13 @@ func startServer(lis net.Listener, logger *zap.Logger) {
 		logger.Info("connection with mongodb cluster established")
 	}
 
-	directoryRepo := dir.NewMongoDirectoryRepository(mongoConn, logger)
-	directoryApp := dir.NewDirectoryApplication(directoryRepo, logger)
-	directoryServer := dir.NewDirectoryServer(directoryApp, logger, authHeader)
-
 	fileRepo := file.NewMongoFileRepository(mongoConn, logger)
 	fileApp := file.NewFileApplication(fileRepo, logger)
 	fileServer := file.NewFileServer(fileApp, authHeader, logger)
+
+	directoryRepo := dir.NewMongoDirectoryRepository(mongoConn, logger)
+	directoryApp := dir.NewDirectoryApplication(directoryRepo, fileRepo, logger)
+	directoryServer := dir.NewDirectoryServer(directoryApp, logger, authHeader)
 
 	directoryHandler := dir.NewDirectoryEventHandler(directoryApp, logger)
 	if err := fileApp.Subscribe(directoryHandler); err != nil {

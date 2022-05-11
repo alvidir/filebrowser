@@ -15,16 +15,19 @@ const (
 	metaCreatedAtKey = "created_at"
 	metaUpdatedAtKey = "updated_at"
 	eventFileCreated = "file::created"
+	eventFileDeleted = "file::deleted"
 )
 
 type FileRepository interface {
 	Create(ctx context.Context, file *File) error
 	Find(context.Context, string) (*File, error)
 	Save(ctx context.Context, file *File) error
+	Delete(ctx context.Context, file *File) error
 }
 
 type FileEventHandler interface {
 	OnFileCreated(file *File, uid int32, path string)
+	OnFileDeleted(file *File, uid int32)
 }
 
 type FileApplication struct {
@@ -41,15 +44,17 @@ func NewFileApplication(repo FileRepository, logger *zap.Logger) *FileApplicatio
 	}
 }
 
-func (app *FileApplication) publishEvent(topic string, args ...interface{}) {
-	app.bus.Publish(eventFileCreated, args...)
-}
-
 func (app *FileApplication) Subscribe(handler FileEventHandler) error {
-	return app.bus.SubscribeAsync(eventFileCreated, handler.OnFileCreated, false)
+	if err := app.bus.SubscribeAsync(eventFileCreated, handler.OnFileCreated, false); err != nil {
+		return err
+	} else if err := app.bus.SubscribeAsync(eventFileDeleted, handler.OnFileDeleted, false); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string, data []byte, meta Metadata) (*File, error) {
+func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string, meta Metadata) (*File, error) {
 	app.logger.Info("processing a \"create\" file request",
 		zap.String("file_path", fpath),
 		zap.Any("user_id", uid))
@@ -61,7 +66,7 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 	meta[metaCreatedAtKey] = strconv.FormatInt(time.Now().Unix(), 16)
 	meta[metaUpdatedAtKey] = meta[metaCreatedAtKey]
 
-	file, err := NewFile("", path.Base(fpath), data)
+	file, err := NewFile("", path.Base(fpath))
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +78,7 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 	}
 
 	file.AddPermissions(uid, Read|Write|Grant|Owner)
-	app.publishEvent(eventFileCreated, file, uid, fpath)
+	app.bus.Publish(eventFileCreated, file, uid, fpath)
 	return file, nil
 }
 
@@ -131,5 +136,27 @@ func (app *FileApplication) Write(ctx context.Context, uid int32, fid string, da
 		return nil, err
 	}
 
+	return file, nil
+}
+
+func (app *FileApplication) Delete(ctx context.Context, uid int32, fid string) (*File, error) {
+	app.logger.Info("processing a \"delete\" file request",
+		zap.String("file_id", fid),
+		zap.Int32("user_id", uid))
+
+	file, err := app.repo.Find(ctx, fid)
+	if err != nil {
+		return nil, err
+	}
+
+	if file.Permissions(uid)&Owner == 0 {
+		return nil, fb.ErrNotAvailable
+	}
+
+	if err := app.repo.Delete(ctx, file); err != nil {
+		return nil, err
+	}
+
+	app.bus.Publish(eventFileDeleted, file, uid)
 	return file, nil
 }

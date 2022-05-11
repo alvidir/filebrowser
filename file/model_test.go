@@ -11,7 +11,7 @@ func TestFileModel_NewFile(t *testing.T) {
 	id := "id"
 	filename := "filename"
 
-	if file, err := NewFile(id, filename, nil); err != nil {
+	if file, err := NewFile(id, filename); err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
 	} else if file.id != id {
 		t.Errorf("got file.id = %v, want = %v", file.id, id)
@@ -23,22 +23,22 @@ func TestFileModel_NewFile(t *testing.T) {
 		t.Errorf("got file.metadata = %v, want = %v", file.metadata, Metadata{})
 	} else if file.permissions == nil {
 		t.Errorf("got file.permissions = %v, want = %v", file.permissions, Permissions{})
-	} else if file.data != nil {
-		t.Errorf("got file.data = %v, want = %v", file.data, nil)
+	} else if file.data == nil || len(file.data) > 0 {
+		t.Errorf("got file.data = %v, want = %v", file.data, []byte{})
 	}
 
 	filename = "/filename"
-	if _, err := NewFile(id, filename, nil); !errors.Is(err, fb.ErrInvalidFormat) {
+	if _, err := NewFile(id, filename); !errors.Is(err, fb.ErrInvalidFormat) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrInvalidFormat)
 	}
 
 	filename = "file/name"
-	if _, err := NewFile(id, filename, nil); !errors.Is(err, fb.ErrInvalidFormat) {
+	if _, err := NewFile(id, filename); !errors.Is(err, fb.ErrInvalidFormat) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrInvalidFormat)
 	}
 
 	filename = "filename/"
-	if _, err := NewFile(id, filename, nil); !errors.Is(err, fb.ErrInvalidFormat) {
+	if _, err := NewFile(id, filename); !errors.Is(err, fb.ErrInvalidFormat) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrInvalidFormat)
 	}
 }

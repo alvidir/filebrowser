@@ -131,3 +131,26 @@ func (repo *MongoFileRepository) Save(ctx context.Context, file *File) error {
 
 	return nil
 }
+
+func (repo *MongoFileRepository) Delete(ctx context.Context, file *File) error {
+	objID, _ := primitive.ObjectIDFromHex(file.id)
+
+	result, err := repo.conn.DeleteOne(ctx, bson.M{"_id": objID})
+	if err != nil {
+		repo.logger.Error("performing delete one on mongo",
+			zap.String("file_id", file.id),
+			zap.Error(err))
+
+		return fb.ErrUnknown
+	}
+
+	if result.DeletedCount == 0 {
+		repo.logger.Error("performing delete one on mongo",
+			zap.String("file_id", file.id),
+			zap.Int64("deleted_count", result.DeletedCount))
+
+		return fb.ErrUnknown
+	}
+
+	return nil
+}

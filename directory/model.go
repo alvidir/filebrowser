@@ -34,10 +34,22 @@ func (dir *Directory) getAvailablePath(dest string) string {
 	return dest
 }
 
+func (dir *Directory) Files() map[string]*file.File {
+	return dir.files
+}
+
 func (dir *Directory) AddFile(file *file.File, path string) string {
 	path = dir.getAvailablePath(path)
 	dir.files[path] = file
 	return path
+}
+
+func (dir *Directory) DeleteFile(file *file.File) {
+	for path, subject := range dir.files {
+		if subject.Id() == file.Id() {
+			delete(dir.files, path)
+		}
+	}
 }
 
 func (dir *Directory) List() map[string]string {

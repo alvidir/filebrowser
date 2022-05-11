@@ -23,13 +23,13 @@ func NewFileServer(app *FileApplication, authHeader string, logger *zap.Logger) 
 	}
 }
 
-func (server *FileServer) Create(ctx context.Context, req *proto.NewFile) (*proto.FileDescriptor, error) {
+func (server *FileServer) Create(ctx context.Context, req *proto.FileLocator) (*proto.FileDescriptor, error) {
 	uid, err := fb.GetUid(ctx, server.header, server.logger)
 	if err != nil {
 		return nil, err
 	}
 
-	file, err := server.app.Create(ctx, uid, req.GetPath(), req.GetData(), req.GetMetadata())
+	file, err := server.app.Create(ctx, uid, req.GetPath(), req.GetMetadata())
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func (server *FileServer) Create(ctx context.Context, req *proto.NewFile) (*prot
 	}, nil
 }
 
-func (server *FileServer) Read(ctx context.Context, req *proto.FileDescriptor) (*proto.FileDescriptor, error) {
+func (server *FileServer) Read(ctx context.Context, req *proto.FileLocator) (*proto.FileDescriptor, error) {
 	uid, err := fb.GetUid(ctx, server.header, server.logger)
 	if err != nil {
 		return nil, err
@@ -89,4 +89,14 @@ func (server *FileServer) Write(ctx context.Context, req *proto.FileDescriptor) 
 	}
 
 	return descriptor, nil
+}
+
+func (server *FileServer) Delete(ctx context.Context, req *proto.FileLocator) (*proto.FileDescriptor, error) {
+	uid, err := fb.GetUid(ctx, server.header, server.logger)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = server.app.Delete(ctx, uid, req.GetId())
+	return nil, err
 }

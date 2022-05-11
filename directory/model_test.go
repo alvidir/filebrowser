@@ -11,7 +11,7 @@ func TestDirectoryModel_AddFile(t *testing.T) {
 	subject := NewDirectory(0)
 	dest := "path/to/filename"
 
-	f, err := file.NewFile("111", "test", nil)
+	f, err := file.NewFile("111", "test")
 	if err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
 	}
