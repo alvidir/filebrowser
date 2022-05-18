@@ -3,8 +3,6 @@ services:
         container_name: filebrowser-mongo
         image: docker.io/mongo:latest
         restart: always
-        ports:
-            - 27017:27017
         volumes:
             - dbdata:/data/db
         security_opt:
@@ -16,8 +14,28 @@ services:
         container_name: filebrowser-server
         image: localhost/alvidir/filebrowser:0.1.0
         restart: always
+        ports:
+            - 8000:8000
+        security_opt:
+            label: disable
         env_file:
             - .env
+
+    envoy:
+        container_name: filebrowser-envoy
+        image: docker.io/envoyproxy/envoy-alpine:v1.21-latest
+        restart: always
+        ports:
+            - 8080:8080
+            - 9901:9901
+        volumes:
+            - ./envoy:/etc/envoy:ro
+        security_opt:
+            label: disable
+        depends_on: 
+            - filebrowser
+        command: /usr/local/bin/envoy --log-level debug -c /etc/envoy/envoy.yaml
+
 
 volumes:
     dbdata:
