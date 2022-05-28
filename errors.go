@@ -11,4 +11,6 @@ var (
 	ErrInvalidHeader    = errors.New("E007")
 	ErrWrongCredentials = errors.New("E008")
 	ErrAlreadyExists    = errors.New("E010")
+
+	ErrChannelClosed = errors.New("channel closed")
 )

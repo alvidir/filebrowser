@@ -15,6 +15,7 @@ proto:
 
 build:
 	podman build -t ${REPO}/${PROJECT}:${VERSION} -f ./container/filebrowser/containerfile .
+	podman build -t ${REPO}/${PROJECT}:${VERSION}-mqworker -f ./container/mqworker/containerfile .
 
 deploy:
 	podman-compose -f compose.yaml up -d
@@ -27,6 +28,9 @@ undeploy:
 
 run:
 	go run cmd/filebrowser/main.go
+
+mqworker:
+	go run cmd/mqworker/main.go
 
 test:
 	go test -v -race ./...

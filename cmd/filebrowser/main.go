@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	ENV_SERVICE_PORT   = "SERVICE_PORT"
+	ENV_SERVICE_ADDR   = "SERVICE_ADDR"
 	ENV_SERVICE_NETW   = "SERVICE_NETW"
 	ENV_AUTH_HEADER    = "AUTH_HEADER"
 	ENV_MONGO_DSN      = "MONGO_DSN"
@@ -22,7 +22,7 @@ const (
 )
 
 var (
-	servicePort = "8000"
+	serviceAddr = "0.0.0.0:8000"
 	serviceNetw = "tcp"
 	authHeader  = "X-Auth"
 )
@@ -80,8 +80,8 @@ func main() {
 			zap.Error(err))
 	}
 
-	if port, exists := os.LookupEnv(ENV_SERVICE_PORT); exists {
-		servicePort = port
+	if addr, exists := os.LookupEnv(ENV_SERVICE_ADDR); exists {
+		serviceAddr = addr
 	}
 
 	if netw, exists := os.LookupEnv(ENV_SERVICE_NETW); exists {
@@ -92,14 +92,14 @@ func main() {
 		authHeader = header
 	}
 
-	lis, err := net.Listen(serviceNetw, servicePort)
+	lis, err := net.Listen(serviceNetw, serviceAddr)
 	if err != nil {
 		logger.Panic("failed to listen: %v",
 			zap.Error(err))
 	}
 
 	logger.Info("server ready to accept connections",
-		zap.String("address", servicePort))
+		zap.String("address", serviceAddr))
 
 	startServer(lis, logger)
 }
