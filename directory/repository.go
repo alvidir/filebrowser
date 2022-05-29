@@ -23,14 +23,18 @@ type mongoDirectory struct {
 }
 
 func newMongoDirectory(dir *Directory, logger *zap.Logger) (*mongoDirectory, error) {
-	oid, err := primitive.ObjectIDFromHex(dir.id)
-	if err != nil {
-		logger.Error("parsing directory id to ObjectID",
-			zap.String("directory", dir.id),
-			zap.Int32("user", dir.userId),
-			zap.Error(err))
+	oid := primitive.NilObjectID
 
-		return nil, fb.ErrUnknown
+	if len(dir.id) > 0 {
+		var err error
+		if oid, err = primitive.ObjectIDFromHex(dir.id); err != nil {
+			logger.Error("parsing directory id to ObjectID",
+				zap.String("directory", dir.id),
+				zap.Int32("user", dir.userId),
+				zap.Error(err))
+
+			return nil, fb.ErrUnknown
+		}
 	}
 
 	mongoDir := &mongoDirectory{
