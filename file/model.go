@@ -79,6 +79,20 @@ func (file *File) AddPermissions(uid int32, perm uint8) {
 	file.permissions[uid] |= perm
 }
 
+func (file *File) RevokePermissions(uid int32, perm uint8) {
+	if file.permissions == nil {
+		return
+	}
+
+	if p, exists := file.permissions[uid]; !exists {
+		return
+	} else if perm = p & ^perm; perm == 0 {
+		delete(file.permissions, uid)
+	} else {
+		file.permissions[uid] = perm
+	}
+}
+
 func (file *File) AddValue(key string, value string) (old string, exists bool) {
 	if file.metadata == nil {
 		file.metadata = make(Metadata)
