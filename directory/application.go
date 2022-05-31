@@ -76,7 +76,15 @@ func (app *DirectoryApplication) Delete(ctx context.Context, uid int32) error {
 			continue
 		}
 
-		if err := app.fileRepo.Delete(ctx, f); err != nil {
+		// TODO: the following condition requires the file to be unique and lockable
+		// for the whole system
+		if owners := f.Owners(); len(owners) > 1 {
+			app.logger.Warn("unsafe condition evaluated",
+				zap.String("reason", "the File instance has to be unique and lockable"))
+
+			f.Revoke(dir.userId)
+			app.fileRepo.Save(ctx, f)
+		} else if err := app.fileRepo.Delete(ctx, f); err != nil {
 			return err
 		}
 	}

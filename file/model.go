@@ -63,6 +63,23 @@ func (file *File) Value(key string) (value string, exists bool) {
 	return
 }
 
+func (file *File) Owners() []int32 {
+	owners := make([]int32, 1) // a file has, for sure, at least one owner
+	for uid, perm := range file.permissions {
+		if perm&Owner == 0 {
+			continue
+		}
+
+		if owners[0] != 0 {
+			owners = append(owners, uid)
+		} else {
+			owners[0] = uid
+		}
+	}
+
+	return owners
+}
+
 func (file *File) Permissions(uid int32) (perm uint8) {
 	if file.permissions != nil {
 		perm = file.permissions[uid]
@@ -90,6 +107,12 @@ func (file *File) RevokePermissions(uid int32, perm uint8) {
 		delete(file.permissions, uid)
 	} else {
 		file.permissions[uid] = perm
+	}
+}
+
+func (file *File) Revoke(uid int32) {
+	if file.permissions != nil {
+		delete(file.permissions, uid)
 	}
 }
 
