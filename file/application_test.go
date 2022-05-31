@@ -228,7 +228,7 @@ func TestFileApplication_read(t *testing.T) {
 		t.Errorf("got permission = %v, want = %v", file.permissions, want)
 	}
 
-	file, err = app.Read(context.Background(), 444, "")
+	_, err = app.Read(context.Background(), 444, "")
 	if err == nil {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)
 		return
