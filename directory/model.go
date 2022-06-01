@@ -44,7 +44,7 @@ func (dir *Directory) AddFile(file *file.File, path string) string {
 	return path
 }
 
-func (dir *Directory) DeleteFile(file *file.File) {
+func (dir *Directory) RemoveFile(file *file.File) {
 	for path, subject := range dir.files {
 		if subject.Id() == file.Id() {
 			delete(dir.files, path)

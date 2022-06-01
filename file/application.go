@@ -12,10 +12,12 @@ import (
 )
 
 const (
-	metaCreatedAtKey = "created_at"
-	metaUpdatedAtKey = "updated_at"
+	CreatedAtKey     = "created_at"
+	UpdatedAtKey     = "updated_at"
+	DeletedAtKey     = "deleted_at"
 	eventFileCreated = "file::created"
 	eventFileDeleted = "file::deleted"
+	timestampBase    = 16
 )
 
 type FileRepository interface {
@@ -63,8 +65,8 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 		meta = make(Metadata)
 	}
 
-	meta[metaCreatedAtKey] = strconv.FormatInt(time.Now().Unix(), 16)
-	meta[metaUpdatedAtKey] = meta[metaCreatedAtKey]
+	meta[CreatedAtKey] = strconv.FormatInt(time.Now().Unix(), timestampBase)
+	meta[UpdatedAtKey] = meta[CreatedAtKey]
 
 	file, err := NewFile("", path.Base(fpath))
 	if err != nil {
@@ -126,11 +128,12 @@ func (app *FileApplication) Write(ctx context.Context, uid int32, fid string, da
 
 	file.data = data
 	if meta != nil {
-		meta[metaCreatedAtKey] = file.metadata[metaCreatedAtKey]
+		// ensure immutable data is not overwrited
+		meta[CreatedAtKey] = file.metadata[CreatedAtKey]
 		file.metadata = meta
 	}
 
-	file.metadata[metaUpdatedAtKey] = strconv.FormatInt(time.Now().Unix(), 16)
+	file.metadata[UpdatedAtKey] = strconv.FormatInt(time.Now().Unix(), timestampBase)
 
 	if err := app.repo.Save(ctx, file); err != nil {
 		return nil, err
@@ -153,7 +156,20 @@ func (app *FileApplication) Delete(ctx context.Context, uid int32, fid string) (
 		return nil, fb.ErrNotAvailable
 	}
 
-	if err := app.repo.Delete(ctx, file); err != nil {
+	// TODO: the following condition requires the file to be unique and lockable
+	// for the whole system
+	if owners := file.Owners(); len(owners) > 1 {
+		app.logger.Warn("unsafe condition evaluated",
+			zap.String("reason", "the File instance has to be unique and lockable"))
+
+		file.RevokeAccess(uid)
+		err = app.repo.Save(ctx, file)
+	} else {
+		file.metadata[DeletedAtKey] = strconv.FormatInt(time.Now().Unix(), timestampBase)
+		err = app.repo.Delete(ctx, file)
+	}
+
+	if err != nil {
 		return nil, err
 	}
 

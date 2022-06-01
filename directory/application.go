@@ -82,9 +82,13 @@ func (app *DirectoryApplication) Delete(ctx context.Context, uid int32) error {
 			app.logger.Warn("unsafe condition evaluated",
 				zap.String("reason", "the File instance has to be unique and lockable"))
 
-			f.Revoke(dir.userId)
-			app.fileRepo.Save(ctx, f)
-		} else if err := app.fileRepo.Delete(ctx, f); err != nil {
+			f.RevokeAccess(dir.userId)
+			err = app.fileRepo.Save(ctx, f)
+		} else {
+			err = app.fileRepo.Delete(ctx, f)
+		}
+
+		if err != nil {
 			return err
 		}
 	}
@@ -96,6 +100,7 @@ func (app *DirectoryApplication) Delete(ctx context.Context, uid int32) error {
 	return nil
 }
 
+// AddFile is executed when a file is created and must be added into the owner's directory file list
 func (app *DirectoryApplication) AddFile(ctx context.Context, file *file.File, uid int32, fpath string) error {
 	app.logger.Info("processing an \"add file\" request",
 		zap.Any("user_id", uid))
@@ -109,15 +114,21 @@ func (app *DirectoryApplication) AddFile(ctx context.Context, file *file.File, u
 	return app.dirRepo.Save(ctx, dir)
 }
 
-func (app *DirectoryApplication) DeleteFile(ctx context.Context, file *file.File, uid int32) error {
-	app.logger.Info("processing a \"delete file\" request",
-		zap.Any("user_id", uid))
+// RemoveFile is executed when a file is deleted and must be removed from the directories file list
+func (app *DirectoryApplication) RemoveFile(ctx context.Context, f *file.File, owner int32) error {
+	app.logger.Info("processing a \"remove file\" request",
+		zap.Any("user_id", owner))
 
-	dir, err := app.dirRepo.FindByUserId(ctx, uid)
+	dir, err := app.dirRepo.FindByUserId(ctx, owner)
 	if err != nil {
 		return err
 	}
 
-	dir.DeleteFile(file)
-	return app.dirRepo.Save(ctx, dir)
+	if _, exists := f.Value(file.DeletedAtKey); !exists {
+		dir.RemoveFile(f)
+		return app.dirRepo.Save(ctx, dir)
+	}
+
+	// TODO: the file must be deleted from all directories file list
+	return nil
 }

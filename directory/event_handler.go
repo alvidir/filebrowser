@@ -42,5 +42,5 @@ func (handler *DirectoryEventHandler) OnFileDeleted(file *file.File, uid int32) 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	handler.app.DeleteFile(ctx, file, uid)
+	handler.app.RemoveFile(ctx, file, uid)
 }

@@ -7,12 +7,11 @@ import (
 )
 
 const (
-	Public = 0x01
-	Read   = 0x02
-	Write  = 0x04
-	Grant  = 0x08
-	Owner  = 0x10
-
+	Public        = 0x01
+	Read          = 0x02
+	Write         = 0x04
+	Grant         = 0x08
+	Owner         = 0x10
 	FilenameRegex = "^[^/]+$"
 )
 
@@ -110,7 +109,7 @@ func (file *File) RevokePermissions(uid int32, perm uint8) {
 	}
 }
 
-func (file *File) Revoke(uid int32) {
+func (file *File) RevokeAccess(uid int32) {
 	if file.permissions != nil {
 		delete(file.permissions, uid)
 	}
