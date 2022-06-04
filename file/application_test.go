@@ -2,6 +2,7 @@ package file
 
 import (
 	"context"
+	"errors"
 	"path"
 	"strconv"
 	"testing"
@@ -9,10 +10,6 @@ import (
 
 	fb "github.com/alvidir/filebrowser"
 	"go.uber.org/zap"
-)
-
-const (
-	mockFileId = "000"
 )
 
 type directoryApplicationMock struct {
@@ -49,8 +46,7 @@ func (mock *fileRepositoryMock) Create(ctx context.Context, file *File) error {
 		return mock.create(mock, ctx, file)
 	}
 
-	file.id = mockFileId
-	return nil
+	return fb.ErrAlreadyExists
 }
 
 func (mock *fileRepositoryMock) Find(ctx context.Context, id string) (*File, error) {
@@ -77,7 +73,7 @@ func (mock *fileRepositoryMock) Delete(ctx context.Context, file *File) error {
 	return fb.ErrUnknown
 }
 
-func TestFileApplication_create(t *testing.T) {
+func TestCreate(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 
@@ -89,7 +85,65 @@ func TestFileApplication_create(t *testing.T) {
 		},
 	}
 
-	fileRepo := &fileRepositoryMock{}
+	var fileId string = "999"
+	fileRepo := &fileRepositoryMock{
+		create: func(repo *fileRepositoryMock, ctx context.Context, file *File) error {
+			file.id = fileId
+			return nil
+		},
+	}
+	app := NewFileApplication(fileRepo, dirApp, logger)
+
+	userId := int32(999)
+	fpath := "path/to/example.test"
+
+	before := time.Now().Unix()
+	file, err := app.Create(context.Background(), userId, fpath, nil)
+	after := time.Now().Unix()
+
+	if err != nil {
+		t.Errorf("got error = %v, want = %v", err, nil)
+		return
+	}
+
+	if got := file.Id(); got != fileId {
+		t.Errorf("got id = %v, want = %v", got, fileId)
+	}
+
+	if want := path.Base(fpath); want != file.Name() {
+		t.Errorf("got name = %v, want = %v", file.name, want)
+	}
+
+	if createdAt, exists := file.Value("created_at"); !exists {
+		t.Errorf("got created_at = %v, want > %v && < %v", createdAt, before, after)
+	} else if unixCreatedAt, err := strconv.ParseInt(createdAt, tsBase, 64); err != nil {
+		t.Errorf("got error = %v, want = %v", err, nil)
+	} else if unixCreatedAt < before || unixCreatedAt > after {
+		t.Errorf("got created_at = %v, want > %v && < %v", unixCreatedAt, before, after)
+	}
+
+	if !directoryAddFileMethodExecuted {
+		t.Errorf("directory's AddFile method did not execute")
+	}
+}
+
+func TestCreateWithCustomMetadata(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	dirApp := &directoryApplicationMock{
+		addFile: func(ctx context.Context, file *File, uid int32, path string) error {
+			return nil
+		},
+	}
+
+	var fileId string = "999"
+	fileRepo := &fileRepositoryMock{
+		create: func(repo *fileRepositoryMock, ctx context.Context, file *File) error {
+			file.id = fileId
+			return nil
+		},
+	}
 	app := NewFileApplication(fileRepo, dirApp, logger)
 
 	userId := int32(999)
@@ -99,6 +153,7 @@ func TestFileApplication_create(t *testing.T) {
 	customFieldKey := "custom_field"
 	customFieldValue := "custom value"
 	meta[customFieldKey] = customFieldValue
+	meta[CreatedAtKey] = strconv.FormatInt(time.Now().Add(time.Hour*24).Unix(), tsBase)
 
 	before := time.Now().Unix()
 	file, err := app.Create(context.Background(), userId, fpath, meta)
@@ -109,36 +164,85 @@ func TestFileApplication_create(t *testing.T) {
 		return
 	}
 
-	if got := file.Id(); got != mockFileId {
-		t.Errorf("got file.id = %v, want = %v", got, mockFileId)
-	}
-
-	if want := path.Base(fpath); want != file.Name() {
-		t.Errorf("got file.name = %v, want = %v", file.name, want)
-	}
-
-	createdAt, exists := file.Value("created_at")
-	if !exists {
-		t.Errorf("metadata created_at does not exists")
-	} else if unixCreatedAt, err := strconv.ParseInt(createdAt, 16, 64); err != nil {
+	if createdAt, exists := file.Value("created_at"); !exists {
+		t.Errorf("got created_at = %v, want > %v && < %v", createdAt, before, after)
+	} else if unixCreatedAt, err := strconv.ParseInt(createdAt, tsBase, 64); err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
 	} else if unixCreatedAt < before || unixCreatedAt > after {
 		t.Errorf("got created_at = %v, want > %v && < %v", unixCreatedAt, before, after)
 	}
 
-	customField, exists := file.Value(customFieldKey)
-	if !exists {
+	if customField, exists := file.Value(customFieldKey); !exists {
 		t.Errorf("metadata custom_field does not exists")
 	} else if customField != customFieldValue {
 		t.Errorf("got custom field = %v, want = %v", customField, customFieldValue)
 	}
+}
 
-	if !directoryAddFileMethodExecuted {
-		t.Errorf("directory's AddFile method did not execute")
+func TestCreateWhenFileAlreadyExists(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	dirApp := &directoryApplicationMock{
+		addFile: func(ctx context.Context, file *File, uid int32, path string) error {
+			return nil
+		},
+	}
+
+	fileRepo := &fileRepositoryMock{}
+	app := NewFileApplication(fileRepo, dirApp, logger)
+
+	userId := int32(999)
+	fpath := "path/to/example.test"
+
+	if _, err := app.Create(context.Background(), userId, fpath, nil); !errors.Is(err, fb.ErrAlreadyExists) {
+		t.Errorf("got error = %v, want = %v", err, fb.ErrAlreadyExists)
 	}
 }
 
-func TestFileApplication_read(t *testing.T) {
+func TestReadWhenFileDoesNotExists(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	dirApp := &directoryApplicationMock{
+		addFile: func(ctx context.Context, file *File, uid int32, path string) error {
+			return nil
+		},
+	}
+
+	fileRepo := &fileRepositoryMock{}
+	app := NewFileApplication(fileRepo, dirApp, logger)
+
+	userId := int32(999)
+	fid := "testing"
+
+	if _, err := app.Read(context.Background(), userId, fid); !errors.Is(err, fb.ErrNotFound) {
+		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
+	}
+}
+
+func TestReadWhenHasNoPermissions(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	dirApp := &directoryApplicationMock{
+		addFile: func(ctx context.Context, file *File, uid int32, path string) error {
+			return nil
+		},
+	}
+
+	fileRepo := &fileRepositoryMock{}
+	app := NewFileApplication(fileRepo, dirApp, logger)
+
+	userId := int32(999)
+	fid := "testing"
+
+	if _, err := app.Read(context.Background(), userId, fid); errors.Is(err, fb.ErrNotAvailable) {
+		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)
+	}
+}
+
+func TestRead(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 
@@ -146,7 +250,7 @@ func TestFileApplication_read(t *testing.T) {
 		find: func(repo *fileRepositoryMock, ctx context.Context, id string) (*File, error) {
 			return &File{
 				id:          "123",
-				name:        "example.test",
+				name:        "testing",
 				metadata:    make(Metadata),
 				permissions: Permissions{111: Owner, 222: Read, 333: Grant | Read},
 				data:        []byte{},

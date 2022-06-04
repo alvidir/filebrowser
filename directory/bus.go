@@ -103,12 +103,11 @@ func (bus *RabbitMqDirectoryBus) Consume(ctx context.Context, queue string) erro
 				return fb.ErrChannelClosed
 			}
 
-			go func() {
-				wg.Add(1)
+			wg.Add(1)
+			go func(ctx context.Context, wg *sync.WaitGroup) {
 				defer wg.Done()
-
 				bus.onEvent(ctx, &event)
-			}()
+			}(ctx, &wg)
 
 		case <-ctx.Done():
 			bus.logger.Warn("context cancelled",

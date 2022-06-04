@@ -7,12 +7,12 @@ import (
 )
 
 const (
-	Public        = 0x01
-	Read          = 0x02
-	Write         = 0x04
-	Grant         = 0x08
-	Owner         = 0x10
-	FilenameRegex = "^[^/]+$"
+	Public        uint8  = 0x01
+	Read          uint8  = 0x02
+	Write         uint8  = 0x04
+	Grant         uint8  = 0x08
+	Owner         uint8  = 0x10
+	FilenameRegex string = "^[^/]+$"
 )
 
 var (

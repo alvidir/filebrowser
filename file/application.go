@@ -11,12 +11,10 @@ import (
 )
 
 const (
-	CreatedAtKey     = "created_at"
-	UpdatedAtKey     = "updated_at"
-	DeletedAtKey     = "deleted_at"
-	eventFileCreated = "file::created"
-	eventFileDeleted = "file::deleted"
-	tsBase           = 16
+	CreatedAtKey = "created_at"
+	UpdatedAtKey = "updated_at"
+	DeletedAtKey = "deleted_at"
+	tsBase       = 16
 )
 
 type FileRepository interface {
@@ -88,10 +86,12 @@ func (app *FileApplication) Read(ctx context.Context, uid int32, fid string) (*F
 		return nil, fb.ErrNotAvailable
 	}
 
-	if perm&Owner > 0 || perm&Grant > 0 {
+	if perm&(Owner|Grant) > 0 {
 		return file, nil
 	}
 
+	// hide all those permissions that do not belong to the user or file owners
+	// WARNING: DO NOT SAVE THE FOLLOWING FILE CHANGES
 	for id, p := range file.permissions {
 		if id != uid && p&Owner == 0 {
 			delete(file.permissions, id)
