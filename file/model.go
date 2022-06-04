@@ -121,10 +121,17 @@ func (file *File) RevokePermissions(uid int32, perm uint8) {
 	}
 }
 
-func (file *File) RevokeAccess(uid int32) {
-	if file.permissions != nil {
-		delete(file.permissions, uid)
+func (file *File) RevokeAccess(uid int32) bool {
+	if file.permissions == nil {
+		return false
 	}
+
+	if _, exists := file.permissions[uid]; !exists {
+		return false
+	}
+
+	delete(file.permissions, uid)
+	return true
 }
 
 func (file *File) AddValue(key string, value string) (old string, exists bool) {

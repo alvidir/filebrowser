@@ -145,9 +145,13 @@ func (app *FileApplication) Delete(ctx context.Context, uid int32, fid string) (
 		// uid is the only owner of file f
 		f.metadata[DeletedAtKey] = strconv.FormatInt(time.Now().Unix(), tsBase)
 		err = app.repo.Delete(ctx, f)
-	} else {
-		f.RevokeAccess(uid)
+	} else if f.RevokeAccess(uid) {
 		err = app.repo.Save(ctx, f)
+	} else {
+		app.logger.Warn("unauthorized \"delete\" file request",
+			zap.String("file_id", fid),
+			zap.Int32("user_id", uid))
+		return nil, fb.ErrNotAvailable
 	}
 
 	if err != nil {

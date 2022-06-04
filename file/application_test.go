@@ -73,6 +73,48 @@ func (mock *fileRepositoryMock) Delete(ctx context.Context, file *File) error {
 	return fb.ErrUnknown
 }
 
+func TestCreateWhenFileAlreadyExists(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	dirApp := &directoryApplicationMock{
+		addFile: func(ctx context.Context, file *File, uid int32, path string) error {
+			return nil
+		},
+	}
+
+	fileRepo := &fileRepositoryMock{}
+	app := NewFileApplication(fileRepo, dirApp, logger)
+
+	userId := int32(999)
+	fpath := "path/to/example.test"
+
+	if _, err := app.Create(context.Background(), userId, fpath, nil); !errors.Is(err, fb.ErrAlreadyExists) {
+		t.Errorf("got error = %v, want = %v", err, fb.ErrAlreadyExists)
+	}
+}
+
+func TestReadWhenFileDoesNotExists(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	dirApp := &directoryApplicationMock{
+		addFile: func(ctx context.Context, file *File, uid int32, path string) error {
+			return nil
+		},
+	}
+
+	fileRepo := &fileRepositoryMock{}
+	app := NewFileApplication(fileRepo, dirApp, logger)
+
+	userId := int32(999)
+	fid := "testing"
+
+	if _, err := app.Read(context.Background(), userId, fid); !errors.Is(err, fb.ErrNotFound) {
+		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
+	}
+}
+
 func TestCreate(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
@@ -114,7 +156,7 @@ func TestCreate(t *testing.T) {
 		t.Errorf("got name = %v, want = %v", file.name, want)
 	}
 
-	if createdAt, exists := file.Value("created_at"); !exists {
+	if createdAt, exists := file.metadata[CreatedAtKey]; !exists {
 		t.Errorf("got created_at = %v, want > %v && < %v", createdAt, before, after)
 	} else if unixCreatedAt, err := strconv.ParseInt(createdAt, tsBase, 64); err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
@@ -164,7 +206,7 @@ func TestCreateWithCustomMetadata(t *testing.T) {
 		return
 	}
 
-	if createdAt, exists := file.Value("created_at"); !exists {
+	if createdAt, exists := file.metadata[CreatedAtKey]; !exists {
 		t.Errorf("got created_at = %v, want > %v && < %v", createdAt, before, after)
 	} else if unixCreatedAt, err := strconv.ParseInt(createdAt, tsBase, 64); err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
@@ -172,52 +214,8 @@ func TestCreateWithCustomMetadata(t *testing.T) {
 		t.Errorf("got created_at = %v, want > %v && < %v", unixCreatedAt, before, after)
 	}
 
-	if customField, exists := file.Value(customFieldKey); !exists {
-		t.Errorf("metadata custom_field does not exists")
-	} else if customField != customFieldValue {
-		t.Errorf("got custom field = %v, want = %v", customField, customFieldValue)
-	}
-}
-
-func TestCreateWhenFileAlreadyExists(t *testing.T) {
-	logger, _ := zap.NewProduction()
-	defer logger.Sync()
-
-	dirApp := &directoryApplicationMock{
-		addFile: func(ctx context.Context, file *File, uid int32, path string) error {
-			return nil
-		},
-	}
-
-	fileRepo := &fileRepositoryMock{}
-	app := NewFileApplication(fileRepo, dirApp, logger)
-
-	userId := int32(999)
-	fpath := "path/to/example.test"
-
-	if _, err := app.Create(context.Background(), userId, fpath, nil); !errors.Is(err, fb.ErrAlreadyExists) {
-		t.Errorf("got error = %v, want = %v", err, fb.ErrAlreadyExists)
-	}
-}
-
-func TestReadWhenFileDoesNotExists(t *testing.T) {
-	logger, _ := zap.NewProduction()
-	defer logger.Sync()
-
-	dirApp := &directoryApplicationMock{
-		addFile: func(ctx context.Context, file *File, uid int32, path string) error {
-			return nil
-		},
-	}
-
-	fileRepo := &fileRepositoryMock{}
-	app := NewFileApplication(fileRepo, dirApp, logger)
-
-	userId := int32(999)
-	fid := "testing"
-
-	if _, err := app.Read(context.Background(), userId, fid); !errors.Is(err, fb.ErrNotFound) {
-		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
+	if customField, exists := file.metadata[customFieldKey]; !exists || customField != customFieldValue {
+		t.Errorf("got custom_field = %v, want = %v", customField, customFieldValue)
 	}
 }
 
@@ -294,7 +292,7 @@ func TestRead(t *testing.T) {
 	}
 
 	_, err = app.Read(context.Background(), 444, "")
-	if err == nil {
+	if !errors.Is(err, fb.ErrNotAvailable) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)
 		return
 	}
@@ -309,5 +307,433 @@ func TestRead(t *testing.T) {
 	want = Permissions{111: Owner}
 	if len(file.permissions) != len(want) {
 		t.Errorf("got permissions = %+v, want = %+v", file.permissions, want)
+	}
+}
+
+func TestWriteWhenFileDoesNotExists(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	dirApp := &directoryApplicationMock{
+		addFile: func(ctx context.Context, file *File, uid int32, path string) error {
+			return nil
+		},
+	}
+
+	fileRepo := &fileRepositoryMock{}
+	app := NewFileApplication(fileRepo, dirApp, logger)
+
+	userId := int32(999)
+	fid := "testing"
+
+	if _, err := app.Write(context.Background(), userId, fid, nil, nil); !errors.Is(err, fb.ErrNotFound) {
+		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
+	}
+}
+
+func TestWriteWhenHasNoPermissions(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	dirApp := &directoryApplicationMock{
+		addFile: func(ctx context.Context, file *File, uid int32, path string) error {
+			return nil
+		},
+	}
+
+	repo := &fileRepositoryMock{
+		find: func(repo *fileRepositoryMock, ctx context.Context, id string) (*File, error) {
+			return &File{
+				id:          "123",
+				name:        "testing",
+				metadata:    make(Metadata),
+				permissions: Permissions{111: Owner, 222: Read, 333: Grant | Read},
+				data:        []byte{},
+				flags:       repo.flags,
+			}, nil
+		},
+	}
+	app := NewFileApplication(repo, dirApp, logger)
+
+	fid := "testing"
+	if _, err := app.Write(context.Background(), 222, fid, nil, nil); !errors.Is(err, fb.ErrNotAvailable) {
+		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)
+	}
+
+	if _, err := app.Write(context.Background(), 999, fid, nil, nil); !errors.Is(err, fb.ErrNotAvailable) {
+		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)
+	}
+}
+
+func TestWriteWhenCannotSave(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	repo := &fileRepositoryMock{
+		find: func(repo *fileRepositoryMock, ctx context.Context, id string) (*File, error) {
+			return &File{
+				id:          "123",
+				name:        "testing",
+				metadata:    make(Metadata),
+				permissions: Permissions{111: Owner, 222: Read, 333: Grant | Read},
+				data:        []byte{},
+				flags:       repo.flags,
+			}, nil
+		},
+	}
+
+	dirApp := &directoryApplicationMock{}
+	app := NewFileApplication(repo, dirApp, logger)
+
+	fid := "testing"
+	if _, err := app.Write(context.Background(), 111, fid, nil, nil); !errors.Is(err, fb.ErrUnknown) {
+		t.Errorf("got error = %v, want = %v", err, fb.ErrUnknown)
+	}
+}
+
+func TestWrite(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	meta := make(Metadata)
+	createdAtValue := "000"
+	meta[CreatedAtKey] = createdAtValue
+
+	repo := &fileRepositoryMock{
+		find: func(repo *fileRepositoryMock, ctx context.Context, id string) (*File, error) {
+			return &File{
+				id:          "123",
+				name:        "testing",
+				metadata:    meta,
+				permissions: Permissions{111: Owner, 222: Read, 333: Grant | Read},
+				data:        []byte{},
+				flags:       repo.flags,
+			}, nil
+		},
+
+		save: func(repo *fileRepositoryMock, ctx context.Context, file *File) error {
+			return nil
+		},
+	}
+
+	dirApp := &directoryApplicationMock{}
+	app := NewFileApplication(repo, dirApp, logger)
+
+	fid := "testing"
+	data := []byte{1, 2, 3}
+
+	before := time.Now().Unix()
+	file, err := app.Write(context.Background(), 111, fid, data, nil)
+	after := time.Now().Unix()
+
+	if err != nil {
+		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)
+	}
+
+	if createdAt, exists := file.metadata[CreatedAtKey]; !exists || createdAt != createdAtValue {
+		t.Errorf("got created_at = %v, want = %v", createdAt, createdAtValue)
+	}
+
+	if updatedAt, exists := file.metadata[UpdatedAtKey]; !exists {
+		t.Errorf("got updated_at = %v, want > %v && < %v", updatedAt, before, after)
+	} else if unixUpdatedAt, err := strconv.ParseInt(updatedAt, tsBase, 64); err != nil {
+		t.Errorf("got error = %v, want = %v", err, nil)
+	} else if unixUpdatedAt < before || unixUpdatedAt > after {
+		t.Errorf("got updated_at = %v, want > %v && < %v", unixUpdatedAt, before, after)
+	}
+}
+
+func TestWriteWithCustomMetadata(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	meta := make(Metadata)
+	createdAtValue := "000"
+	meta[CreatedAtKey] = createdAtValue
+
+	repo := &fileRepositoryMock{
+		find: func(repo *fileRepositoryMock, ctx context.Context, id string) (*File, error) {
+			return &File{
+				id:          "123",
+				name:        "testing",
+				metadata:    meta,
+				permissions: Permissions{111: Owner, 222: Read, 333: Grant | Read},
+				data:        []byte{},
+				flags:       repo.flags,
+			}, nil
+		},
+
+		save: func(repo *fileRepositoryMock, ctx context.Context, file *File) error {
+			return nil
+		},
+	}
+
+	dirApp := &directoryApplicationMock{}
+	app := NewFileApplication(repo, dirApp, logger)
+
+	fid := "testing"
+	data := []byte{1, 2, 3}
+	customFieldKey := "custom_field"
+	customFieldValue := "custom value"
+
+	customMeta := make(Metadata)
+	customMeta[customFieldKey] = customFieldValue
+	customMeta[CreatedAtKey] = strconv.FormatInt(time.Now().Add(time.Hour*24).Unix(), tsBase)
+
+	file, err := app.Write(context.Background(), 111, fid, data, customMeta)
+
+	if err != nil {
+		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)
+	}
+
+	if createdAt, exists := file.metadata[CreatedAtKey]; !exists || createdAt != createdAtValue {
+		t.Errorf("got created_at = %v, want = %v", createdAt, createdAtValue)
+	}
+
+	if customField, exists := file.metadata[customFieldKey]; !exists || customField != customFieldValue {
+		t.Errorf("got custom_field = %v, want = %v", customField, customFieldValue)
+	}
+}
+
+func TestDeleteWhenFileDoesNotExists(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	dirApp := &directoryApplicationMock{
+		addFile: func(ctx context.Context, file *File, uid int32, path string) error {
+			return nil
+		},
+	}
+
+	fileRepo := &fileRepositoryMock{}
+	app := NewFileApplication(fileRepo, dirApp, logger)
+
+	userId := int32(999)
+	fid := "testing"
+
+	if _, err := app.Delete(context.Background(), userId, fid); !errors.Is(err, fb.ErrNotFound) {
+		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
+	}
+}
+
+func TestDeleteWhenHasNoPermissions(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	dirApp := &directoryApplicationMock{
+		removeFile: func(ctx context.Context, file *File, uid int32) error {
+			return nil
+		},
+	}
+
+	repo := &fileRepositoryMock{
+		find: func(repo *fileRepositoryMock, ctx context.Context, id string) (*File, error) {
+			return &File{
+				id:          "123",
+				name:        "testing",
+				metadata:    make(Metadata),
+				permissions: make(Permissions),
+				data:        []byte{},
+				flags:       repo.flags,
+			}, nil
+		},
+	}
+	app := NewFileApplication(repo, dirApp, logger)
+
+	fid := "testing"
+	if _, err := app.Delete(context.Background(), 999, fid); !errors.Is(err, fb.ErrNotAvailable) {
+		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)
+	}
+}
+
+func TestDeleteWhenCannotSave(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	dirApp := &directoryApplicationMock{
+		removeFile: func(ctx context.Context, file *File, uid int32) error {
+			return nil
+		},
+	}
+
+	repo := &fileRepositoryMock{
+		find: func(repo *fileRepositoryMock, ctx context.Context, id string) (*File, error) {
+			return &File{
+				id:          "123",
+				name:        "testing",
+				metadata:    make(Metadata),
+				permissions: Permissions{222: Read},
+				data:        []byte{},
+				flags:       repo.flags,
+			}, nil
+		},
+	}
+
+	app := NewFileApplication(repo, dirApp, logger)
+
+	fid := "testing"
+	if _, err := app.Delete(context.Background(), 222, fid); !errors.Is(err, fb.ErrUnknown) {
+		t.Errorf("got error = %v, want = %v", err, fb.ErrUnknown)
+	}
+}
+
+func TestDeleteWhenIsNotOwner(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	directoryRemoveFileMethodExecuted := false
+	dirApp := &directoryApplicationMock{
+		removeFile: func(ctx context.Context, file *File, uid int32) error {
+			directoryRemoveFileMethodExecuted = true
+			return nil
+		},
+	}
+
+	repo := &fileRepositoryMock{
+		find: func(repo *fileRepositoryMock, ctx context.Context, id string) (*File, error) {
+			return &File{
+				id:          "123",
+				name:        "testing",
+				metadata:    make(Metadata),
+				permissions: Permissions{111: Read},
+				data:        []byte{},
+				flags:       repo.flags,
+			}, nil
+		},
+
+		save: func(repo *fileRepositoryMock, ctx context.Context, file *File) error {
+			return nil
+		},
+	}
+
+	app := NewFileApplication(repo, dirApp, logger)
+
+	fid := "testing"
+	file, err := app.Delete(context.Background(), 111, fid)
+	if err != nil {
+		t.Errorf("got error = %v, want = %v", err, nil)
+	}
+
+	if deletedAt, exists := file.metadata[DeletedAtKey]; exists {
+		t.Errorf("got deleted_at = %v, want = %v", deletedAt, nil)
+	}
+
+	if perm, exists := file.permissions[111]; exists {
+		t.Errorf("got permissions = %v, want = %v", perm, nil)
+	}
+
+	if !directoryRemoveFileMethodExecuted {
+		t.Errorf("directory's RemoveFile method did not execute")
+	}
+}
+
+func TestDeleteWhenMoreThanOneOwner(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	directoryRemoveFileMethodExecuted := false
+	dirApp := &directoryApplicationMock{
+		removeFile: func(ctx context.Context, file *File, uid int32) error {
+			directoryRemoveFileMethodExecuted = true
+			return nil
+		},
+	}
+
+	repo := &fileRepositoryMock{
+		find: func(repo *fileRepositoryMock, ctx context.Context, id string) (*File, error) {
+			return &File{
+				id:          "123",
+				name:        "testing",
+				metadata:    make(Metadata),
+				permissions: Permissions{111: Owner, 222: Owner},
+				data:        []byte{},
+				flags:       repo.flags,
+			}, nil
+		},
+
+		save: func(repo *fileRepositoryMock, ctx context.Context, file *File) error {
+			return nil
+		},
+	}
+
+	app := NewFileApplication(repo, dirApp, logger)
+
+	fid := "testing"
+	file, err := app.Delete(context.Background(), 111, fid)
+	if err != nil {
+		t.Errorf("got error = %v, want = %v", err, nil)
+	}
+
+	if deletedAt, exists := file.metadata[DeletedAtKey]; exists {
+		t.Errorf("got deleted_at = %v, want = %v", deletedAt, nil)
+	}
+
+	if perm, exists := file.permissions[111]; exists {
+		t.Errorf("got permissions = %v, want = %v", perm, nil)
+	}
+
+	if perm, exists := file.permissions[222]; !exists || perm != Owner {
+		t.Errorf("got permissions = %v, want = %v", perm, Owner)
+	}
+
+	if !directoryRemoveFileMethodExecuted {
+		t.Errorf("directory's RemoveFile method did not execute")
+	}
+}
+
+func TestDeleteWhenSingleOwner(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	directoryRemoveFileMethodExecuted := false
+	dirApp := &directoryApplicationMock{
+		removeFile: func(ctx context.Context, file *File, uid int32) error {
+			directoryRemoveFileMethodExecuted = true
+			return nil
+		},
+	}
+
+	repo := &fileRepositoryMock{
+		find: func(repo *fileRepositoryMock, ctx context.Context, id string) (*File, error) {
+			return &File{
+				id:          "123",
+				name:        "testing",
+				metadata:    make(Metadata),
+				permissions: Permissions{111: Owner},
+				data:        []byte{},
+				flags:       repo.flags,
+			}, nil
+		},
+
+		delete: func(repo *fileRepositoryMock, ctx context.Context, file *File) error {
+			return nil
+		},
+	}
+
+	app := NewFileApplication(repo, dirApp, logger)
+
+	fid := "testing"
+	before := time.Now().Unix()
+	file, err := app.Delete(context.Background(), 111, fid)
+	after := time.Now().Unix()
+
+	if err != nil {
+		t.Errorf("got error = %v, want = %v", err, nil)
+	}
+
+	if deletedAt, exists := file.metadata[DeletedAtKey]; !exists {
+		t.Errorf("got deleted_at = %v, want > %v && < %v", deletedAt, before, after)
+	} else if unixDeletedAt, err := strconv.ParseInt(deletedAt, tsBase, 64); err != nil {
+		t.Errorf("got error = %v, want = %v", err, nil)
+	} else if unixDeletedAt < before || unixDeletedAt > after {
+		t.Errorf("got deleted_at = %v, want > %v && < %v", unixDeletedAt, before, after)
+	}
+
+	if perm, exists := file.permissions[111]; !exists {
+		t.Errorf("got permissions = %v, want = %v", perm, Owner)
+	}
+
+	if !directoryRemoveFileMethodExecuted {
+		t.Errorf("directory's RemoveFile method did not execute")
 	}
 }

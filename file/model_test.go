@@ -147,8 +147,14 @@ func TestRevokeAccess(t *testing.T) {
 	}
 
 	var uid int32 = 999
+	if ok := file.RevokeAccess(uid); ok {
+		t.Errorf("got ok = %v, want = %v", ok, false)
+	}
+
 	file.AddPermissions(uid, Write|Read)
-	file.RevokeAccess(uid)
+	if ok := file.RevokeAccess(uid); !ok {
+		t.Errorf("got ok = %v, want = %v", ok, true)
+	}
 
 	if got, exists := file.permissions[uid]; exists {
 		t.Errorf("got permissions = %v, want = %v", got, nil)
