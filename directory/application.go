@@ -2,6 +2,7 @@ package directory
 
 import (
 	"context"
+	"sync"
 
 	fb "github.com/alvidir/filebrowser"
 	"github.com/alvidir/filebrowser/file"
@@ -66,41 +67,34 @@ func (app *DirectoryApplication) Delete(ctx context.Context, uid int32) error {
 		return err
 	}
 
+	var wg sync.WaitGroup
 	for _, fileId := range dir.List() {
-		f, err := app.fileRepo.Find(ctx, fileId)
-		if err != nil {
-			continue
-		}
+		wg.Add(1)
+		go func(ctx context.Context, wg *sync.WaitGroup, fid string) {
+			defer wg.Done()
 
-		if f.Permissions(uid)&file.Owner == 0 {
-			continue
-		}
+			f, err := app.fileRepo.Find(ctx, fid)
+			if err != nil {
+				return
+			}
 
-		// TODO: the following condition requires the file to be unique and lockable
-		// for the whole system
-		if owners := f.Owners(); len(owners) > 1 {
-			app.logger.Warn("unsafe condition evaluated",
-				zap.String("reason", "the File instance has to be unique and lockable"))
+			if f.Permissions(uid)&file.Owner == 0 {
+				return
+			}
 
-			f.RevokeAccess(dir.userId)
-			err = app.fileRepo.Save(ctx, f)
-		} else {
-			err = app.fileRepo.Delete(ctx, f)
-		}
-
-		if err != nil {
-			return err
-		}
+			app.fileRepo.Delete(ctx, f)
+		}(ctx, &wg, fileId)
 	}
 
 	if err := app.dirRepo.Delete(ctx, dir); err != nil {
 		return err
 	}
 
+	wg.Wait()
 	return nil
 }
 
-// AddFile is executed when a file is created and must be added into the owner's directory file list
+// AddFile is executed when a file has been created
 func (app *DirectoryApplication) AddFile(ctx context.Context, file *file.File, uid int32, fpath string) error {
 	app.logger.Info("processing an \"add file\" request",
 		zap.Any("user_id", uid))
@@ -114,14 +108,19 @@ func (app *DirectoryApplication) AddFile(ctx context.Context, file *file.File, u
 	return app.dirRepo.Save(ctx, dir)
 }
 
-// RemoveFile is executed when a file is deleted and must be removed from the directories file list
-func (app *DirectoryApplication) RemoveFile(ctx context.Context, f *file.File, owner int32) error {
+// RemoveFile is executed when a file has been deleted
+func (app *DirectoryApplication) RemoveFile(ctx context.Context, f *file.File, uid int32) error {
 	app.logger.Info("processing a \"remove file\" request",
-		zap.Any("user_id", owner))
+		zap.Any("user_id", uid))
 
-	dir, err := app.dirRepo.FindByUserId(ctx, owner)
+	dir, err := app.dirRepo.FindByUserId(ctx, uid)
 	if err != nil {
 		return err
+	}
+
+	if f.Permissions(uid)&file.Owner == 0 {
+		dir.RemoveFile(f)
+		return app.dirRepo.Save(ctx, dir)
 	}
 
 	if _, exists := f.Value(file.DeletedAtKey); !exists {
@@ -129,6 +128,22 @@ func (app *DirectoryApplication) RemoveFile(ctx context.Context, f *file.File, o
 		return app.dirRepo.Save(ctx, dir)
 	}
 
-	// TODO: the file must be deleted from all directories file list
+	var wg sync.WaitGroup
+	for _, uid := range f.SharedWith() {
+		wg.Add(1)
+		go func(ctx context.Context, wg *sync.WaitGroup, uid int32) {
+			defer wg.Done()
+
+			dir, err := app.dirRepo.FindByUserId(ctx, uid)
+			if err != nil {
+				return
+			}
+
+			dir.RemoveFile(f)
+			app.dirRepo.Save(ctx, dir)
+		}(ctx, &wg, uid)
+	}
+
+	wg.Wait()
 	return nil
 }

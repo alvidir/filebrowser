@@ -7,7 +7,6 @@ import (
 	"time"
 
 	fb "github.com/alvidir/filebrowser"
-	eb "github.com/asaskevich/EventBus"
 	"go.uber.org/zap"
 )
 
@@ -17,7 +16,7 @@ const (
 	DeletedAtKey     = "deleted_at"
 	eventFileCreated = "file::created"
 	eventFileDeleted = "file::deleted"
-	timestampBase    = 16
+	tsBase           = 16
 )
 
 type FileRepository interface {
@@ -27,33 +26,23 @@ type FileRepository interface {
 	Delete(ctx context.Context, file *File) error
 }
 
-type FileEventHandler interface {
-	OnFileCreated(file *File, uid int32, path string)
-	OnFileDeleted(file *File, uid int32)
+type DirectoryApplication interface {
+	AddFile(ctx context.Context, file *File, uid int32, path string) error
+	RemoveFile(ctx context.Context, file *File, uid int32) error
 }
 
 type FileApplication struct {
 	repo   FileRepository
-	bus    eb.Bus
+	dirApp DirectoryApplication
 	logger *zap.Logger
 }
 
-func NewFileApplication(repo FileRepository, logger *zap.Logger) *FileApplication {
+func NewFileApplication(repo FileRepository, dirApp DirectoryApplication, logger *zap.Logger) *FileApplication {
 	return &FileApplication{
 		repo:   repo,
-		bus:    eb.New(),
+		dirApp: dirApp,
 		logger: logger,
 	}
-}
-
-func (app *FileApplication) Subscribe(handler FileEventHandler) error {
-	if err := app.bus.SubscribeAsync(eventFileCreated, handler.OnFileCreated, false); err != nil {
-		return err
-	} else if err := app.bus.SubscribeAsync(eventFileDeleted, handler.OnFileDeleted, false); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string, meta Metadata) (*File, error) {
@@ -65,7 +54,7 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 		meta = make(Metadata)
 	}
 
-	meta[CreatedAtKey] = strconv.FormatInt(time.Now().Unix(), timestampBase)
+	meta[CreatedAtKey] = strconv.FormatInt(time.Now().Unix(), tsBase)
 	meta[UpdatedAtKey] = meta[CreatedAtKey]
 
 	file, err := NewFile("", path.Base(fpath))
@@ -80,8 +69,8 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 	}
 
 	file.AddPermissions(uid, Read|Write|Grant|Owner)
-	app.bus.Publish(eventFileCreated, file, uid, fpath)
-	return file, nil
+	err = app.dirApp.AddFile(ctx, file, uid, fpath)
+	return file, err
 }
 
 func (app *FileApplication) Read(ctx context.Context, uid int32, fid string) (*File, error) {
@@ -133,7 +122,7 @@ func (app *FileApplication) Write(ctx context.Context, uid int32, fid string, da
 		file.metadata = meta
 	}
 
-	file.metadata[UpdatedAtKey] = strconv.FormatInt(time.Now().Unix(), timestampBase)
+	file.metadata[UpdatedAtKey] = strconv.FormatInt(time.Now().Unix(), tsBase)
 
 	if err := app.repo.Save(ctx, file); err != nil {
 		return nil, err
@@ -147,32 +136,24 @@ func (app *FileApplication) Delete(ctx context.Context, uid int32, fid string) (
 		zap.String("file_id", fid),
 		zap.Int32("user_id", uid))
 
-	file, err := app.repo.Find(ctx, fid)
+	f, err := app.repo.Find(ctx, fid)
 	if err != nil {
 		return nil, err
 	}
 
-	if file.Permissions(uid)&Owner == 0 {
-		return nil, fb.ErrNotAvailable
-	}
-
-	// TODO: the following condition requires the file to be unique and lockable
-	// for the whole system
-	if owners := file.Owners(); len(owners) > 1 {
-		app.logger.Warn("unsafe condition evaluated",
-			zap.String("reason", "the File instance has to be unique and lockable"))
-
-		file.RevokeAccess(uid)
-		err = app.repo.Save(ctx, file)
+	if f.Permissions(uid)&Owner != 0 && len(f.Owners()) == 1 {
+		// uid is the only owner of file f
+		f.metadata[DeletedAtKey] = strconv.FormatInt(time.Now().Unix(), tsBase)
+		err = app.repo.Delete(ctx, f)
 	} else {
-		file.metadata[DeletedAtKey] = strconv.FormatInt(time.Now().Unix(), timestampBase)
-		err = app.repo.Delete(ctx, file)
+		f.RevokeAccess(uid)
+		err = app.repo.Save(ctx, f)
 	}
 
 	if err != nil {
 		return nil, err
 	}
 
-	app.bus.Publish(eventFileDeleted, file, uid)
-	return file, nil
+	err = app.dirApp.RemoveFile(ctx, f, uid)
+	return f, err
 }

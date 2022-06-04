@@ -15,54 +15,25 @@ const (
 	mockFileId = "000"
 )
 
-type fileEventHandlerMock struct {
-	onFileCreated func(file *File, uid int32, path string)
-	onFileDeleted func(file *File, uid int32)
-	ch            chan struct {
-		file *File
-		uid  int32
-		path string
-	}
-
-	t *testing.T
+type directoryApplicationMock struct {
+	addFile    func(ctx context.Context, file *File, uid int32, path string) error
+	removeFile func(ctx context.Context, file *File, uid int32) error
 }
 
-func newFileEventHandlerMock(t *testing.T) *fileEventHandlerMock {
-	return &fileEventHandlerMock{
-		ch: make(chan struct {
-			file *File
-			uid  int32
-			path string
-		}),
-
-		t: t,
+func (app *directoryApplicationMock) AddFile(ctx context.Context, file *File, uid int32, path string) error {
+	if app.addFile != nil {
+		return app.addFile(ctx, file, uid, path)
 	}
+
+	return fb.ErrUnknown
 }
 
-func (handler *fileEventHandlerMock) OnFileCreated(file *File, uid int32, path string) {
-	if handler.onFileCreated != nil {
-		handler.onFileCreated(file, uid, path)
-		return
+func (app *directoryApplicationMock) RemoveFile(ctx context.Context, file *File, uid int32) error {
+	if app.removeFile != nil {
+		return app.removeFile(ctx, file, uid)
 	}
 
-	handler.ch <- struct {
-		file *File
-		uid  int32
-		path string
-	}{file, uid, path}
-}
-
-func (handler *fileEventHandlerMock) OnFileDeleted(file *File, uid int32) {
-	if handler.onFileDeleted != nil {
-		handler.onFileDeleted(file, uid)
-		return
-	}
-
-	handler.ch <- struct {
-		file *File
-		uid  int32
-		path string
-	}{file, uid, ""}
+	return fb.ErrUnknown
 }
 
 type fileRepositoryMock struct {
@@ -110,11 +81,16 @@ func TestFileApplication_create(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 
-	repo := &fileRepositoryMock{}
-	handler := newFileEventHandlerMock(t)
+	directoryAddFileMethodExecuted := false
+	dirApp := &directoryApplicationMock{
+		addFile: func(ctx context.Context, file *File, uid int32, path string) error {
+			directoryAddFileMethodExecuted = true
+			return nil
+		},
+	}
 
-	app := NewFileApplication(repo, logger)
-	app.Subscribe(handler)
+	fileRepo := &fileRepositoryMock{}
+	app := NewFileApplication(fileRepo, dirApp, logger)
 
 	userId := int32(999)
 	fpath := "path/to/example.test"
@@ -157,24 +133,8 @@ func TestFileApplication_create(t *testing.T) {
 		t.Errorf("got custom field = %v, want = %v", customField, customFieldValue)
 	}
 
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
-
-	select {
-	case v := <-handler.ch:
-		if v.file != file {
-			t.Errorf("got field = %p, want = %p", v.file, file)
-		}
-
-		if v.uid != userId {
-			t.Errorf("got user id = %v, want = %v", v.uid, userId)
-		}
-
-		if v.path != fpath {
-			t.Errorf("got path = %v, want = %v", v.path, fpath)
-		}
-	case <-ticker.C:
-		t.Errorf("timeout exceed")
+	if !directoryAddFileMethodExecuted {
+		t.Errorf("directory's AddFile method did not execute")
 	}
 }
 
@@ -195,7 +155,8 @@ func TestFileApplication_read(t *testing.T) {
 		},
 	}
 
-	app := NewFileApplication(repo, logger)
+	dirApp := &directoryApplicationMock{}
+	app := NewFileApplication(repo, dirApp, logger)
 	file, err := app.Read(context.Background(), 111, "")
 	if err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)

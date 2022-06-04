@@ -79,6 +79,18 @@ func (file *File) Owners() []int32 {
 	return owners
 }
 
+func (file *File) SharedWith() []int32 {
+	shared := make([]int32, len(file.permissions))
+
+	index := 0
+	for uid := range file.permissions {
+		shared[index] = uid
+		index++
+	}
+
+	return shared
+}
+
 func (file *File) Permissions(uid int32) (perm uint8) {
 	if file.permissions != nil {
 		perm = file.permissions[uid]
