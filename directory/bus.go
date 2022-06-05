@@ -11,14 +11,14 @@ import (
 )
 
 const (
-	CREATED_EVENT_KIND = 0
+	EVENT_CREATED = "CREATED"
 )
 
 type UserEvent struct {
 	ID    int32  `json:"id"`
 	Name  string `json:"name"`
-	Email string `json:"emit"`
-	Kind  int8   `json:"kind"`
+	Email string `json:"email"`
+	Kind  string `json:"kind"`
 }
 
 type RabbitMqDirectoryBus struct {
@@ -39,21 +39,22 @@ func (bus *RabbitMqDirectoryBus) onEvent(ctx context.Context, event *amqp.Delive
 	userEvent := new(UserEvent)
 	if err := json.Unmarshal(event.Body, userEvent); err != nil {
 		bus.logger.Error("parsing event body",
+			zap.ByteString("event_body", event.Body),
 			zap.Error(err))
 
 		return
 	}
 
 	switch kind := userEvent.Kind; kind {
-	case CREATED_EVENT_KIND:
+	case EVENT_CREATED:
 		bus.logger.Info("handling event",
-			zap.Int8("kind", kind))
+			zap.String("kind", kind))
 
 		bus.onUserCreatedEvent(ctx, userEvent)
 
 	default:
 		bus.logger.Warn("unhandled event",
-			zap.Int8("kind", kind))
+			zap.String("kind", kind))
 	}
 }
 
