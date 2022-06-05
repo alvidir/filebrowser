@@ -222,8 +222,8 @@ func TestDeleteWhenUserIsSingleOwner(t *testing.T) {
 		return &Directory{
 			id:     "test",
 			userId: 999,
-			files: map[string]*file.File{
-				"path/to/file": f,
+			files: map[string]string{
+				"path/to/file": f.Id(),
 			},
 		}, nil
 	}
@@ -269,8 +269,8 @@ func TestDeleteWhenUserIsNotSingleOwner(t *testing.T) {
 		return &Directory{
 			id:     "test",
 			userId: 999,
-			files: map[string]*file.File{
-				"path/to/file": f,
+			files: map[string]string{
+				"path/to/file": f.Id(),
 			},
 		}, nil
 	}
@@ -306,8 +306,8 @@ func TestDeleteWhenUserIsNotOwner(t *testing.T) {
 		return &Directory{
 			id:     "test",
 			userId: 999,
-			files: map[string]*file.File{
-				"path/to/file": f,
+			files: map[string]string{
+				"path/to/file": f.Id(),
 			},
 		}, nil
 	}

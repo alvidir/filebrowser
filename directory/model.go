@@ -10,14 +10,14 @@ import (
 type Directory struct {
 	id     string
 	userId int32
-	files  map[string]*file.File
+	files  map[string]string
 }
 
 func NewDirectory(userId int32) *Directory {
 	return &Directory{
 		id:     "",
 		userId: userId,
-		files:  make(map[string]*file.File),
+		files:  make(map[string]string),
 	}
 }
 
@@ -36,13 +36,13 @@ func (dir *Directory) getAvailablePath(dest string) string {
 
 func (dir *Directory) AddFile(file *file.File, path string) string {
 	path = dir.getAvailablePath(path)
-	dir.files[path] = file
+	dir.files[path] = file.Id()
 	return path
 }
 
 func (dir *Directory) RemoveFile(file *file.File) {
-	for path, subject := range dir.files {
-		if subject.Id() == file.Id() {
+	for path, fileId := range dir.files {
+		if fileId == file.Id() {
 			delete(dir.files, path)
 		}
 	}
@@ -54,8 +54,8 @@ func (dir *Directory) List() map[string]string {
 		return list
 	}
 
-	for path, file := range dir.files {
-		list[path] = file.Id()
+	for path, fileId := range dir.files {
+		list[path] = fileId
 	}
 
 	return list

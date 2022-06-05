@@ -33,10 +33,8 @@ func TestAddFile(t *testing.T) {
 		t.Errorf("got final path = %s, want = %v", got, want)
 	}
 
-	if got := dir.files[want]; got.Id() != f.Id() {
-		t.Errorf("got file id = %s, want = %v", got.Id(), f.Id())
-	} else if got := got.Name(); got != f.Name() {
-		t.Errorf("got file name = %s, want = %v", got, f.Name())
+	if got := dir.files[want]; got != f.Id() {
+		t.Errorf("got file id = %s, want = %v", got, f.Id())
 	}
 
 	want = fmt.Sprintf("%s (1)", want)
