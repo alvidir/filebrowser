@@ -34,10 +34,6 @@ func (dir *Directory) getAvailablePath(dest string) string {
 	return dest
 }
 
-func (dir *Directory) Files() map[string]*file.File {
-	return dir.files
-}
-
 func (dir *Directory) AddFile(file *file.File, path string) string {
 	path = dir.getAvailablePath(path)
 	dir.files[path] = file

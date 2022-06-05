@@ -13,21 +13,21 @@ import (
 )
 
 type directoryApplicationMock struct {
-	addFile    func(ctx context.Context, file *File, uid int32, path string) error
-	removeFile func(ctx context.Context, file *File, uid int32) error
+	registerFile   func(ctx context.Context, file *File, uid int32, path string) error
+	unregisterFile func(ctx context.Context, file *File, uid int32) error
 }
 
-func (app *directoryApplicationMock) AddFile(ctx context.Context, file *File, uid int32, path string) error {
-	if app.addFile != nil {
-		return app.addFile(ctx, file, uid, path)
+func (app *directoryApplicationMock) RegisterFile(ctx context.Context, file *File, uid int32, path string) error {
+	if app.registerFile != nil {
+		return app.registerFile(ctx, file, uid, path)
 	}
 
 	return fb.ErrUnknown
 }
 
-func (app *directoryApplicationMock) RemoveFile(ctx context.Context, file *File, uid int32) error {
-	if app.removeFile != nil {
-		return app.removeFile(ctx, file, uid)
+func (app *directoryApplicationMock) UnregisterFile(ctx context.Context, file *File, uid int32) error {
+	if app.unregisterFile != nil {
+		return app.unregisterFile(ctx, file, uid)
 	}
 
 	return fb.ErrUnknown
@@ -78,7 +78,7 @@ func TestCreateWhenFileAlreadyExists(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		addFile: func(ctx context.Context, file *File, uid int32, path string) error {
+		registerFile: func(ctx context.Context, file *File, uid int32, path string) error {
 			return nil
 		},
 	}
@@ -99,7 +99,7 @@ func TestReadWhenFileDoesNotExists(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		addFile: func(ctx context.Context, file *File, uid int32, path string) error {
+		registerFile: func(ctx context.Context, file *File, uid int32, path string) error {
 			return nil
 		},
 	}
@@ -121,7 +121,7 @@ func TestCreate(t *testing.T) {
 
 	directoryAddFileMethodExecuted := false
 	dirApp := &directoryApplicationMock{
-		addFile: func(ctx context.Context, file *File, uid int32, path string) error {
+		registerFile: func(ctx context.Context, file *File, uid int32, path string) error {
 			directoryAddFileMethodExecuted = true
 			return nil
 		},
@@ -158,7 +158,7 @@ func TestCreate(t *testing.T) {
 
 	if createdAt, exists := file.metadata[CreatedAtKey]; !exists {
 		t.Errorf("got created_at = %v, want > %v && < %v", createdAt, before, after)
-	} else if unixCreatedAt, err := strconv.ParseInt(createdAt, tsBase, 64); err != nil {
+	} else if unixCreatedAt, err := strconv.ParseInt(createdAt, TimestampBase, 64); err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
 	} else if unixCreatedAt < before || unixCreatedAt > after {
 		t.Errorf("got created_at = %v, want > %v && < %v", unixCreatedAt, before, after)
@@ -174,7 +174,7 @@ func TestCreateWithCustomMetadata(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		addFile: func(ctx context.Context, file *File, uid int32, path string) error {
+		registerFile: func(ctx context.Context, file *File, uid int32, path string) error {
 			return nil
 		},
 	}
@@ -195,7 +195,7 @@ func TestCreateWithCustomMetadata(t *testing.T) {
 	customFieldKey := "custom_field"
 	customFieldValue := "custom value"
 	meta[customFieldKey] = customFieldValue
-	meta[CreatedAtKey] = strconv.FormatInt(time.Now().Add(time.Hour*24).Unix(), tsBase)
+	meta[CreatedAtKey] = strconv.FormatInt(time.Now().Add(time.Hour*24).Unix(), TimestampBase)
 
 	before := time.Now().Unix()
 	file, err := app.Create(context.Background(), userId, fpath, meta)
@@ -208,7 +208,7 @@ func TestCreateWithCustomMetadata(t *testing.T) {
 
 	if createdAt, exists := file.metadata[CreatedAtKey]; !exists {
 		t.Errorf("got created_at = %v, want > %v && < %v", createdAt, before, after)
-	} else if unixCreatedAt, err := strconv.ParseInt(createdAt, tsBase, 64); err != nil {
+	} else if unixCreatedAt, err := strconv.ParseInt(createdAt, TimestampBase, 64); err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
 	} else if unixCreatedAt < before || unixCreatedAt > after {
 		t.Errorf("got created_at = %v, want > %v && < %v", unixCreatedAt, before, after)
@@ -224,7 +224,7 @@ func TestReadWhenHasNoPermissions(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		addFile: func(ctx context.Context, file *File, uid int32, path string) error {
+		registerFile: func(ctx context.Context, file *File, uid int32, path string) error {
 			return nil
 		},
 	}
@@ -315,7 +315,7 @@ func TestWriteWhenFileDoesNotExists(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		addFile: func(ctx context.Context, file *File, uid int32, path string) error {
+		registerFile: func(ctx context.Context, file *File, uid int32, path string) error {
 			return nil
 		},
 	}
@@ -336,7 +336,7 @@ func TestWriteWhenHasNoPermissions(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		addFile: func(ctx context.Context, file *File, uid int32, path string) error {
+		registerFile: func(ctx context.Context, file *File, uid int32, path string) error {
 			return nil
 		},
 	}
@@ -436,7 +436,7 @@ func TestWrite(t *testing.T) {
 
 	if updatedAt, exists := file.metadata[UpdatedAtKey]; !exists {
 		t.Errorf("got updated_at = %v, want > %v && < %v", updatedAt, before, after)
-	} else if unixUpdatedAt, err := strconv.ParseInt(updatedAt, tsBase, 64); err != nil {
+	} else if unixUpdatedAt, err := strconv.ParseInt(updatedAt, TimestampBase, 64); err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
 	} else if unixUpdatedAt < before || unixUpdatedAt > after {
 		t.Errorf("got updated_at = %v, want > %v && < %v", unixUpdatedAt, before, after)
@@ -478,7 +478,7 @@ func TestWriteWithCustomMetadata(t *testing.T) {
 
 	customMeta := make(Metadata)
 	customMeta[customFieldKey] = customFieldValue
-	customMeta[CreatedAtKey] = strconv.FormatInt(time.Now().Add(time.Hour*24).Unix(), tsBase)
+	customMeta[CreatedAtKey] = strconv.FormatInt(time.Now().Add(time.Hour*24).Unix(), TimestampBase)
 
 	file, err := app.Write(context.Background(), 111, fid, data, customMeta)
 
@@ -500,7 +500,7 @@ func TestDeleteWhenFileDoesNotExists(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		addFile: func(ctx context.Context, file *File, uid int32, path string) error {
+		registerFile: func(ctx context.Context, file *File, uid int32, path string) error {
 			return nil
 		},
 	}
@@ -521,7 +521,7 @@ func TestDeleteWhenHasNoPermissions(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		removeFile: func(ctx context.Context, file *File, uid int32) error {
+		unregisterFile: func(ctx context.Context, file *File, uid int32) error {
 			return nil
 		},
 	}
@@ -551,7 +551,7 @@ func TestDeleteWhenCannotSave(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		removeFile: func(ctx context.Context, file *File, uid int32) error {
+		unregisterFile: func(ctx context.Context, file *File, uid int32) error {
 			return nil
 		},
 	}
@@ -583,7 +583,7 @@ func TestDeleteWhenIsNotOwner(t *testing.T) {
 
 	directoryRemoveFileMethodExecuted := false
 	dirApp := &directoryApplicationMock{
-		removeFile: func(ctx context.Context, file *File, uid int32) error {
+		unregisterFile: func(ctx context.Context, file *File, uid int32) error {
 			directoryRemoveFileMethodExecuted = true
 			return nil
 		},
@@ -633,7 +633,7 @@ func TestDeleteWhenMoreThanOneOwner(t *testing.T) {
 
 	directoryRemoveFileMethodExecuted := false
 	dirApp := &directoryApplicationMock{
-		removeFile: func(ctx context.Context, file *File, uid int32) error {
+		unregisterFile: func(ctx context.Context, file *File, uid int32) error {
 			directoryRemoveFileMethodExecuted = true
 			return nil
 		},
@@ -687,7 +687,7 @@ func TestDeleteWhenSingleOwner(t *testing.T) {
 
 	directoryRemoveFileMethodExecuted := false
 	dirApp := &directoryApplicationMock{
-		removeFile: func(ctx context.Context, file *File, uid int32) error {
+		unregisterFile: func(ctx context.Context, file *File, uid int32) error {
 			directoryRemoveFileMethodExecuted = true
 			return nil
 		},
@@ -723,9 +723,9 @@ func TestDeleteWhenSingleOwner(t *testing.T) {
 
 	if deletedAt, exists := file.metadata[DeletedAtKey]; !exists {
 		t.Errorf("got deleted_at = %v, want > %v && < %v", deletedAt, before, after)
-	} else if unixDeletedAt, err := strconv.ParseInt(deletedAt, tsBase, 64); err != nil {
+	} else if unixDeletedAt, err := strconv.ParseInt(deletedAt, TimestampBase, 64); err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
-	} else if unixDeletedAt < before || unixDeletedAt > after {
+	} else if unixDeletedAt > before || unixDeletedAt < after {
 		t.Errorf("got deleted_at = %v, want > %v && < %v", unixDeletedAt, before, after)
 	}
 

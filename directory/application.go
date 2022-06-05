@@ -2,7 +2,9 @@ package directory
 
 import (
 	"context"
+	"strconv"
 	"sync"
+	"time"
 
 	fb "github.com/alvidir/filebrowser"
 	"github.com/alvidir/filebrowser/file"
@@ -82,7 +84,11 @@ func (app *DirectoryApplication) Delete(ctx context.Context, uid int32) error {
 				return
 			}
 
-			app.fileRepo.Delete(ctx, f)
+			if len(f.Owners()) == 1 {
+				// uid is the only owner of file f
+				f.AddValue(file.DeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
+				app.fileRepo.Delete(ctx, f)
+			}
 		}(ctx, &wg, fileId)
 	}
 
@@ -94,8 +100,8 @@ func (app *DirectoryApplication) Delete(ctx context.Context, uid int32) error {
 	return nil
 }
 
-// AddFile is executed when a file has been created
-func (app *DirectoryApplication) AddFile(ctx context.Context, file *file.File, uid int32, fpath string) error {
+// RegisterFile is executed when a file has been created
+func (app *DirectoryApplication) RegisterFile(ctx context.Context, file *file.File, uid int32, fpath string) error {
 	app.logger.Info("processing an \"add file\" request",
 		zap.Any("user_id", uid))
 
@@ -108,8 +114,8 @@ func (app *DirectoryApplication) AddFile(ctx context.Context, file *file.File, u
 	return app.dirRepo.Save(ctx, dir)
 }
 
-// RemoveFile is executed when a file has been deleted
-func (app *DirectoryApplication) RemoveFile(ctx context.Context, f *file.File, uid int32) error {
+// UnregisterFile is executed when a file has been deleted
+func (app *DirectoryApplication) UnregisterFile(ctx context.Context, f *file.File, uid int32) error {
 	app.logger.Info("processing a \"remove file\" request",
 		zap.Any("user_id", uid))
 

@@ -11,10 +11,10 @@ import (
 )
 
 const (
-	CreatedAtKey = "created_at"
-	UpdatedAtKey = "updated_at"
-	DeletedAtKey = "deleted_at"
-	tsBase       = 16
+	CreatedAtKey  = "created_at"
+	UpdatedAtKey  = "updated_at"
+	DeletedAtKey  = "deleted_at"
+	TimestampBase = 16
 )
 
 type FileRepository interface {
@@ -25,8 +25,8 @@ type FileRepository interface {
 }
 
 type DirectoryApplication interface {
-	AddFile(ctx context.Context, file *File, uid int32, path string) error
-	RemoveFile(ctx context.Context, file *File, uid int32) error
+	RegisterFile(ctx context.Context, file *File, uid int32, path string) error
+	UnregisterFile(ctx context.Context, file *File, uid int32) error
 }
 
 type FileApplication struct {
@@ -52,7 +52,7 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 		meta = make(Metadata)
 	}
 
-	meta[CreatedAtKey] = strconv.FormatInt(time.Now().Unix(), tsBase)
+	meta[CreatedAtKey] = strconv.FormatInt(time.Now().Unix(), TimestampBase)
 	meta[UpdatedAtKey] = meta[CreatedAtKey]
 
 	file, err := NewFile("", path.Base(fpath))
@@ -67,7 +67,7 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 	}
 
 	file.AddPermissions(uid, Read|Write|Grant|Owner)
-	err = app.dirApp.AddFile(ctx, file, uid, fpath)
+	err = app.dirApp.RegisterFile(ctx, file, uid, fpath)
 	return file, err
 }
 
@@ -90,9 +90,9 @@ func (app *FileApplication) Read(ctx context.Context, uid int32, fid string) (*F
 		return file, nil
 	}
 
-	// hide all those permissions that do not belong to the user or file owners
-	// WARNING: DO NOT SAVE THE FOLLOWING FILE CHANGES
 	for id, p := range file.permissions {
+		// hide all those permissions that do not belong to any of both, the user or owners
+		// WARNING: DO NOT SAVE THE FOLLOWING FILE CHANGES
 		if id != uid && p&Owner == 0 {
 			delete(file.permissions, id)
 		}
@@ -122,7 +122,7 @@ func (app *FileApplication) Write(ctx context.Context, uid int32, fid string, da
 		file.metadata = meta
 	}
 
-	file.metadata[UpdatedAtKey] = strconv.FormatInt(time.Now().Unix(), tsBase)
+	file.metadata[UpdatedAtKey] = strconv.FormatInt(time.Now().Unix(), TimestampBase)
 
 	if err := app.repo.Save(ctx, file); err != nil {
 		return nil, err
@@ -143,7 +143,7 @@ func (app *FileApplication) Delete(ctx context.Context, uid int32, fid string) (
 
 	if f.Permissions(uid)&Owner != 0 && len(f.Owners()) == 1 {
 		// uid is the only owner of file f
-		f.metadata[DeletedAtKey] = strconv.FormatInt(time.Now().Unix(), tsBase)
+		f.metadata[DeletedAtKey] = strconv.FormatInt(time.Now().Unix(), TimestampBase)
 		err = app.repo.Delete(ctx, f)
 	} else if f.RevokeAccess(uid) {
 		err = app.repo.Save(ctx, f)
@@ -158,6 +158,6 @@ func (app *FileApplication) Delete(ctx context.Context, uid int32, fid string) (
 		return nil, err
 	}
 
-	err = app.dirApp.RemoveFile(ctx, f, uid)
+	err = app.dirApp.UnregisterFile(ctx, f, uid)
 	return f, err
 }
