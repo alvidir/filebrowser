@@ -65,7 +65,7 @@ func TestRemoveFile(t *testing.T) {
 	}
 }
 
-func TestList(t *testing.T) {
+func TestFiles(t *testing.T) {
 	dir := NewDirectory(999)
 
 	f, err := file.NewFile("111", "test")
@@ -85,7 +85,7 @@ func TestList(t *testing.T) {
 
 	want[1] = "path/to/filename (1)"
 
-	got := dir.List()
+	got := dir.Files()
 	if len(got) != len(want) {
 		t.Errorf("got len = %v, want = %v", len(got), len(want))
 	}

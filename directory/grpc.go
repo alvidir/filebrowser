@@ -36,26 +36,26 @@ func (server *DirectoryServer) Create(ctx context.Context, req *proto.DirectoryL
 
 	descriptor := &proto.DirectoryDescriptor{
 		Id:    dir.id,
-		Files: dir.List(),
+		Files: dir.Files(),
 	}
 
 	return descriptor, nil
 }
 
-func (server *DirectoryServer) Describe(ctx context.Context, req *proto.DirectoryLocator) (*proto.DirectoryDescriptor, error) {
+func (server *DirectoryServer) Retrieve(ctx context.Context, req *proto.DirectoryLocator) (*proto.DirectoryDescriptor, error) {
 	uid, err := fb.GetUid(ctx, server.header, server.logger)
 	if err != nil {
 		return nil, err
 	}
 
-	dir, err := server.app.Describe(ctx, uid)
+	dir, err := server.app.Retrieve(ctx, uid)
 	if err != nil {
 		return nil, err
 	}
 
 	descriptor := &proto.DirectoryDescriptor{
 		Id:    dir.id,
-		Files: dir.List(),
+		Files: dir.Files(),
 	}
 
 	return descriptor, nil

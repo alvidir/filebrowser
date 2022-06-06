@@ -48,7 +48,7 @@ func (dir *Directory) RemoveFile(file *file.File) {
 	}
 }
 
-func (dir *Directory) List() map[string]string {
+func (dir *Directory) Files() map[string]string {
 	list := make(map[string]string)
 	if dir.files == nil {
 		return list

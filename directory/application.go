@@ -48,8 +48,8 @@ func (app *DirectoryApplication) Create(ctx context.Context, uid int32) (*Direct
 	return directory, nil
 }
 
-func (app *DirectoryApplication) Describe(ctx context.Context, uid int32) (*Directory, error) {
-	app.logger.Info("processing a \"describe\" directory request",
+func (app *DirectoryApplication) Retrieve(ctx context.Context, uid int32) (*Directory, error) {
+	app.logger.Info("processing a \"retrieve\" directory request",
 		zap.Any("user_id", uid))
 
 	dir, err := app.dirRepo.FindByUserId(ctx, uid)
@@ -70,7 +70,7 @@ func (app *DirectoryApplication) Delete(ctx context.Context, uid int32) error {
 	}
 
 	var wg sync.WaitGroup
-	for _, fileId := range dir.List() {
+	for _, fileId := range dir.Files() {
 		wg.Add(1)
 		go func(ctx context.Context, wg *sync.WaitGroup, fid string) {
 			defer wg.Done()

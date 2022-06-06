@@ -35,22 +35,22 @@ func NewRabbitMqDirectoryBus(app *DirectoryApplication, chann *amqp.Channel, log
 	}
 }
 
-func (bus *RabbitMqDirectoryBus) onEvent(ctx context.Context, event *amqp.Delivery) {
-	userEvent := new(UserEvent)
-	if err := json.Unmarshal(event.Body, userEvent); err != nil {
+func (bus *RabbitMqDirectoryBus) onEvent(ctx context.Context, delivery *amqp.Delivery) {
+	event := new(UserEvent)
+	if err := json.Unmarshal(delivery.Body, event); err != nil {
 		bus.logger.Error("parsing event body",
-			zap.ByteString("event_body", event.Body),
+			zap.ByteString("event_body", delivery.Body),
 			zap.Error(err))
 
 		return
 	}
 
-	switch kind := userEvent.Kind; kind {
+	switch kind := event.Kind; kind {
 	case EVENT_CREATED:
 		bus.logger.Info("handling event",
 			zap.String("kind", kind))
 
-		bus.onUserCreatedEvent(ctx, userEvent)
+		bus.onUserCreatedEvent(ctx, event)
 
 	default:
 		bus.logger.Warn("unhandled event",
@@ -59,14 +59,9 @@ func (bus *RabbitMqDirectoryBus) onEvent(ctx context.Context, event *amqp.Delive
 }
 
 func (bus *RabbitMqDirectoryBus) onUserCreatedEvent(ctx context.Context, event *UserEvent) {
-	if dir, err := bus.app.Create(ctx, event.ID); err == nil {
-		bus.logger.Info("directory created",
-			zap.String("id", dir.id),
-			zap.Int32("user_id", dir.userId))
-	} else {
-		bus.logger.Error("creating directory",
-			zap.Int32("user_id", event.ID),
-			zap.Error(err))
+	_, err := bus.app.Create(ctx, event.ID)
+	if err != nil {
+		return
 	}
 }
 

@@ -146,7 +146,7 @@ func TestCreate(t *testing.T) {
 	}
 }
 
-func TestDescribeWhenDirectoryDoesNotExists(t *testing.T) {
+func TestRetrieveWhenDirectoryDoesNotExists(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 
@@ -158,12 +158,12 @@ func TestDescribeWhenDirectoryDoesNotExists(t *testing.T) {
 	fileRepo := &fileRepositoryMock{}
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
-	if _, err := app.Describe(context.TODO(), 999); !errors.Is(err, fb.ErrNotFound) {
+	if _, err := app.Retrieve(context.TODO(), 999); !errors.Is(err, fb.ErrNotFound) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 }
 
-func TestDescribe(t *testing.T) {
+func TestRetrieve(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 
@@ -179,7 +179,7 @@ func TestDescribe(t *testing.T) {
 	fileRepo := &fileRepositoryMock{}
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
-	if dir, err := app.Describe(context.TODO(), 999); err != nil {
+	if dir, err := app.Retrieve(context.TODO(), 999); err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
 	} else if dir.id != "test" {
 		t.Errorf("got id = %v, want = %v", dir.id, "test")
@@ -365,7 +365,7 @@ func TestRegisterFile(t *testing.T) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 
-	if got := d.List(); len(got) != 1 {
+	if got := d.Files(); len(got) != 1 {
 		t.Errorf("got list len = %v, want = %v", len(got), 1)
 	} else if gotId, exists := got["path/to/file"]; !exists || gotId != "test" {
 		t.Errorf("got file = %v, want = %v", gotId, "test")
@@ -412,7 +412,7 @@ func TestUnregisterFileWhenUserIsNoOwner(t *testing.T) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 
-	if got, exists := d.List()["path/to/file"]; exists {
+	if got, exists := d.Files()["path/to/file"]; exists {
 		t.Errorf("got file = %v, want = %v", got, exists)
 	}
 }
@@ -440,7 +440,7 @@ func TestUnregisterFileWhenFileIsDeleted(t *testing.T) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 
-	if got, exists := d.List()["path/to/file"]; exists {
+	if got, exists := d.Files()["path/to/file"]; exists {
 		t.Errorf("got file = %v, want = %v", got, nil)
 	}
 }
@@ -480,11 +480,11 @@ func TestUnregisterFileWhenFileIsShared(t *testing.T) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 
-	if got, exists := d1.List()["path/to/file"]; exists {
+	if got, exists := d1.Files()["path/to/file"]; exists {
 		t.Errorf("got file = %v, want = %v", got, nil)
 	}
 
-	if got, exists := d2.List()["path/to/file"]; exists {
+	if got, exists := d2.Files()["path/to/file"]; exists {
 		t.Errorf("got file = %v, want = %v", got, nil)
 	}
 

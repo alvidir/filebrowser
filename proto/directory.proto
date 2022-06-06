@@ -12,6 +12,6 @@ message DirectoryDescriptor {
 
 service Directory {
     rpc Create(DirectoryLocator) returns (DirectoryDescriptor);
-    rpc Describe(DirectoryLocator) returns (DirectoryDescriptor);
+    rpc Retrieve(DirectoryLocator) returns (DirectoryDescriptor);
     rpc Delete(DirectoryLocator) returns (DirectoryDescriptor);
 }
