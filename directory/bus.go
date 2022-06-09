@@ -87,6 +87,7 @@ func (bus *RabbitMqDirectoryBus) Consume(ctx context.Context, queue string) erro
 		zap.String("queue", queue))
 
 	var wg sync.WaitGroup
+	defer wg.Wait()
 
 	for {
 		select {
@@ -95,7 +96,6 @@ func (bus *RabbitMqDirectoryBus) Consume(ctx context.Context, queue string) erro
 				bus.logger.Error("channel closed",
 					zap.String("queue", queue))
 
-				wg.Wait()
 				return fb.ErrChannelClosed
 			}
 
@@ -109,7 +109,6 @@ func (bus *RabbitMqDirectoryBus) Consume(ctx context.Context, queue string) erro
 			bus.logger.Warn("context cancelled",
 				zap.Error(ctx.Err()))
 
-			wg.Wait()
 			return ctx.Err()
 		}
 	}

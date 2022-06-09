@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alvidir/filebrowser"
 	fb "github.com/alvidir/filebrowser"
 	"github.com/alvidir/filebrowser/file"
 	"go.uber.org/zap"
@@ -66,7 +65,6 @@ type fileRepositoryMock struct {
 	find   func(repo *fileRepositoryMock, ctx context.Context, id string) (*file.File, error)
 	save   func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
 	delete func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
-	flags  uint8
 }
 
 func (mock *fileRepositoryMock) Create(ctx context.Context, file *file.File) error {
@@ -125,7 +123,7 @@ func TestCreate(t *testing.T) {
 
 	dirRepo := &directoryRepositoryMock{}
 	dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
-		return nil, filebrowser.ErrNotFound
+		return nil, fb.ErrNotFound
 	}
 
 	fileRepo := &fileRepositoryMock{}
@@ -152,7 +150,7 @@ func TestRetrieveWhenDirectoryDoesNotExists(t *testing.T) {
 
 	dirRepo := &directoryRepositoryMock{}
 	dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
-		return nil, filebrowser.ErrNotFound
+		return nil, fb.ErrNotFound
 	}
 
 	fileRepo := &fileRepositoryMock{}
@@ -194,7 +192,7 @@ func TestDeleteWhenDirectoryDoesNotExists(t *testing.T) {
 
 	dirRepo := &directoryRepositoryMock{}
 	dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
-		return nil, filebrowser.ErrNotFound
+		return nil, fb.ErrNotFound
 	}
 
 	fileRepo := &fileRepositoryMock{}
@@ -334,7 +332,7 @@ func TestRegisterFileWhenDirectoryDoesNotExists(t *testing.T) {
 
 	dirRepo := &directoryRepositoryMock{}
 	dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
-		return nil, filebrowser.ErrNotFound
+		return nil, fb.ErrNotFound
 	}
 
 	fileRepo := &fileRepositoryMock{}
@@ -378,7 +376,7 @@ func TestUnregisterFileWhenDirectoryDoesNotExists(t *testing.T) {
 
 	dirRepo := &directoryRepositoryMock{}
 	dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
-		return nil, filebrowser.ErrNotFound
+		return nil, fb.ErrNotFound
 	}
 
 	fileRepo := &fileRepositoryMock{}
