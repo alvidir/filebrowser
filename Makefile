@@ -14,6 +14,8 @@ proto:
 
 	go mod tidy
 
+release: build push
+
 build:
 	podman build -t ${REPO}/${PROJECT}:${VERSION} -f ./container/filebrowser/containerfile .
 	podman build -t ${REPO}/${PROJECT}:${VERSION}-mqworker -f ./container/mqworker/containerfile .

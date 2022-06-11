@@ -6,39 +6,47 @@ import (
 	"sync"
 
 	fb "github.com/alvidir/filebrowser"
+	"github.com/alvidir/filebrowser/file"
 	"github.com/streadway/amqp"
 	"go.uber.org/zap"
 )
 
 const (
 	EVENT_CREATED = "CREATED"
+	ProfilePath   = "profile"
 )
 
-type UserEvent struct {
-	ID    int32  `json:"id"`
+type Profile struct {
 	Name  string `json:"name"`
 	Email string `json:"email"`
-	Kind  string `json:"kind"`
+}
+
+type UserEvent struct {
+	ID   int32  `json:"id"`
+	Kind string `json:"kind"`
+	Profile
 }
 
 type RabbitMqDirectoryBus struct {
-	app    *DirectoryApplication
-	chann  *amqp.Channel
-	logger *zap.Logger
+	dirApp  *DirectoryApplication
+	fileApp *file.FileApplication
+	chann   *amqp.Channel
+	logger  *zap.Logger
 }
 
-func NewRabbitMqDirectoryBus(app *DirectoryApplication, chann *amqp.Channel, logger *zap.Logger) *RabbitMqDirectoryBus {
+func NewRabbitMqDirectoryBus(dirApp *DirectoryApplication, fileApp *file.FileApplication, chann *amqp.Channel, logger *zap.Logger) *RabbitMqDirectoryBus {
 	return &RabbitMqDirectoryBus{
-		app:    app,
-		chann:  chann,
-		logger: logger,
+		dirApp:  dirApp,
+		fileApp: fileApp,
+		chann:   chann,
+		logger:  logger,
 	}
 }
 
 func (bus *RabbitMqDirectoryBus) onEvent(ctx context.Context, delivery *amqp.Delivery) {
 	event := new(UserEvent)
 	if err := json.Unmarshal(delivery.Body, event); err != nil {
-		bus.logger.Error("parsing event body",
+		bus.logger.Error("unmarshaling event body",
 			zap.ByteString("event_body", delivery.Body),
 			zap.Error(err))
 
@@ -59,10 +67,27 @@ func (bus *RabbitMqDirectoryBus) onEvent(ctx context.Context, delivery *amqp.Del
 }
 
 func (bus *RabbitMqDirectoryBus) onUserCreatedEvent(ctx context.Context, event *UserEvent) {
-	_, err := bus.app.Create(ctx, event.ID)
+	if _, err := bus.dirApp.Create(ctx, event.ID); err != nil {
+		return
+	}
+
+	data, err := json.Marshal(event.Profile)
+	if err != nil {
+		bus.logger.Error("marshaling event profile",
+			zap.Error(err))
+
+		return
+	}
+
+	file, err := bus.fileApp.Create(ctx, event.ID, ProfilePath, nil)
 	if err != nil {
 		return
 	}
+
+	if _, err := bus.fileApp.Write(ctx, event.ID, file.Id(), data, nil); err != nil {
+		return
+	}
+
 }
 
 func (bus *RabbitMqDirectoryBus) Consume(ctx context.Context, queue string) error {

@@ -44,6 +44,7 @@ func startWorker(ctx context.Context, conn *amqp.Connection, name string, logger
 	fileRepo := file.NewMongoFileRepository(mongoConn, logger)
 	directoryRepo := dir.NewMongoDirectoryRepository(mongoConn, logger)
 	directoryApp := dir.NewDirectoryApplication(directoryRepo, fileRepo, logger)
+	fileApp := file.NewFileApplication(fileRepo, directoryApp, logger)
 
 	ch, err := conn.Channel()
 	if err != nil {
@@ -103,7 +104,7 @@ func startWorker(ctx context.Context, conn *amqp.Connection, name string, logger
 		return err
 	}
 
-	rabbitmqBus := dir.NewRabbitMqDirectoryBus(directoryApp, ch, logger)
+	rabbitmqBus := dir.NewRabbitMqDirectoryBus(directoryApp, fileApp, ch, logger)
 	return rabbitmqBus.Consume(ctx, q.Name)
 }
 
