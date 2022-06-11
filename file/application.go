@@ -60,13 +60,13 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 		return nil, err
 	}
 
+	file.AddPermissions(uid, Read|Write|Grant|Owner)
 	file.metadata = meta
 
 	if err := app.repo.Create(ctx, file); err != nil {
 		return nil, err
 	}
 
-	file.AddPermissions(uid, Read|Write|Grant|Owner)
 	err = app.dirApp.RegisterFile(ctx, file, uid, fpath)
 	return file, err
 }

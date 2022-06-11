@@ -159,7 +159,15 @@ func (repo *MongoDirectoryRepository) Save(ctx context.Context, dir *Directory) 
 }
 
 func (repo *MongoDirectoryRepository) Delete(ctx context.Context, dir *Directory) error {
-	objID, _ := primitive.ObjectIDFromHex(dir.id)
+	objID, err := primitive.ObjectIDFromHex(dir.id)
+	if err != nil {
+		repo.logger.Error("parsing directory id to ObjectID",
+			zap.String("directory", dir.id),
+			zap.Int32("user", dir.userId),
+			zap.Error(err))
+
+		return fb.ErrUnknown
+	}
 
 	result, err := repo.conn.DeleteOne(ctx, bson.M{"_id": objID})
 	if err != nil {

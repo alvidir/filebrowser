@@ -30,7 +30,7 @@ func newMongoFile(f *File, logger *zap.Logger) (*mongoFile, error) {
 		var err error
 		if oid, err = primitive.ObjectIDFromHex(f.id); err != nil {
 			logger.Error("parsing file id to ObjectID",
-				zap.String("file", f.id),
+				zap.String("file_id", f.id),
 				zap.Error(err))
 
 			return nil, fb.ErrUnknown
@@ -98,10 +98,17 @@ func (repo *MongoFileRepository) Create(ctx context.Context, file *File) error {
 }
 
 func (repo *MongoFileRepository) Find(ctx context.Context, id string) (*File, error) {
-	objID, _ := primitive.ObjectIDFromHex(id)
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		repo.logger.Error("parsing file id to ObjectID",
+			zap.String("file_id", id),
+			zap.Error(err))
+
+		return nil, fb.ErrUnknown
+	}
 
 	var mfile mongoFile
-	err := repo.conn.FindOne(ctx, bson.M{"_id": objID}).Decode(&mfile)
+	err = repo.conn.FindOne(ctx, bson.M{"_id": objID}).Decode(&mfile)
 	if err != nil {
 		repo.logger.Error("performing find one on mongo",
 			zap.String("file_id", id),
@@ -114,9 +121,12 @@ func (repo *MongoFileRepository) Find(ctx context.Context, id string) (*File, er
 }
 
 func (repo *MongoFileRepository) Save(ctx context.Context, file *File) error {
-	objID, _ := primitive.ObjectIDFromHex(file.id)
+	mFile, err := newMongoFile(file, repo.logger)
+	if err != nil {
+		return err
+	}
 
-	result, err := repo.conn.ReplaceOne(ctx, bson.M{"_id": objID}, file)
+	result, err := repo.conn.ReplaceOne(ctx, bson.M{"_id": mFile.ID}, mFile)
 	if err != nil {
 		repo.logger.Error("performing replace one on mongo",
 			zap.String("file_id", file.id),
@@ -137,7 +147,14 @@ func (repo *MongoFileRepository) Save(ctx context.Context, file *File) error {
 }
 
 func (repo *MongoFileRepository) Delete(ctx context.Context, file *File) error {
-	objID, _ := primitive.ObjectIDFromHex(file.id)
+	objID, err := primitive.ObjectIDFromHex(file.id)
+	if err != nil {
+		repo.logger.Error("parsing file id to ObjectID",
+			zap.String("file_id", file.Id()),
+			zap.Error(err))
+
+		return fb.ErrUnknown
+	}
 
 	result, err := repo.conn.DeleteOne(ctx, bson.M{"_id": objID})
 	if err != nil {
