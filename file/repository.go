@@ -24,13 +24,17 @@ type mongoFile struct {
 }
 
 func newMongoFile(f *File, logger *zap.Logger) (*mongoFile, error) {
-	oid, err := primitive.ObjectIDFromHex(f.id)
-	if err != nil {
-		logger.Error("parsing file id to ObjectID",
-			zap.String("directory", f.id),
-			zap.Error(err))
+	oid := primitive.NilObjectID
 
-		return nil, fb.ErrUnknown
+	if len(f.id) > 0 {
+		var err error
+		if oid, err = primitive.ObjectIDFromHex(f.id); err != nil {
+			logger.Error("parsing file id to ObjectID",
+				zap.String("file", f.id),
+				zap.Error(err))
+
+			return nil, fb.ErrUnknown
+		}
 	}
 
 	return &mongoFile{
