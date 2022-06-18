@@ -89,7 +89,7 @@ func TestCreateWhenFileAlreadyExists(t *testing.T) {
 	userId := int32(999)
 	fpath := "path/to/example.test"
 
-	if _, err := app.Create(context.Background(), userId, fpath, nil); !errors.Is(err, fb.ErrAlreadyExists) {
+	if _, err := app.Create(context.Background(), userId, fpath, nil, nil); !errors.Is(err, fb.ErrAlreadyExists) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrAlreadyExists)
 	}
 }
@@ -138,9 +138,10 @@ func TestCreate(t *testing.T) {
 
 	userId := int32(999)
 	fpath := "path/to/example.test"
+	data := []byte("hello world")
 
 	before := time.Now().Unix()
-	file, err := app.Create(context.Background(), userId, fpath, nil)
+	file, err := app.Create(context.Background(), userId, fpath, data, nil)
 	after := time.Now().Unix()
 
 	if err != nil {
@@ -154,6 +155,10 @@ func TestCreate(t *testing.T) {
 
 	if want := path.Base(fpath); want != file.Name() {
 		t.Errorf("got name = %v, want = %v", file.name, want)
+	}
+
+	if got := file.Data(); string(got) != string(data) {
+		t.Errorf("got data = %v, want = %v", got, data)
 	}
 
 	if createdAt, exists := file.metadata[CreatedAtKey]; !exists {
@@ -198,7 +203,7 @@ func TestCreateWithCustomMetadata(t *testing.T) {
 	meta[CreatedAtKey] = strconv.FormatInt(time.Now().Add(time.Hour*24).Unix(), TimestampBase)
 
 	before := time.Now().Unix()
-	file, err := app.Create(context.Background(), userId, fpath, meta)
+	file, err := app.Create(context.Background(), userId, fpath, nil, meta)
 	after := time.Now().Unix()
 
 	if err != nil {

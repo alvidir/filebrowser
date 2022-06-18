@@ -43,7 +43,7 @@ func NewFileApplication(repo FileRepository, dirApp DirectoryApplication, logger
 	}
 }
 
-func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string, meta Metadata) (*File, error) {
+func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string, data []byte, meta Metadata) (*File, error) {
 	app.logger.Info("processing a \"create\" file request",
 		zap.String("file_path", fpath),
 		zap.Any("user_id", uid))
@@ -62,6 +62,7 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 
 	file.AddPermissions(uid, Read|Write|Grant|Owner)
 	file.metadata = meta
+	file.data = data
 
 	if err := app.repo.Create(ctx, file); err != nil {
 		return nil, err

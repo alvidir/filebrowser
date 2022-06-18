@@ -23,13 +23,13 @@ func NewFileServer(app *FileApplication, authHeader string, logger *zap.Logger) 
 	}
 }
 
-func (server *FileServer) Create(ctx context.Context, req *proto.FileLocator) (*proto.FileDescriptor, error) {
+func (server *FileServer) Create(ctx context.Context, req *proto.FileConstructor) (*proto.FileDescriptor, error) {
 	uid, err := fb.GetUid(ctx, server.header, server.logger)
 	if err != nil {
 		return nil, err
 	}
 
-	file, err := server.app.Create(ctx, uid, req.GetPath(), req.GetMetadata())
+	file, err := server.app.Create(ctx, uid, req.GetPath(), req.GetData(), req.GetMetadata())
 	if err != nil {
 		return nil, err
 	}

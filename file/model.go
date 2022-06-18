@@ -143,3 +143,7 @@ func (file *File) AddValue(key string, value string) (old string, exists bool) {
 	file.metadata[key] = value
 	return
 }
+
+func (file *File) Data() []byte {
+	return file.data
+}

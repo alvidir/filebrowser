@@ -83,26 +83,16 @@ func (bus *RabbitMqDirectoryBus) onUserCreatedEvent(ctx context.Context, event *
 		return
 	}
 
-	file, err := bus.fileApp.Create(ctx, event.ID, ProfilePath, nil)
+	_, err = bus.fileApp.Create(ctx, event.ID, ProfilePath, data, nil)
 	if err != nil {
 		bus.logger.Error("creating file",
 			zap.String("file_path", ProfilePath),
-			zap.Int32("user_id", event.ID),
-			zap.Error(err))
-
-		return
-	}
-
-	if _, err := bus.fileApp.Write(ctx, event.ID, file.Id(), data, nil); err != nil {
-		bus.logger.Error("writing file data",
-			zap.String("file_id", file.Id()),
 			zap.Int32("user_id", event.ID),
 			zap.ByteString("data", data),
 			zap.Error(err))
 
 		return
 	}
-
 }
 
 func (bus *RabbitMqDirectoryBus) Consume(ctx context.Context, queue string) error {
