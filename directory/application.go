@@ -123,7 +123,7 @@ func (app *DirectoryApplication) FileSearch(ctx context.Context, uid int32, sear
 	length := 0
 	filenames := make([]string, len(dir.files))
 
-	for path, _ := range dir.files {
+	for path := range dir.files {
 		if regex.FindStringIndex(path) == nil {
 			continue
 		}
