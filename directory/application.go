@@ -2,6 +2,8 @@ package directory
 
 import (
 	"context"
+	"regexp"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -98,6 +100,50 @@ func (app *DirectoryApplication) Delete(ctx context.Context, uid int32) error {
 
 	wg.Wait()
 	return nil
+}
+
+func (app *DirectoryApplication) FileSearch(ctx context.Context, uid int32, search string) ([]*file.File, error) {
+	app.logger.Info("processing a \"search file\" directory request",
+		zap.Any("user_id", uid),
+		zap.String("search", search))
+
+	dir, err := app.Retrieve(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+
+	regex, err := regexp.Compile(search)
+	if err != nil {
+		app.logger.Error("compiling search regex",
+			zap.Any("user_id", uid),
+			zap.String("search", search),
+			zap.Error(err))
+	}
+
+	length := 0
+	filenames := make([]string, len(dir.files))
+
+	for path, _ := range dir.files {
+		if regex.FindStringIndex(path) == nil {
+			continue
+		}
+
+		filenames[length] = path
+		length++
+	}
+
+	filenames = filenames[:length]
+	sort.Slice(filenames, func(i, j int) bool {
+		return regex.FindStringIndex(filenames[i])[0] <
+			regex.FindStringIndex(filenames[j])[0]
+	})
+
+	files := make([]*file.File, length)
+	for index, filename := range filenames {
+		files[index], _ = file.NewFile(dir.files[filename], filename)
+	}
+
+	return files, nil
 }
 
 // RegisterFile is executed when a file has been created

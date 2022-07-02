@@ -25,21 +25,22 @@ type FileRepository interface {
 }
 
 type DirectoryApplication interface {
+	FileSearch(ctx context.Context, uid int32, search string) ([]*File, error)
 	RegisterFile(ctx context.Context, file *File, uid int32, path string) error
 	UnregisterFile(ctx context.Context, file *File, uid int32) error
 }
 
 type FileApplication struct {
-	repo   FileRepository
-	dirApp DirectoryApplication
-	logger *zap.Logger
+	fileRepo FileRepository
+	dirApp   DirectoryApplication
+	logger   *zap.Logger
 }
 
 func NewFileApplication(repo FileRepository, dirApp DirectoryApplication, logger *zap.Logger) *FileApplication {
 	return &FileApplication{
-		repo:   repo,
-		dirApp: dirApp,
-		logger: logger,
+		fileRepo: repo,
+		dirApp:   dirApp,
+		logger:   logger,
 	}
 }
 
@@ -64,7 +65,7 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 	file.metadata = meta
 	file.data = data
 
-	if err := app.repo.Create(ctx, file); err != nil {
+	if err := app.fileRepo.Create(ctx, file); err != nil {
 		return nil, err
 	}
 
@@ -77,7 +78,7 @@ func (app *FileApplication) Read(ctx context.Context, uid int32, fid string) (*F
 		zap.String("file_id", fid),
 		zap.Int32("user_id", uid))
 
-	file, err := app.repo.Find(ctx, fid)
+	file, err := app.fileRepo.Find(ctx, fid)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +108,7 @@ func (app *FileApplication) Write(ctx context.Context, uid int32, fid string, da
 		zap.String("file_id", fid),
 		zap.Int32("user_id", uid))
 
-	file, err := app.repo.Find(ctx, fid)
+	file, err := app.fileRepo.Find(ctx, fid)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +126,7 @@ func (app *FileApplication) Write(ctx context.Context, uid int32, fid string, da
 
 	file.metadata[UpdatedAtKey] = strconv.FormatInt(time.Now().Unix(), TimestampBase)
 
-	if err := app.repo.Save(ctx, file); err != nil {
+	if err := app.fileRepo.Save(ctx, file); err != nil {
 		return nil, err
 	}
 
@@ -137,7 +138,7 @@ func (app *FileApplication) Delete(ctx context.Context, uid int32, fid string) (
 		zap.String("file_id", fid),
 		zap.Int32("user_id", uid))
 
-	f, err := app.repo.Find(ctx, fid)
+	f, err := app.fileRepo.Find(ctx, fid)
 	if err != nil {
 		return nil, err
 	}
@@ -145,9 +146,9 @@ func (app *FileApplication) Delete(ctx context.Context, uid int32, fid string) (
 	if f.Permissions(uid)&Owner != 0 && len(f.Owners()) == 1 {
 		// uid is the only owner of file f
 		f.metadata[DeletedAtKey] = strconv.FormatInt(time.Now().Unix(), TimestampBase)
-		err = app.repo.Delete(ctx, f)
+		err = app.fileRepo.Delete(ctx, f)
 	} else if f.RevokeAccess(uid) {
-		err = app.repo.Save(ctx, f)
+		err = app.fileRepo.Save(ctx, f)
 	} else {
 		app.logger.Warn("unauthorized \"delete\" file request",
 			zap.String("file_id", fid),
@@ -161,4 +162,12 @@ func (app *FileApplication) Delete(ctx context.Context, uid int32, fid string) (
 
 	err = app.dirApp.UnregisterFile(ctx, f, uid)
 	return f, err
+}
+
+func (app *FileApplication) Search(ctx context.Context, uid int32, search string) ([]*File, error) {
+	app.logger.Info("processing a \"search\" file request",
+		zap.String("search", search),
+		zap.Int32("user_id", uid))
+
+	return app.dirApp.FileSearch(ctx, uid, search)
 }

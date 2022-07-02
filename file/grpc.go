@@ -15,6 +15,22 @@ type FileServer struct {
 	header string
 }
 
+func NewFileDescriptor(file *File) *proto.FileDescriptor {
+	descriptor := &proto.FileDescriptor{
+		Id:          file.id,
+		Name:        file.name,
+		Metadata:    file.metadata,
+		Permissions: make(map[int32]int32),
+		Data:        file.data,
+	}
+
+	for uid, perm := range file.permissions {
+		descriptor.Permissions[uid] = int32(perm)
+	}
+
+	return descriptor
+}
+
 func NewFileServer(app *FileApplication, authHeader string, logger *zap.Logger) *FileServer {
 	return &FileServer{
 		app:    app,
@@ -76,19 +92,7 @@ func (server *FileServer) Write(ctx context.Context, req *proto.FileDescriptor) 
 		return nil, err
 	}
 
-	descriptor := &proto.FileDescriptor{
-		Id:          file.id,
-		Name:        file.name,
-		Metadata:    file.metadata,
-		Permissions: make(map[int32]int32),
-		Data:        file.data,
-	}
-
-	for uid, perm := range file.permissions {
-		descriptor.Permissions[uid] = int32(perm)
-	}
-
-	return descriptor, nil
+	return NewFileDescriptor(file), nil
 }
 
 func (server *FileServer) Delete(ctx context.Context, req *proto.FileLocator) (*proto.FileDescriptor, error) {
@@ -99,4 +103,26 @@ func (server *FileServer) Delete(ctx context.Context, req *proto.FileLocator) (*
 
 	_, err = server.app.Delete(ctx, uid, req.GetId())
 	return nil, err
+}
+
+func (server *FileServer) Search(ctx context.Context, req *proto.FileLocator) (*proto.FileDescriptorArray, error) {
+	uid, err := fb.GetUid(ctx, server.header, server.logger)
+	if err != nil {
+		return nil, err
+	}
+
+	files, err := server.app.Search(ctx, uid, req.Search)
+	if err != nil {
+		return nil, err
+	}
+
+	descriptor := &proto.FileDescriptorArray{
+		Files: make([]*proto.FileDescriptor, len(files)),
+	}
+
+	for index, file := range files {
+		descriptor.Files[index] = NewFileDescriptor(file)
+	}
+
+	return descriptor, nil
 }

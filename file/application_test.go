@@ -33,6 +33,10 @@ func (app *directoryApplicationMock) UnregisterFile(ctx context.Context, file *F
 	return fb.ErrUnknown
 }
 
+func (app *directoryApplicationMock) FileSearch(ctx context.Context, uid int32, search string) ([]*File, error) {
+	return nil, fb.ErrUnknown
+}
+
 type fileRepositoryMock struct {
 	create func(repo *fileRepositoryMock, ctx context.Context, file *File) error
 	find   func(repo *fileRepositoryMock, ctx context.Context, id string) (*File, error)

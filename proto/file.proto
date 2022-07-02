@@ -11,6 +11,11 @@ message FileConstructor {
 
 message FileLocator {
     string id = 1;
+    string search = 2;
+}
+
+message FileDescriptorArray {
+   repeated FileDescriptor files = 1;
 }
 
 message FileDescriptor {
@@ -26,4 +31,5 @@ service File {
     rpc Read(FileLocator) returns (FileDescriptor);
     rpc Write(FileDescriptor) returns (FileDescriptor);
     rpc Delete(FileLocator) returns (FileDescriptor);
+    rpc Search(FileLocator) returns (FileDescriptorArray); 
 }

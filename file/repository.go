@@ -120,6 +120,29 @@ func (repo *MongoFileRepository) Find(ctx context.Context, id string) (*File, er
 	return mfile.build(), nil
 }
 
+func (repo *MongoFileRepository) FindAll(ctx context.Context, id string) (*File, error) {
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		repo.logger.Error("parsing file id to ObjectID",
+			zap.String("file_id", id),
+			zap.Error(err))
+
+		return nil, fb.ErrUnknown
+	}
+
+	var mfile mongoFile
+	err = repo.conn.FindOne(ctx, bson.M{"_id": objID}).Decode(&mfile)
+	if err != nil {
+		repo.logger.Error("performing find one on mongo",
+			zap.String("file_id", id),
+			zap.Error(err))
+
+		return nil, fb.ErrUnknown
+	}
+
+	return mfile.build(), nil
+}
+
 func (repo *MongoFileRepository) Save(ctx context.Context, file *File) error {
 	mFile, err := newMongoFile(file, repo.logger)
 	if err != nil {
