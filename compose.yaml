@@ -31,9 +31,9 @@ services:
         env_file:
             - .env
 
-    mqworker:
-        container_name: filebrowser-mqworker
-        image: localhost/alvidir/filebrowser:0.1.0-mqworker
+    mq-users:
+        container_name: filebrowser-mq-users
+        image: localhost/alvidir/filebrowser:0.1.0-mq-users
         restart: always
         security_opt:
             label: disable

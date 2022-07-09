@@ -18,13 +18,13 @@ release: build push
 
 build:
 	podman build -t ${REPO}/${PROJECT}:${VERSION} -f ./container/filebrowser/containerfile .
-	podman build -t ${REPO}/${PROJECT}:${VERSION}-mqworker -f ./container/mqworker/containerfile .
+	podman build -t ${REPO}/${PROJECT}:${VERSION}-mq-users -f ./container/mq-users/containerfile .
 
 push:
 	podman tag localhost/${REPO}/${PROJECT}:${VERSION} ${REMOTE}/${REPO}/${PROJECT}:${VERSION}
 	podman push ${REMOTE}/${REPO}/${PROJECT}:${VERSION}
-	podman tag localhost/${REPO}/${PROJECT}:${VERSION}-mqworker ${REMOTE}/${REPO}/${PROJECT}:${VERSION}-mqworker
-	podman push ${REMOTE}/${REPO}/${PROJECT}:${VERSION}-mqworker
+	podman tag localhost/${REPO}/${PROJECT}:${VERSION}-mq-users ${REMOTE}/${REPO}/${PROJECT}:${VERSION}-mq-users
+	podman push ${REMOTE}/${REPO}/${PROJECT}:${VERSION}-mq-users
 
 deploy:
 	podman-compose -f compose.yaml up -d
@@ -38,8 +38,8 @@ undeploy:
 run:
 	go run cmd/filebrowser/main.go
 
-mqworker:
-	go run cmd/mqworker/main.go
+all-mqworkers:
+	go run cmd/mq-users/main.go
 
 test:
 	go test -v -race ./...

@@ -9,6 +9,7 @@ import (
 	file "github.com/alvidir/filebrowser/file"
 	proto "github.com/alvidir/filebrowser/proto"
 	"github.com/joho/godotenv"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
@@ -27,7 +28,7 @@ var (
 	authHeader  = "X-Auth"
 )
 
-func startServer(lis net.Listener, logger *zap.Logger) {
+func newMongoConnection(logger *zap.Logger) *mongo.Database {
 	mongoUri, exists := os.LookupEnv(ENV_MONGO_DSN)
 	if !exists {
 		logger.Fatal("mongo dsn must be set")
@@ -47,8 +48,16 @@ func startServer(lis net.Listener, logger *zap.Logger) {
 		logger.Info("connection with mongodb cluster established")
 	}
 
-	fileRepo := file.NewMongoFileRepository(mongoConn, logger)
-	directoryRepo := dir.NewMongoDirectoryRepository(mongoConn, logger)
+	return mongoConn
+}
+
+func newFilebrowserGrpcServer(conn *mongo.Database, logger *zap.Logger) *grpc.Server {
+	if header, exists := os.LookupEnv(ENV_AUTH_HEADER); exists {
+		authHeader = header
+	}
+
+	fileRepo := file.NewMongoFileRepository(conn, logger)
+	directoryRepo := dir.NewMongoDirectoryRepository(conn, logger)
 	directoryApp := dir.NewDirectoryApplication(directoryRepo, fileRepo, logger)
 
 	fileApp := file.NewFileApplication(fileRepo, directoryApp, logger)
@@ -60,10 +69,25 @@ func startServer(lis net.Listener, logger *zap.Logger) {
 	proto.RegisterDirectoryServer(grpcSrv, directoryServer)
 	proto.RegisterFileServer(grpcSrv, fileServer)
 
-	if err := grpcSrv.Serve(lis); err != nil {
-		logger.Fatal("server terminated with errors",
+	return grpcSrv
+}
+
+func newNetworkListener(logger *zap.Logger) net.Listener {
+	if addr, exists := os.LookupEnv(ENV_SERVICE_ADDR); exists {
+		serviceAddr = addr
+	}
+
+	if netw, exists := os.LookupEnv(ENV_SERVICE_NETW); exists {
+		serviceNetw = netw
+	}
+
+	lis, err := net.Listen(serviceNetw, serviceAddr)
+	if err != nil {
+		logger.Panic("failed to listen: %v",
 			zap.Error(err))
 	}
+
+	return lis
 }
 
 func main() {
@@ -75,26 +99,15 @@ func main() {
 			zap.Error(err))
 	}
 
-	if addr, exists := os.LookupEnv(ENV_SERVICE_ADDR); exists {
-		serviceAddr = addr
-	}
-
-	if netw, exists := os.LookupEnv(ENV_SERVICE_NETW); exists {
-		serviceNetw = netw
-	}
-
-	if header, exists := os.LookupEnv(ENV_AUTH_HEADER); exists {
-		authHeader = header
-	}
-
-	lis, err := net.Listen(serviceNetw, serviceAddr)
-	if err != nil {
-		logger.Panic("failed to listen: %v",
-			zap.Error(err))
-	}
+	mongoConn := newMongoConnection(logger)
+	grpcServer := newFilebrowserGrpcServer(mongoConn, logger)
+	lis := newNetworkListener(logger)
 
 	logger.Info("server ready to accept connections",
 		zap.String("address", serviceAddr))
 
-	startServer(lis, logger)
+	if err := grpcServer.Serve(lis); err != nil {
+		logger.Fatal("server terminated with errors",
+			zap.Error(err))
+	}
 }
