@@ -25,7 +25,6 @@ type FileRepository interface {
 }
 
 type DirectoryApplication interface {
-	FileSearch(ctx context.Context, uid int32, search string) ([]*File, error)
 	RegisterFile(ctx context.Context, file *File, uid int32, path string) error
 	UnregisterFile(ctx context.Context, file *File, uid int32) error
 }
@@ -162,12 +161,4 @@ func (app *FileApplication) Delete(ctx context.Context, uid int32, fid string) (
 
 	err = app.dirApp.UnregisterFile(ctx, f, uid)
 	return f, err
-}
-
-func (app *FileApplication) Search(ctx context.Context, uid int32, search string) ([]*File, error) {
-	app.logger.Info("processing a \"search\" file request",
-		zap.String("search", search),
-		zap.Int32("user_id", uid))
-
-	return app.dirApp.FileSearch(ctx, uid, search)
 }

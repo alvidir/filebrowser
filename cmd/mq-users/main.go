@@ -72,7 +72,7 @@ func newAmqpChannel(conn *amqp.Connection, logger *zap.Logger) *amqp.Channel {
 	return ch
 }
 
-func buildRabbitMQUsersBus(ch *amqp.Channel, logger *zap.Logger) {
+func initRabbitMQUsersBus(ch *amqp.Channel, logger *zap.Logger) {
 	bus, exists := os.LookupEnv(ENV_RABBITMQ_USERS_BUS)
 	if !exists {
 		logger.Fatal("must be set",
@@ -141,7 +141,7 @@ func main() {
 	ch := newAmqpChannel(conn, logger)
 	defer ch.Close()
 
-	buildRabbitMQUsersBus(ch, logger)
+	initRabbitMQUsersBus(ch, logger)
 
 	ctx := context.Background()
 	rabbitmqBus := dir.NewRabbitMqDirectoryBus(directoryApp, fileApp, ch, logger)

@@ -104,25 +104,3 @@ func (server *FileServer) Delete(ctx context.Context, req *proto.FileLocator) (*
 	_, err = server.app.Delete(ctx, uid, req.GetId())
 	return nil, err
 }
-
-func (server *FileServer) Search(ctx context.Context, req *proto.FileLocator) (*proto.FileDescriptorArray, error) {
-	uid, err := fb.GetUid(ctx, server.header, server.logger)
-	if err != nil {
-		return nil, err
-	}
-
-	files, err := server.app.Search(ctx, uid, req.Search)
-	if err != nil {
-		return nil, err
-	}
-
-	descriptor := &proto.FileDescriptorArray{
-		Files: make([]*proto.FileDescriptor, len(files)),
-	}
-
-	for index, file := range files {
-		descriptor.Files[index] = NewFileDescriptor(file)
-	}
-
-	return descriptor, nil
-}
