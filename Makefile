@@ -14,23 +14,8 @@ proto:
 
 	go mod tidy
 
-release: build push
-
-build:
-	podman build -t ${REPO}/${PROJECT}:${VERSION} -f ./container/filebrowser/containerfile .
-	podman build -t ${REPO}/${PROJECT}:${VERSION}-mq-users -f ./container/mq-users/containerfile .
-
-push:
-	podman tag localhost/${REPO}/${PROJECT}:${VERSION} ${REMOTE}/${REPO}/${PROJECT}:${VERSION}
-	podman push ${REMOTE}/${REPO}/${PROJECT}:${VERSION}
-	podman tag localhost/${REPO}/${PROJECT}:${VERSION}-mq-users ${REMOTE}/${REPO}/${PROJECT}:${VERSION}-mq-users
-	podman push ${REMOTE}/${REPO}/${PROJECT}:${VERSION}-mq-users
-
 deploy:
 	podman-compose -f compose.yaml up -d
-
-follow:
-	podman logs --follow --names filebrowser-server
 
 undeploy:
 	podman-compose -f compose.yaml down
@@ -38,7 +23,7 @@ undeploy:
 run:
 	go run cmd/filebrowser/main.go
 
-all-mqworkers:
+run-mqworkers:
 	go run cmd/mq-users/main.go
 
 test:
