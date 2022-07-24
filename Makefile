@@ -43,3 +43,7 @@ all-mqworkers:
 
 test:
 	go test -v -race ./...
+
+binaries:
+	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o ${PROJECT} cmd/filebrowser/main.go
+	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o ${PROJECT}-mq-users cmd/mq-users/main.go

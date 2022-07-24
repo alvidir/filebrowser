@@ -1,0 +1,38 @@
+name: Release version
+
+on:
+  workflow_run:
+    workflows: ["Run tests"]
+    branches: [main]
+    types: 
+      - completed
+
+  workflow_dispatch:
+
+jobs:
+  release_version:
+    name: Release version
+    strategy:
+      matrix:
+        go-version: [1.18.x]
+        os: [ubuntu-latest]
+
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Create tag
+        id: tagging
+        uses: anothrNick/github-tag-action@1.36.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEFAULT_BUMP: build
+          WITH_V: true
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.tagging.outputs.new_tag }}
+          token: ${{ secrets.PAT }}

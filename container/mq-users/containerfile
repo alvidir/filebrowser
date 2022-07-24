@@ -1,6 +1,7 @@
 FROM docker.io/golang:latest as builder
 
-RUN apt update
+RUN apt update && \
+    apt install -y protobuf-compiler
 
 WORKDIR /app
 
@@ -8,7 +9,9 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 
-# RUN go test ./...
+RUN make install && \
+    make proto -B
+
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o filebrowser-mq-users cmd/mq-users/main.go
 
 ######## Start a new stage from scratch #######
@@ -20,5 +23,4 @@ WORKDIR /app
 
 COPY --from=builder /app/filebrowser-mq-users .
 
-# Command to run the executable
 CMD [ "./filebrowser-mq-users" ]
