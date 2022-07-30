@@ -1,8 +1,3 @@
-VERSION=0.1.0
-PROJECT=filebrowser
-REPO=alvidir
-REMOTE=docker.io
-
 install:
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
