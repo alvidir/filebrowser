@@ -7,6 +7,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.uber.org/zap"
 )
 
@@ -120,27 +121,47 @@ func (repo *MongoFileRepository) Find(ctx context.Context, id string) (*File, er
 	return mfile.build(), nil
 }
 
-func (repo *MongoFileRepository) FindAll(ctx context.Context, id string) (*File, error) {
-	objID, err := primitive.ObjectIDFromHex(id)
+// FindAll returns all those files matching the given ids, excluding the data field
+func (repo *MongoFileRepository) FindAll(ctx context.Context, ids []string) ([]*File, error) {
+	objIDs := make([]primitive.ObjectID, len(ids))
+	for index, id := range ids {
+		objID, err := primitive.ObjectIDFromHex(id)
+		if err != nil {
+			repo.logger.Error("parsing file id to ObjectID",
+				zap.String("file_id", id),
+				zap.Error(err))
+
+			return nil, fb.ErrUnknown
+		}
+
+		objIDs[index] = objID
+	}
+
+	// exclude data field from being loaded
+	opts := options.Find().SetProjection(bson.D{{Key: "data", Value: 0}})
+	cursor, err := repo.conn.Find(ctx, bson.M{"_id": bson.M{"$in": objIDs}}, opts)
 	if err != nil {
-		repo.logger.Error("parsing file id to ObjectID",
-			zap.String("file_id", id),
+		repo.logger.Error("performing find all on mongo",
+			zap.Strings("file_ids", ids),
 			zap.Error(err))
 
 		return nil, fb.ErrUnknown
 	}
 
-	var mfile mongoFile
-	err = repo.conn.FindOne(ctx, bson.M{"_id": objID}).Decode(&mfile)
-	if err != nil {
-		repo.logger.Error("performing find one on mongo",
-			zap.String("file_id", id),
+	mfiles := make([]mongoFile, len(ids))
+	if err := cursor.All(ctx, mfiles); err != nil {
+		repo.logger.Error("decoding found items",
 			zap.Error(err))
 
 		return nil, fb.ErrUnknown
 	}
 
-	return mfile.build(), nil
+	files := make([]*File, len(ids))
+	for index, mfile := range mfiles {
+		files[index] = mfile.build()
+	}
+
+	return files, nil
 }
 
 func (repo *MongoFileRepository) Save(ctx context.Context, file *File) error {

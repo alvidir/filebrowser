@@ -70,7 +70,7 @@ func (app *DirectoryApplication) Delete(ctx context.Context, uid int32) error {
 	}
 
 	var wg sync.WaitGroup
-	for _, fileId := range dir.Files() {
+	for _, f := range dir.Files() {
 		wg.Add(1)
 		go func(ctx context.Context, wg *sync.WaitGroup, fid string) {
 			defer wg.Done()
@@ -89,7 +89,7 @@ func (app *DirectoryApplication) Delete(ctx context.Context, uid int32) error {
 				f.AddValue(file.DeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
 				app.fileRepo.Delete(ctx, f)
 			}
-		}(ctx, &wg, fileId)
+		}(ctx, &wg, f.Id())
 	}
 
 	if err := app.dirRepo.Delete(ctx, dir); err != nil {

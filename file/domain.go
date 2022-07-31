@@ -62,6 +62,10 @@ func (file *File) Value(key string) (value string, exists bool) {
 	return
 }
 
+func (file *File) Metadata() Metadata {
+	return file.metadata
+}
+
 func (file *File) Owners() []int32 {
 	owners := make([]int32, 1) // a file has, for sure, at least one owner
 	for uid, perm := range file.permissions {

@@ -43,12 +43,12 @@ func newMongoDirectory(dir *Directory, logger *zap.Logger) (*mongoDirectory, err
 		Files:  make(map[string]primitive.ObjectID),
 	}
 
-	for fpath, fileId := range dir.files {
-		oid, err := primitive.ObjectIDFromHex(fileId)
+	for fpath, f := range dir.files {
+		oid, err := primitive.ObjectIDFromHex(f.Id())
 		if err != nil {
 			logger.Error("parsing file id to ObjectID",
 				zap.String("directory", dir.id),
-				zap.String("file", fileId),
+				zap.String("file", f.Id()),
 				zap.Int32("user", dir.userId),
 				zap.Error(err))
 
@@ -65,7 +65,7 @@ func (mdir *mongoDirectory) build(logger *zap.Logger) *Directory {
 	dir := &Directory{
 		id:     mdir.ID.Hex(),
 		userId: mdir.UserID,
-		files:  make(map[string]string),
+		files:  make(map[string]*file.File),
 	}
 
 	for fpath, oid := range mdir.Files {
@@ -82,7 +82,7 @@ func (mdir *mongoDirectory) build(logger *zap.Logger) *Directory {
 			continue
 		}
 
-		dir.files[fpath] = file.Id()
+		dir.files[fpath] = file
 	}
 
 	return dir

@@ -33,8 +33,8 @@ func TestAddFile(t *testing.T) {
 		t.Errorf("got final path = %s, want = %v", got, want)
 	}
 
-	if got := dir.files[want]; got != f.Id() {
-		t.Errorf("got file id = %s, want = %v", got, f.Id())
+	if got := dir.files[want]; got.Id() != f.Id() {
+		t.Errorf("got file id = %v, want = %v", got, f.Id())
 	}
 
 	want = fmt.Sprintf("%s (1)", want)
@@ -91,7 +91,7 @@ func TestFiles(t *testing.T) {
 	}
 
 	for _, path := range want {
-		if got, exists := got[path]; !exists || got != f.Id() {
+		if got, exists := got[path]; !exists || got.Id() != f.Id() {
 			t.Errorf("got file id = %v, want = %v", got, f.Id())
 		}
 	}

@@ -220,8 +220,8 @@ func TestDeleteWhenUserIsSingleOwner(t *testing.T) {
 		return &Directory{
 			id:     "test",
 			userId: 999,
-			files: map[string]string{
-				"path/to/file": f.Id(),
+			files: map[string]*file.File{
+				"path/to/file": f,
 			},
 		}, nil
 	}
@@ -267,8 +267,8 @@ func TestDeleteWhenUserIsNotSingleOwner(t *testing.T) {
 		return &Directory{
 			id:     "test",
 			userId: 999,
-			files: map[string]string{
-				"path/to/file": f.Id(),
+			files: map[string]*file.File{
+				"path/to/file": f,
 			},
 		}, nil
 	}
@@ -304,8 +304,8 @@ func TestDeleteWhenUserIsNotOwner(t *testing.T) {
 		return &Directory{
 			id:     "test",
 			userId: 999,
-			files: map[string]string{
-				"path/to/file": f.Id(),
+			files: map[string]*file.File{
+				"path/to/file": f,
 			},
 		}, nil
 	}
@@ -365,8 +365,8 @@ func TestRegisterFile(t *testing.T) {
 
 	if got := d.Files(); len(got) != 1 {
 		t.Errorf("got list len = %v, want = %v", len(got), 1)
-	} else if gotId, exists := got["path/to/file"]; !exists || gotId != "test" {
-		t.Errorf("got file = %v, want = %v", gotId, "test")
+	} else if got, exists := got["path/to/file"]; !exists || got.Id() != "test" {
+		t.Errorf("got file = %v, want = %v", got, "test")
 	}
 }
 

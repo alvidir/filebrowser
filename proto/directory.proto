@@ -2,12 +2,13 @@ syntax = "proto3";
 option go_package = "github.com/alvidir/filebrowser/proto";
 
 package proto;
+import "proto/file.proto";
 
 message DirectoryLocator {}
 
 message DirectoryDescriptor {
     string id = 1;
-    map<string, string> files = 2;
+    map<string, FileDescriptor> files = 2;
 }
 
 service Directory {
