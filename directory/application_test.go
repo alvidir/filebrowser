@@ -83,6 +83,10 @@ func (mock *fileRepositoryMock) Find(ctx context.Context, id string) (*file.File
 	return nil, fb.ErrNotFound
 }
 
+func (mock *fileRepositoryMock) FindAll(context.Context, []string) ([]*file.File, error) {
+	return nil, errors.New("unimplemented")
+}
+
 func (mock *fileRepositoryMock) Save(ctx context.Context, file *file.File) error {
 	if mock.save != nil {
 		return mock.save(mock, ctx, file)
@@ -240,7 +244,7 @@ func TestDeleteWhenUserIsSingleOwner(t *testing.T) {
 
 	after := time.Now().Unix()
 
-	if deletedAt, exists := f.Value(file.DeletedAtKey); !exists {
+	if deletedAt, exists := f.Value(file.MetadataDeletedAtKey); !exists {
 		t.Errorf("got deleted_at = %v, want > %v && < %v", deletedAt, before, after)
 	} else if unixDeletedAt, err := strconv.ParseInt(deletedAt, file.TimestampBase, 64); err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
@@ -284,7 +288,7 @@ func TestDeleteWhenUserIsNotSingleOwner(t *testing.T) {
 		t.Errorf("got error = %v, want = %v", err, nil)
 	}
 
-	if deletedAt, exists := f.Value(file.DeletedAtKey); exists {
+	if deletedAt, exists := f.Value(file.MetadataDeletedAtKey); exists {
 		t.Errorf("got deleted_at = %v, want = %v", deletedAt, nil)
 	}
 }
@@ -321,7 +325,7 @@ func TestDeleteWhenUserIsNotOwner(t *testing.T) {
 		t.Errorf("got error = %v, want = %v", err, nil)
 	}
 
-	if deletedAt, exists := f.Value(file.DeletedAtKey); exists {
+	if deletedAt, exists := f.Value(file.MetadataDeletedAtKey); exists {
 		t.Errorf("got deleted_at = %v, want = %v", deletedAt, nil)
 	}
 }
@@ -430,7 +434,7 @@ func TestUnregisterFileWhenFileIsDeleted(t *testing.T) {
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
 	f, _ := file.NewFile("test", "filename")
-	f.AddValue(file.DeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
+	f.AddValue(file.MetadataDeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
 	f.AddPermissions(999, file.Owner)
 	d.AddFile(f, "path/to/file")
 
@@ -467,7 +471,7 @@ func TestUnregisterFileWhenFileIsShared(t *testing.T) {
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
 	f, _ := file.NewFile("test", "filename")
-	f.AddValue(file.DeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
+	f.AddValue(file.MetadataDeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
 	f.AddPermissions(999, file.Owner)
 	f.AddPermissions(888, file.Read|file.Write|file.Grant)
 
