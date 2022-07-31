@@ -61,10 +61,11 @@ func (mock *directoryRepositoryMock) Delete(ctx context.Context, dir *Directory)
 }
 
 type fileRepositoryMock struct {
-	create func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
-	find   func(repo *fileRepositoryMock, ctx context.Context, id string) (*file.File, error)
-	save   func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
-	delete func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
+	create  func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
+	find    func(repo *fileRepositoryMock, ctx context.Context, id string) (*file.File, error)
+	findAll func(repo *fileRepositoryMock, ctx context.Context, ids []string) ([]*file.File, error)
+	save    func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
+	delete  func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
 }
 
 func (mock *fileRepositoryMock) Create(ctx context.Context, file *file.File) error {
@@ -83,8 +84,12 @@ func (mock *fileRepositoryMock) Find(ctx context.Context, id string) (*file.File
 	return nil, fb.ErrNotFound
 }
 
-func (mock *fileRepositoryMock) FindAll(context.Context, []string) ([]*file.File, error) {
-	return nil, errors.New("unimplemented")
+func (mock *fileRepositoryMock) FindAll(ctx context.Context, ids []string) ([]*file.File, error) {
+	if mock.findAll != nil {
+		return mock.findAll(mock, ctx, ids)
+	}
+
+	return nil, fb.ErrNotFound
 }
 
 func (mock *fileRepositoryMock) Save(ctx context.Context, file *file.File) error {
@@ -179,6 +184,10 @@ func TestRetrieve(t *testing.T) {
 	}
 
 	fileRepo := &fileRepositoryMock{}
+	fileRepo.findAll = func(repo *fileRepositoryMock, ctx context.Context, ids []string) ([]*file.File, error) {
+		return nil, nil
+	}
+
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
 	if dir, err := app.Retrieve(context.TODO(), 999); err != nil {
