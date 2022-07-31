@@ -42,8 +42,8 @@ jobs:
           tags: ${{ steps.build-image.outputs.tags }}
           registry: ${{ env.IMAGE_REGISTRY }}
 
-  push_workers_to_registry:
-    name: Push workers images to registry
+  push_worker_to_registry:
+    name: Push worker image to registry
     runs-on: ubuntu-latest
     
     steps:
@@ -55,9 +55,9 @@ jobs:
         uses: redhat-actions/buildah-build@v2
         with:
           image: ${{ env.IMAGE_NAME }}
-          tags: ${{ github.event.release.tag_name }}-mq-users
+          tags: ${{ github.event.release.tag_name }}-mq-worker
           containerfiles: |
-            ./container/mq-users/containerfile
+            ./container/mq-worker/containerfile
 
       - name: Log in to registry
         uses: redhat-actions/podman-login@v1

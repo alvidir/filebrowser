@@ -12,7 +12,7 @@ COPY . .
 RUN make install && \
     make proto -B
 
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o filebrowser-mq-users cmd/mq-users/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o filebrowser-mq-worker cmd/mq-worker/main.go
 
 ######## Start a new stage from scratch #######
 FROM docker.io/alpine:3.15.5
@@ -21,6 +21,6 @@ RUN apk --no-cache add ca-certificates
 
 WORKDIR /app
 
-COPY --from=builder /app/filebrowser-mq-users .
+COPY --from=builder /app/filebrowser-mq-worker .
 
-CMD [ "./filebrowser-mq-users" ]
+CMD [ "./filebrowser-mq-worker" ]

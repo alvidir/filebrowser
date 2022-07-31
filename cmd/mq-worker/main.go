@@ -6,6 +6,7 @@ import (
 
 	fb "github.com/alvidir/filebrowser"
 	dir "github.com/alvidir/filebrowser/directory"
+	"github.com/alvidir/filebrowser/event"
 	"github.com/alvidir/filebrowser/file"
 	"github.com/joho/godotenv"
 	"github.com/streadway/amqp"
@@ -14,12 +15,11 @@ import (
 )
 
 const (
-	ENV_RABBITMQ_USERS_BUS = "RABBITMQ_USERS_BUS"
-	ENV_RABBITMQ_DSN       = "RABBITMQ_DSN"
-	ENV_MONGO_DSN          = "MONGO_DSN"
-	ENV_MONGO_DATABASE     = "MONGO_INITDB_DATABASE"
-	EXCHANGE_TYPE          = "fanout"
-	QUEUE_NAME             = "filebrowser-users"
+	ENV_RABBITMQ_USERS_EXCHANGE = "RABBITMQ_USERS_EXCHANGE"
+	ENV_RABBITMQ_USERS_QUEUE    = "RABBITMQ_USERS_QUEUE"
+	ENV_RABBITMQ_DSN            = "RABBITMQ_DSN"
+	ENV_MONGO_DSN               = "MONGO_DSN"
+	ENV_MONGO_DATABASE          = "MONGO_INITDB_DATABASE"
 )
 
 func newMongoConnection(logger *zap.Logger) *mongo.Database {
@@ -72,52 +72,27 @@ func newAmqpChannel(conn *amqp.Connection, logger *zap.Logger) *amqp.Channel {
 	return ch
 }
 
-func initRabbitMQUsersBus(ch *amqp.Channel, logger *zap.Logger) {
-	bus, exists := os.LookupEnv(ENV_RABBITMQ_USERS_BUS)
+func handleRabbitMqUserEvents(ctx context.Context, bus *event.RabbitMqEventBus, handler *event.UserEventHandler, logger *zap.Logger) {
+	exchange, exists := os.LookupEnv(ENV_RABBITMQ_USERS_EXCHANGE)
 	if !exists {
 		logger.Fatal("must be set",
-			zap.String("varname", ENV_RABBITMQ_USERS_BUS))
+			zap.String("varname", ENV_RABBITMQ_USERS_EXCHANGE))
 	}
 
-	if err := ch.ExchangeDeclare(
-		bus,           // name
-		EXCHANGE_TYPE, // type
-		true,          // durable
-		false,         // auto-deleted
-		false,         // internal
-		false,         // no-wait
-		nil,           // arguments
-	); err != nil {
-		logger.Fatal("declaring exchange",
-			zap.String("name", bus),
+	queue, exists := os.LookupEnv(ENV_RABBITMQ_USERS_QUEUE)
+	if !exists {
+		logger.Fatal("must be set",
+			zap.String("varname", ENV_RABBITMQ_USERS_QUEUE))
+	}
+
+	if err := bus.QueueBind(exchange, queue); err != nil {
+		logger.Error("binding queue",
+			zap.String("queue", queue),
+			zap.String("exchange", exchange),
 			zap.Error(err))
 	}
 
-	if _, err := ch.QueueDeclare(
-		QUEUE_NAME, // name
-		false,      // durable
-		false,      // delete when unused
-		true,       // exclusive
-		false,      // no-wait
-		nil,        // arguments
-	); err != nil {
-		logger.Fatal("declaring a queue",
-			zap.String("name", QUEUE_NAME),
-			zap.Error(err))
-	}
-
-	if err := ch.QueueBind(
-		QUEUE_NAME, // queue name
-		"",         // routing key
-		bus,        // exchange name
-		false,
-		nil,
-	); err != nil {
-		logger.Fatal("binding a queue",
-			zap.String("exchange", bus),
-			zap.String("queue", QUEUE_NAME),
-			zap.Error(err))
-	}
+	bus.Consume(ctx, queue, handler.OnEvent)
 }
 
 func main() {
@@ -134,6 +109,7 @@ func main() {
 	directoryRepo := dir.NewMongoDirectoryRepository(mongoConn, logger)
 	directoryApp := dir.NewDirectoryApplication(directoryRepo, fileRepo, logger)
 	fileApp := file.NewFileApplication(fileRepo, directoryApp, logger)
+	userEventHandler := event.NewUserEventHandler(directoryApp, fileApp, logger)
 
 	conn := newAmqpConnection(logger)
 	defer conn.Close()
@@ -141,9 +117,7 @@ func main() {
 	ch := newAmqpChannel(conn, logger)
 	defer ch.Close()
 
-	initRabbitMQUsersBus(ch, logger)
-
 	ctx := context.Background()
-	rabbitmqBus := dir.NewRabbitMqDirectoryBus(directoryApp, fileApp, ch, logger)
-	rabbitmqBus.Consume(ctx, QUEUE_NAME)
+	bus := event.NewRabbitMqEventBus(ch, logger)
+	handleRabbitMqUserEvents(ctx, bus, userEventHandler, logger)
 }

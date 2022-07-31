@@ -9,6 +9,10 @@ proto:
 
 	go mod tidy
 
+build:
+	podman build -t alvidir/filebrowser:latest -f ./container/filebrowser/containerfile .
+	podman build -t alvidir/filebrowser:latest-mq-worker -f ./container/mq-worker/containerfile .
+
 deploy:
 	podman-compose -f compose.yaml up -d
 
@@ -18,8 +22,8 @@ undeploy:
 run:
 	go run cmd/filebrowser/main.go
 
-run-mqworkers:
-	go run cmd/mq-users/main.go
+mq-worker:
+	go run cmd/mq-worker/main.go
 
 test:
 	go test -v -race ./...
