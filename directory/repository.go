@@ -98,7 +98,7 @@ func (repo *MongoDirectoryRepository) Create(ctx context.Context, dir *Directory
 	}
 
 	if docId, ok := res.InsertedID.(primitive.ObjectID); ok {
-		dir.id = docId.String()
+		dir.id = docId.Hex()
 		return nil
 	}
 
@@ -169,7 +169,7 @@ func (repo *MongoDirectoryRepository) build(ctx context.Context, mdir *mongoDire
 		files:  make(map[string]*file.File),
 	}
 
-	filesIds := make([]string, len(mdir.Files))
+	filesIds := make([]string, 0, len(mdir.Files))
 	pathByFileId := make(map[string]string)
 	for fpath, oid := range mdir.Files {
 		filesIds = append(filesIds, oid.Hex())

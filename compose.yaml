@@ -33,7 +33,7 @@ services:
 
     mq-worker:
         container_name: filebrowser-mq-worker
-        image: localhost/alvidir/filebrowser:0.1.0-mq-worker
+        image: localhost/alvidir/filebrowser:latest-mq-worker
         restart: always
         security_opt:
             label: disable

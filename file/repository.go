@@ -138,7 +138,7 @@ func (repo *MongoFileRepository) FindAll(ctx context.Context, ids []string) ([]*
 	}
 
 	mfiles := make([]mongoFile, len(ids))
-	if err := cursor.All(ctx, mfiles); err != nil {
+	if err := cursor.All(ctx, &mfiles); err != nil {
 		repo.logger.Error("decoding found items",
 			zap.Error(err))
 

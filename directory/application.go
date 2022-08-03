@@ -57,21 +57,8 @@ func (app *DirectoryApplication) Retrieve(ctx context.Context, uid int32) (*Dire
 		return nil, err
 	}
 
-	filesIds := make([]string, 0, len(dir.Files()))
-	pathByFileId := make(map[string]string)
-	for p, f := range dir.Files() {
-		filesIds = append(filesIds, f.Id())
-		pathByFileId[f.Id()] = p
-	}
-
-	files, err := app.fileRepo.FindAll(ctx, filesIds)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, f := range files {
+	for _, f := range dir.Files() {
 		f.HideProtectedFields(uid)
-		dir.files[pathByFileId[f.Id()]] = f
 	}
 
 	return dir, nil

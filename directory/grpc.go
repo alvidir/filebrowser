@@ -66,9 +66,15 @@ func (server *DirectoryServer) Retrieve(ctx context.Context, req *proto.Director
 	}
 
 	for p, fs := range dir.Files() {
+		permissions := make(map[int32]int32)
+		for _, uid := range fs.SharedWith() {
+			permissions[uid] = int32(fs.Permissions(uid))
+		}
+
 		descriptor.Files[p] = &proto.FileDescriptor{
-			Id:       fs.Id(),
-			Metadata: fs.Metadata(),
+			Id:          fs.Id(),
+			Metadata:    fs.Metadata(),
+			Permissions: permissions,
 		}
 	}
 
