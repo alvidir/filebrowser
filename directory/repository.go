@@ -2,7 +2,6 @@ package directory
 
 import (
 	"context"
-	"path"
 
 	fb "github.com/alvidir/filebrowser"
 	"github.com/alvidir/filebrowser/file"
@@ -22,18 +21,13 @@ type mongoDirectory struct {
 	Files  map[string]primitive.ObjectID `bson:"files"`
 }
 
-func newMongoDirectory(dir *Directory, logger *zap.Logger) (*mongoDirectory, error) {
+func newMongoDirectory(dir *Directory) (*mongoDirectory, error) {
 	oid := primitive.NilObjectID
 
 	if len(dir.id) > 0 {
 		var err error
 		if oid, err = primitive.ObjectIDFromHex(dir.id); err != nil {
-			logger.Error("parsing directory id to ObjectID",
-				zap.String("directory", dir.id),
-				zap.Int32("user", dir.userId),
-				zap.Error(err))
-
-			return nil, fb.ErrUnknown
+			return nil, err
 		}
 	}
 
@@ -46,13 +40,7 @@ func newMongoDirectory(dir *Directory, logger *zap.Logger) (*mongoDirectory, err
 	for fpath, f := range dir.files {
 		oid, err := primitive.ObjectIDFromHex(f.Id())
 		if err != nil {
-			logger.Error("parsing file id to ObjectID",
-				zap.String("directory", dir.id),
-				zap.String("file", f.Id()),
-				zap.Int32("user", dir.userId),
-				zap.Error(err))
-
-			continue
+			return nil, err
 		}
 
 		mongoDir.Files[fpath] = oid
@@ -61,48 +49,23 @@ func newMongoDirectory(dir *Directory, logger *zap.Logger) (*mongoDirectory, err
 	return mongoDir, nil
 }
 
-func (mdir *mongoDirectory) build(logger *zap.Logger) *Directory {
-	dir := &Directory{
-		id:     mdir.ID.Hex(),
-		userId: mdir.UserID,
-		files:  make(map[string]*file.File),
-	}
-
-	for fpath, oid := range mdir.Files {
-		base := path.Base(fpath)
-		file, err := file.NewFile(oid.Hex(), base)
-		if err != nil {
-			logger.Error("building file",
-				zap.String("directory", dir.id),
-				zap.String("file", file.Id()),
-				zap.String("filename", base),
-				zap.Int32("user", dir.userId),
-				zap.Error(err))
-
-			continue
-		}
-
-		dir.files[fpath] = file
-	}
-
-	return dir
-}
-
 type MongoDirectoryRepository struct {
-	conn   *mongo.Collection
-	logger *zap.Logger
+	fileRepo file.FileRepository
+	conn     *mongo.Collection
+	logger   *zap.Logger
 }
 
-func NewMongoDirectoryRepository(db *mongo.Database, logger *zap.Logger) *MongoDirectoryRepository {
+func NewMongoDirectoryRepository(db *mongo.Database, fileRepo file.FileRepository, logger *zap.Logger) *MongoDirectoryRepository {
 	return &MongoDirectoryRepository{
-		conn:   db.Collection(mongoDirectoryCollectionName),
-		logger: logger,
+		fileRepo: fileRepo,
+		conn:     db.Collection(mongoDirectoryCollectionName),
+		logger:   logger,
 	}
 }
 
 func (repo *MongoDirectoryRepository) FindByUserId(ctx context.Context, userId int32) (*Directory, error) {
-	var mongoDirectory mongoDirectory
-	err := repo.conn.FindOne(ctx, bson.M{"user_id": userId}).Decode(&mongoDirectory)
+	var mdir mongoDirectory
+	err := repo.conn.FindOne(ctx, bson.M{"user_id": userId}).Decode(&mdir)
 	if err != nil {
 		repo.logger.Error("performing find by user id on mongo",
 			zap.Int32("user_id", userId),
@@ -111,13 +74,18 @@ func (repo *MongoDirectoryRepository) FindByUserId(ctx context.Context, userId i
 		return nil, fb.ErrUnknown
 	}
 
-	return mongoDirectory.build(repo.logger), nil
+	return repo.build(ctx, &mdir)
 }
 
 func (repo *MongoDirectoryRepository) Create(ctx context.Context, dir *Directory) error {
-	mdir, err := newMongoDirectory(dir, repo.logger)
+	mdir, err := newMongoDirectory(dir)
 	if err != nil {
-		return err
+		repo.logger.Error("building mongo directory",
+			zap.String("directory", dir.id),
+			zap.Int32("user", dir.userId),
+			zap.Error(err))
+
+		return fb.ErrUnknown
 	}
 
 	res, err := repo.conn.InsertOne(ctx, mdir)
@@ -142,9 +110,14 @@ func (repo *MongoDirectoryRepository) Create(ctx context.Context, dir *Directory
 }
 
 func (repo *MongoDirectoryRepository) Save(ctx context.Context, dir *Directory) error {
-	mdir, err := newMongoDirectory(dir, repo.logger)
+	mdir, err := newMongoDirectory(dir)
 	if err != nil {
-		return err
+		repo.logger.Error("building mongo directory",
+			zap.String("directory", dir.id),
+			zap.Int32("user", dir.userId),
+			zap.Error(err))
+
+		return fb.ErrUnknown
 	}
 
 	if _, err = repo.conn.ReplaceOne(ctx, bson.M{"_id": mdir.ID}, mdir); err != nil {
@@ -187,4 +160,30 @@ func (repo *MongoDirectoryRepository) Delete(ctx context.Context, dir *Directory
 	}
 
 	return nil
+}
+
+func (repo *MongoDirectoryRepository) build(ctx context.Context, mdir *mongoDirectory) (*Directory, error) {
+	dir := &Directory{
+		id:     mdir.ID.Hex(),
+		userId: mdir.UserID,
+		files:  make(map[string]*file.File),
+	}
+
+	filesIds := make([]string, len(mdir.Files))
+	pathByFileId := make(map[string]string)
+	for fpath, oid := range mdir.Files {
+		filesIds = append(filesIds, oid.Hex())
+		pathByFileId[oid.Hex()] = fpath
+	}
+
+	files, err := repo.fileRepo.FindAll(ctx, filesIds)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, f := range files {
+		dir.files[pathByFileId[f.Id()]] = f
+	}
+
+	return dir, nil
 }
