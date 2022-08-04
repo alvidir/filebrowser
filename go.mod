@@ -8,7 +8,6 @@ require (
 	go.mongodb.org/mongo-driver v1.9.1
 	go.uber.org/zap v1.21.0
 	google.golang.org/grpc v1.47.0
-	google.golang.org/protobuf v1.28.0
 )
 
 require (
@@ -29,4 +28,5 @@ require (
 	golang.org/x/sys v0.0.0-20220708085239-5a0f0661e09d // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/genproto v0.0.0-20220708155623-50e5f4832e73 // indirect
+	google.golang.org/protobuf v1.28.1 // indirect
 )
