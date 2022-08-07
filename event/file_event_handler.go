@@ -3,7 +3,6 @@ package event
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	dir "github.com/alvidir/filebrowser/directory"
 	"github.com/alvidir/filebrowser/file"
@@ -14,7 +13,6 @@ type FileEventPayload struct {
 	UserID   int32  `json:"user_id"`
 	FileID   string `json:"id"`
 	FileName string `json:"name"`
-	App      string `json:"app"`
 	Kind     string `json:"kind"`
 }
 
@@ -57,11 +55,7 @@ func (handler *FileEventHandler) OnEvent(ctx context.Context, body []byte) {
 
 func (handler *FileEventHandler) onFileCreatedEvent(ctx context.Context, event *FileEventPayload) {
 	meta := file.Metadata{
-		file.MetadataOriginKey: fmt.Sprintf(
-			file.FileOriginFormat,
-			event.FileID,
-			event.App,
-		),
+		file.MetadataOriginKey: event.FileID,
 	}
 
 	_, err := handler.fileApp.Create(ctx, event.UserID, event.FileName, nil, meta)
