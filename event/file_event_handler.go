@@ -59,8 +59,8 @@ func (handler *FileEventHandler) onFileCreatedEvent(ctx context.Context, event *
 	meta := file.Metadata{
 		file.MetadataOriginKey: fmt.Sprintf(
 			file.FileOriginFormat,
-			event.App,
 			event.FileID,
+			event.App,
 		),
 	}
 
