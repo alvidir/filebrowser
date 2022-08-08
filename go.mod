@@ -6,7 +6,7 @@ require (
 	github.com/joho/godotenv v1.4.0
 	github.com/streadway/amqp v1.0.0
 	go.mongodb.org/mongo-driver v1.10.1
-	go.uber.org/zap v1.21.0
+	go.uber.org/zap v1.22.0
 	google.golang.org/grpc v1.47.0
 )
 
