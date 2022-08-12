@@ -1,13 +1,16 @@
 package main
 
 import (
+	"context"
 	"net"
 	"os"
 
 	fb "github.com/alvidir/filebrowser"
 	dir "github.com/alvidir/filebrowser/directory"
 	file "github.com/alvidir/filebrowser/file"
+	perm "github.com/alvidir/filebrowser/permissions"
 	proto "github.com/alvidir/filebrowser/proto"
+	"github.com/go-redis/redis/v9"
 	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
@@ -51,23 +54,51 @@ func newMongoConnection(logger *zap.Logger) *mongo.Database {
 	return mongoConn
 }
 
-func newFilebrowserGrpcServer(conn *mongo.Database, logger *zap.Logger) *grpc.Server {
+func newRedisConnection(logger *zap.Logger) *redis.Client {
+	redisUri, exists := os.LookupEnv("ENV_REDIS_DSN")
+	if !exists {
+		logger.Fatal("redis dsn must be set")
+	}
+
+	client := redis.NewClient(&redis.Options{
+		Addr:     redisUri,
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+
+	if err := client.Ping(context.Background()).Err(); err != nil {
+		logger.Fatal("failed establishing connection",
+			zap.String("uri", redisUri),
+			zap.Error(err))
+	} else {
+		logger.Info("connection with redis cluster established")
+	}
+
+	return client
+}
+
+func newFilebrowserGrpcServer(mongoConn *mongo.Database, redisConn *redis.Client, logger *zap.Logger) *grpc.Server {
 	if header, exists := os.LookupEnv(ENV_AUTH_HEADER); exists {
 		authHeader = header
 	}
 
-	fileRepo := file.NewMongoFileRepository(conn, logger)
-	directoryRepo := dir.NewMongoDirectoryRepository(conn, fileRepo, logger)
+	fileRepo := file.NewMongoFileRepository(mongoConn, logger)
+
+	directoryRepo := dir.NewMongoDirectoryRepository(mongoConn, fileRepo, logger)
 	directoryApp := dir.NewDirectoryApplication(directoryRepo, fileRepo, logger)
+	directoryServer := dir.NewDirectoryServer(directoryApp, logger, authHeader)
 
 	fileApp := file.NewFileApplication(fileRepo, directoryApp, logger)
 	fileServer := file.NewFileServer(fileApp, authHeader, logger)
 
-	directoryServer := dir.NewDirectoryServer(directoryApp, logger, authHeader)
+	permissionsRepo := perm.NewRedisPermissionsRepository(redisConn, fileRepo, logger)
+	permissionsApp := perm.NewPermissionsApplication(permissionsRepo, fileRepo, logger)
+	permissionsServer := perm.NewPermissionsServer(permissionsApp, logger, authHeader)
 
 	grpcSrv := grpc.NewServer()
 	proto.RegisterDirectoryServer(grpcSrv, directoryServer)
 	proto.RegisterFileServer(grpcSrv, fileServer)
+	proto.RegisterPermissionsServer(grpcSrv, permissionsServer)
 
 	return grpcSrv
 }
@@ -100,7 +131,8 @@ func main() {
 	}
 
 	mongoConn := newMongoConnection(logger)
-	grpcServer := newFilebrowserGrpcServer(mongoConn, logger)
+	redisConn := newRedisConnection(logger)
+	grpcServer := newFilebrowserGrpcServer(mongoConn, redisConn, logger)
 	lis := newNetworkListener(logger)
 
 	logger.Info("server ready to accept connections",

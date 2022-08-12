@@ -1,0 +1,13 @@
+syntax = "proto3";
+option go_package = "github.com/alvidir/filebrowser/proto";
+
+package proto;
+import "proto/file.proto";
+
+message HasPermissions {
+    bool isTrue = 1;
+}
+
+service Permissions {
+    rpc HasPermissionsFor(FileLocator) returns (HasPermissions);
+}
