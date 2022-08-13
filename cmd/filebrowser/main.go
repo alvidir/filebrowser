@@ -1,16 +1,18 @@
 package main
 
 import (
-	"context"
 	"net"
 	"os"
+	"strconv"
+	"time"
 
 	fb "github.com/alvidir/filebrowser"
 	dir "github.com/alvidir/filebrowser/directory"
 	file "github.com/alvidir/filebrowser/file"
 	perm "github.com/alvidir/filebrowser/permissions"
 	proto "github.com/alvidir/filebrowser/proto"
-	"github.com/go-redis/redis/v9"
+	"github.com/go-redis/cache/v8"
+	"github.com/go-redis/redis/v8"
 	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
@@ -22,13 +24,18 @@ const (
 	ENV_SERVICE_NETW   = "SERVICE_NETW"
 	ENV_AUTH_HEADER    = "AUTH_HEADER"
 	ENV_MONGO_DSN      = "MONGO_DSN"
-	ENV_MONGO_DATABASE = "MONGO_INITDB_DATABASE"
+	ENV_MONGO_DATABASE = "MONGO_DATABASE"
+	ENV_REDIS_DSN      = "REDIS_DSN"
+	ENV_CACHE_TTL      = "CACHE_TTL"
+	ENV_CACHE_SIZE     = "CACHE_SIZE"
 )
 
 var (
 	serviceAddr = "0.0.0.0:8000"
 	serviceNetw = "tcp"
 	authHeader  = "X-Auth"
+	cacheTTL    = 10 * time.Minute
+	cacheSize   = 1024
 )
 
 func newMongoConnection(logger *zap.Logger) *mongo.Database {
@@ -54,30 +61,45 @@ func newMongoConnection(logger *zap.Logger) *mongo.Database {
 	return mongoConn
 }
 
-func newRedisConnection(logger *zap.Logger) *redis.Client {
-	redisUri, exists := os.LookupEnv("ENV_REDIS_DSN")
+func newRedisCache(logger *zap.Logger) *cache.Cache {
+	addr, exists := os.LookupEnv(ENV_REDIS_DSN)
 	if !exists {
 		logger.Fatal("redis dsn must be set")
 	}
 
-	client := redis.NewClient(&redis.Options{
-		Addr:     redisUri,
-		Password: "", // no password set
-		DB:       0,  // use default DB
-	})
-
-	if err := client.Ping(context.Background()).Err(); err != nil {
-		logger.Fatal("failed establishing connection",
-			zap.String("uri", redisUri),
-			zap.Error(err))
-	} else {
-		logger.Info("connection with redis cluster established")
+	if value, exists := os.LookupEnv(ENV_CACHE_TTL); exists {
+		if ttl, err := time.ParseDuration(value); err != nil {
+			logger.Fatal("invalid cache ttl",
+				zap.String("value", value),
+				zap.Error(err))
+		} else {
+			cacheTTL = ttl
+		}
 	}
 
-	return client
+	if value, exists := os.LookupEnv(ENV_CACHE_SIZE); exists {
+		if size, err := strconv.Atoi(value); err != nil {
+			logger.Fatal("invalid cache size",
+				zap.String("value", value),
+				zap.Error(err))
+		} else {
+			cacheSize = size
+		}
+	}
+
+	ring := redis.NewRing(&redis.RingOptions{
+		Addrs: map[string]string{
+			"server": addr,
+		},
+	})
+
+	return cache.New(&cache.Options{
+		Redis:      ring,
+		LocalCache: cache.NewTinyLFU(cacheSize, cacheTTL),
+	})
 }
 
-func newFilebrowserGrpcServer(mongoConn *mongo.Database, redisConn *redis.Client, logger *zap.Logger) *grpc.Server {
+func newFilebrowserGrpcServer(mongoConn *mongo.Database, cache *cache.Cache, logger *zap.Logger) *grpc.Server {
 	if header, exists := os.LookupEnv(ENV_AUTH_HEADER); exists {
 		authHeader = header
 	}
@@ -91,7 +113,7 @@ func newFilebrowserGrpcServer(mongoConn *mongo.Database, redisConn *redis.Client
 	fileApp := file.NewFileApplication(fileRepo, directoryApp, logger)
 	fileServer := file.NewFileServer(fileApp, authHeader, logger)
 
-	permissionsRepo := perm.NewRedisPermissionsRepository(redisConn, fileRepo, logger)
+	permissionsRepo := perm.NewRedisPermissionsRepository(cache, fileRepo, logger)
 	permissionsApp := perm.NewPermissionsApplication(permissionsRepo, fileRepo, logger)
 	permissionsServer := perm.NewPermissionsServer(permissionsApp, logger, authHeader)
 
@@ -131,8 +153,8 @@ func main() {
 	}
 
 	mongoConn := newMongoConnection(logger)
-	redisConn := newRedisConnection(logger)
-	grpcServer := newFilebrowserGrpcServer(mongoConn, redisConn, logger)
+	redisCache := newRedisCache(logger)
+	grpcServer := newFilebrowserGrpcServer(mongoConn, redisCache, logger)
 	lis := newNetworkListener(logger)
 
 	logger.Info("server ready to accept connections",

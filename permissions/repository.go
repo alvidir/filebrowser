@@ -4,20 +4,20 @@ import (
 	"context"
 
 	"github.com/alvidir/filebrowser/file"
-	"github.com/go-redis/redis/v9"
+	"github.com/go-redis/cache/v8"
 	"go.uber.org/zap"
 )
 
 type RedisPermissionsRepository struct {
-	conn     *redis.Client
+	cache    *cache.Cache
 	fileRepo file.FileRepository
 	logger   *zap.Logger
 }
 
 // NewRedisPermissionsRepository returns an implementation of Cache for RedisPermissionsRepository
-func NewRedisPermissionsRepository(conn *redis.Client, fileRepo file.FileRepository, logger *zap.Logger) *RedisPermissionsRepository {
+func NewRedisPermissionsRepository(cache *cache.Cache, fileRepo file.FileRepository, logger *zap.Logger) *RedisPermissionsRepository {
 	return &RedisPermissionsRepository{
-		conn:     conn,
+		cache:    cache,
 		fileRepo: fileRepo,
 	}
 }
