@@ -61,11 +61,12 @@ func (mock *directoryRepositoryMock) Delete(ctx context.Context, dir *Directory)
 }
 
 type fileRepositoryMock struct {
-	create  func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
-	find    func(repo *fileRepositoryMock, ctx context.Context, id string) (*file.File, error)
-	findAll func(repo *fileRepositoryMock, ctx context.Context, ids []string) ([]*file.File, error)
-	save    func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
-	delete  func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
+	create          func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
+	find            func(repo *fileRepositoryMock, ctx context.Context, id string) (*file.File, error)
+	findAll         func(repo *fileRepositoryMock, ctx context.Context, ids []string) ([]*file.File, error)
+	findPermissions func(repo *fileRepositoryMock, ctx context.Context, id string) (*file.File, error)
+	save            func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
+	delete          func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
 }
 
 func (mock *fileRepositoryMock) Create(ctx context.Context, file *file.File) error {
@@ -92,8 +93,12 @@ func (mock *fileRepositoryMock) FindAll(ctx context.Context, ids []string) ([]*f
 	return nil, fb.ErrNotFound
 }
 
-func (mock *fileRepositoryMock) FindPermissions(context.Context, string) (*file.File, error) {
-	return nil, errors.New("unimplemented")
+func (mock *fileRepositoryMock) FindPermissions(ctx context.Context, id string) (*file.File, error) {
+	if mock.findPermissions != nil {
+		return mock.findPermissions(mock, ctx, id)
+	}
+
+	return nil, fb.ErrNotFound
 }
 
 func (mock *fileRepositoryMock) Save(ctx context.Context, file *file.File) error {
