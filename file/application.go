@@ -103,7 +103,10 @@ func (app *FileApplication) Write(ctx context.Context, uid int32, fid string, da
 		return nil, fb.ErrNotAvailable
 	}
 
-	file.data = data
+	if data != nil {
+		file.data = data
+	}
+
 	if meta != nil {
 		// ensure immutable data is not overwrited
 		meta[MetadataCreatedAtKey] = file.metadata[MetadataCreatedAtKey]
@@ -148,4 +151,11 @@ func (app *FileApplication) Delete(ctx context.Context, uid int32, fid string) (
 
 	err = app.dirApp.UnregisterFile(ctx, f, uid)
 	return f, err
+}
+
+func (app *FileApplication) Permissions(ctx context.Context, uid int32, fileId string) (*File, error) {
+	app.logger.Info("processing a \"permissions\" request",
+		zap.Int32("user_id", uid))
+
+	return nil, nil
 }

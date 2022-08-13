@@ -9,7 +9,6 @@ import (
 	fb "github.com/alvidir/filebrowser"
 	dir "github.com/alvidir/filebrowser/directory"
 	file "github.com/alvidir/filebrowser/file"
-	perm "github.com/alvidir/filebrowser/permissions"
 	proto "github.com/alvidir/filebrowser/proto"
 	"github.com/go-redis/cache/v8"
 	"github.com/go-redis/redis/v8"
@@ -104,7 +103,7 @@ func newFilebrowserGrpcServer(mongoConn *mongo.Database, cache *cache.Cache, log
 		authHeader = header
 	}
 
-	fileRepo := file.NewMongoFileRepository(mongoConn, logger)
+	fileRepo := file.NewMongoFileRepository(mongoConn, cache, logger)
 
 	directoryRepo := dir.NewMongoDirectoryRepository(mongoConn, fileRepo, logger)
 	directoryApp := dir.NewDirectoryApplication(directoryRepo, fileRepo, logger)
@@ -113,14 +112,9 @@ func newFilebrowserGrpcServer(mongoConn *mongo.Database, cache *cache.Cache, log
 	fileApp := file.NewFileApplication(fileRepo, directoryApp, logger)
 	fileServer := file.NewFileServer(fileApp, authHeader, logger)
 
-	permissionsRepo := perm.NewRedisPermissionsRepository(cache, fileRepo, logger)
-	permissionsApp := perm.NewPermissionsApplication(permissionsRepo, fileRepo, logger)
-	permissionsServer := perm.NewPermissionsServer(permissionsApp, logger, authHeader)
-
 	grpcSrv := grpc.NewServer()
 	proto.RegisterDirectoryServer(grpcSrv, directoryServer)
 	proto.RegisterFileServer(grpcSrv, fileServer)
-	proto.RegisterPermissionsServer(grpcSrv, permissionsServer)
 
 	return grpcSrv
 }

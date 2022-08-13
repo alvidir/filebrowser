@@ -4,6 +4,7 @@ import (
 	"context"
 
 	fb "github.com/alvidir/filebrowser"
+	"github.com/go-redis/cache/v8"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -46,12 +47,14 @@ func newMongoFile(f *File) (*mongoFile, error) {
 
 type MongoFileRepository struct {
 	conn   *mongo.Collection
+	cache  *cache.Cache
 	logger *zap.Logger
 }
 
-func NewMongoFileRepository(db *mongo.Database, logger *zap.Logger) *MongoFileRepository {
+func NewMongoFileRepository(db *mongo.Database, cache *cache.Cache, logger *zap.Logger) *MongoFileRepository {
 	return &MongoFileRepository{
 		conn:   db.Collection(MongoFileCollectionName),
+		cache:  cache,
 		logger: logger,
 	}
 }

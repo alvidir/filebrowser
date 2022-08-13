@@ -104,3 +104,13 @@ func (server *FileServer) Delete(ctx context.Context, req *proto.FileLocator) (*
 	_, err = server.app.Delete(ctx, uid, req.GetId())
 	return nil, err
 }
+
+func (server *FileServer) Permissions(ctx context.Context, req *proto.FileLocator) (*proto.FileDescriptor, error) {
+	uid, err := fb.GetUid(ctx, server.header, server.logger)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = server.app.Delete(ctx, uid, req.GetId())
+	return nil, err
+}
