@@ -156,6 +156,10 @@ func (repo *MongoFileRepository) FindAll(ctx context.Context, ids []string) ([]*
 	return files, nil
 }
 
+func (repo *MongoFileRepository) FindPermissions(context.Context, string) (*File, error) {
+	return nil, nil
+}
+
 func (repo *MongoFileRepository) Save(ctx context.Context, file *File) error {
 	mFile, err := newMongoFile(file)
 	if err != nil {

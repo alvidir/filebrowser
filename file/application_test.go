@@ -65,6 +65,10 @@ func (mock *fileRepositoryMock) FindAll(context.Context, []string) ([]*File, err
 	return nil, errors.New("unimplemented")
 }
 
+func (mock *fileRepositoryMock) FindPermissions(context.Context, string) (*File, error) {
+	return nil, errors.New("unimplemented")
+}
+
 func (mock *fileRepositoryMock) Save(ctx context.Context, file *File) error {
 	if mock.save != nil {
 		return mock.save(mock, ctx, file)

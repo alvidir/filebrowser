@@ -14,6 +14,7 @@ type FileRepository interface {
 	Create(ctx context.Context, file *File) error
 	Find(context.Context, string) (*File, error)
 	FindAll(context.Context, []string) ([]*File, error)
+	FindPermissions(context.Context, string) (*File, error)
 	Save(ctx context.Context, file *File) error
 	Delete(ctx context.Context, file *File) error
 }
