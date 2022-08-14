@@ -55,7 +55,7 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 		return nil, err
 	}
 
-	file.AddPermissions(uid, Read|Write|Grant|Owner)
+	file.AddPermissions(uid, Read|Write|Owner)
 	file.metadata = meta
 	file.data = data
 
@@ -78,16 +78,14 @@ func (app *FileApplication) Read(ctx context.Context, uid int32, fid string) (*F
 	}
 
 	perm := file.Permissions(uid)
-	if file.flags&Public == 0 && perm&(Read|Owner) == 0 {
-		return nil, fb.ErrNotAvailable
-	}
-
-	if perm&(Owner|Grant) > 0 {
+	if perm&(Owner) > 0 {
+		return file, nil
+	} else if perm&(Read) > 0 {
+		file.HideProtectedFields(uid)
 		return file, nil
 	}
 
-	file.HideProtectedFields(uid)
-	return file, nil
+	return nil, fb.ErrNotAvailable
 }
 
 func (app *FileApplication) Write(ctx context.Context, uid int32, fid string, data []byte, meta Metadata) (*File, error) {

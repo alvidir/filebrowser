@@ -491,7 +491,7 @@ func TestUnregisterFileWhenFileIsShared(t *testing.T) {
 	f, _ := file.NewFile("test", "filename")
 	f.AddValue(file.MetadataDeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
 	f.AddPermissions(999, file.Owner)
-	f.AddPermissions(888, file.Read|file.Write|file.Grant)
+	f.AddPermissions(888, file.Read|file.Write)
 
 	d1.AddFile(f, "path/to/file")
 	d2.AddFile(f, "path/to/file")

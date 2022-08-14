@@ -26,10 +26,16 @@ message FileDescriptor {
     bytes data = 5;
 }
 
+message FilePermissions {
+    bool read = 1;
+    bool write = 2;
+    bool owner = 3;
+}
+
 service File {
     rpc Create(FileConstructor) returns (FileDescriptor); 
-    // rpc Read(FileLocator) returns (FileDescriptor);
-    // rpc Write(FileDescriptor) returns (FileDescriptor);
+    rpc Read(FileLocator) returns (FileDescriptor);
+    rpc Write(FileDescriptor) returns (FileDescriptor);
     rpc Delete(FileLocator) returns (FileDescriptor); 
-    rpc Permissions(FileLocator) returns (FileDescriptor);
+    rpc Permissions(FileLocator) returns (FilePermissions);
 }
