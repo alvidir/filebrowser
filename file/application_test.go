@@ -65,7 +65,7 @@ func (mock *fileRepositoryMock) FindAll(context.Context, []string) ([]*File, err
 	return nil, errors.New("unimplemented")
 }
 
-func (mock *fileRepositoryMock) FindPermissions(context.Context, string) (*File, error) {
+func (mock *fileRepositoryMock) FindPermissions(context.Context, string) (Permissions, error) {
 	return nil, errors.New("unimplemented")
 }
 

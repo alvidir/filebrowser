@@ -4,7 +4,6 @@ import (
 	"context"
 
 	fb "github.com/alvidir/filebrowser"
-	"github.com/go-redis/cache/v8"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -47,14 +46,12 @@ func newMongoFile(f *File) (*mongoFile, error) {
 
 type MongoFileRepository struct {
 	conn   *mongo.Collection
-	cache  *cache.Cache
 	logger *zap.Logger
 }
 
-func NewMongoFileRepository(db *mongo.Database, cache *cache.Cache, logger *zap.Logger) *MongoFileRepository {
+func NewMongoFileRepository(db *mongo.Database, logger *zap.Logger) *MongoFileRepository {
 	return &MongoFileRepository{
 		conn:   db.Collection(MongoFileCollectionName),
-		cache:  cache,
 		logger: logger,
 	}
 }
@@ -156,8 +153,36 @@ func (repo *MongoFileRepository) FindAll(ctx context.Context, ids []string) ([]*
 	return files, nil
 }
 
-func (repo *MongoFileRepository) FindPermissions(context.Context, string) (*File, error) {
-	return nil, nil
+func (repo *MongoFileRepository) FindPermissions(ctx context.Context, id string) (Permissions, error) {
+	objID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		repo.logger.Error("parsing file id to ObjectID",
+			zap.String("file_id", id),
+			zap.Error(err))
+
+		return nil, fb.ErrUnknown
+	}
+
+	// exclude all fields except permissions
+	opts := options.FindOne().SetProjection(bson.D{
+		{Key: "_id", Value: 0},
+		{Key: "name", Value: 0},
+		{Key: "flags", Value: 0},
+		{Key: "metadata", Value: 0},
+		{Key: "data", Value: 0},
+	})
+
+	var mfile mongoFile
+	err = repo.conn.FindOne(ctx, bson.M{"_id": objID}, opts).Decode(&mfile)
+	if err != nil {
+		repo.logger.Error("performing find one on mongo",
+			zap.String("file_id", id),
+			zap.Error(err))
+
+		return nil, fb.ErrUnknown
+	}
+
+	return mfile.Permissions, nil
 }
 
 func (repo *MongoFileRepository) Save(ctx context.Context, file *File) error {

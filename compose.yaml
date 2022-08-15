@@ -10,16 +10,6 @@ services:
         env_file:
             - .env
 
-    redis:
-        container_name: filebrowser-redis
-        image: docker.io/redis:alpine3.15
-        restart: always
-        volumes:
-            - ./redis:/usr/local/etc/redis:ro
-        security_opt:
-            label: disable
-        command: "redis-server /usr/local/etc/redis/redis.conf"
-
     rabbitmq:
         container_name: filebrowser-rabbitmq
         image: docker.io/rabbitmq:3.10.2-alpine

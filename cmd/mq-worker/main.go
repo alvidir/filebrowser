@@ -105,7 +105,7 @@ func main() {
 	}
 
 	mongoConn := newMongoConnection(logger)
-	fileRepo := file.NewMongoFileRepository(mongoConn, nil, logger)
+	fileRepo := file.NewMongoFileRepository(mongoConn, logger)
 	directoryRepo := dir.NewMongoDirectoryRepository(mongoConn, fileRepo, logger)
 	directoryApp := dir.NewDirectoryApplication(directoryRepo, fileRepo, logger)
 	fileApp := file.NewFileApplication(fileRepo, directoryApp, logger)
