@@ -61,6 +61,10 @@ func (mock *fileRepositoryMock) Find(ctx context.Context, id string) (*File, err
 	return nil, fb.ErrNotFound
 }
 
+func (mock *fileRepositoryMock) FindAll(context.Context, []string) ([]*File, error) {
+	return nil, errors.New("unimplemented")
+}
+
 func (mock *fileRepositoryMock) Save(ctx context.Context, file *File) error {
 	if mock.save != nil {
 		return mock.save(mock, ctx, file)
@@ -165,7 +169,7 @@ func TestCreate(t *testing.T) {
 		t.Errorf("got data = %v, want = %v", got, data)
 	}
 
-	if createdAt, exists := file.metadata[CreatedAtKey]; !exists {
+	if createdAt, exists := file.metadata[MetadataCreatedAtKey]; !exists {
 		t.Errorf("got created_at = %v, want > %v && < %v", createdAt, before, after)
 	} else if unixCreatedAt, err := strconv.ParseInt(createdAt, TimestampBase, 64); err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
@@ -204,7 +208,7 @@ func TestCreateWithCustomMetadata(t *testing.T) {
 	customFieldKey := "custom_field"
 	customFieldValue := "custom value"
 	meta[customFieldKey] = customFieldValue
-	meta[CreatedAtKey] = strconv.FormatInt(time.Now().Add(time.Hour*24).Unix(), TimestampBase)
+	meta[MetadataCreatedAtKey] = strconv.FormatInt(time.Now().Add(time.Hour*24).Unix(), TimestampBase)
 
 	before := time.Now().Unix()
 	file, err := app.Create(context.Background(), userId, fpath, nil, meta)
@@ -215,7 +219,7 @@ func TestCreateWithCustomMetadata(t *testing.T) {
 		return
 	}
 
-	if createdAt, exists := file.metadata[CreatedAtKey]; !exists {
+	if createdAt, exists := file.metadata[MetadataCreatedAtKey]; !exists {
 		t.Errorf("got created_at = %v, want > %v && < %v", createdAt, before, after)
 	} else if unixCreatedAt, err := strconv.ParseInt(createdAt, TimestampBase, 64); err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
@@ -406,7 +410,7 @@ func TestWrite(t *testing.T) {
 
 	meta := make(Metadata)
 	createdAtValue := "000"
-	meta[CreatedAtKey] = createdAtValue
+	meta[MetadataCreatedAtKey] = createdAtValue
 
 	repo := &fileRepositoryMock{
 		find: func(repo *fileRepositoryMock, ctx context.Context, id string) (*File, error) {
@@ -439,11 +443,11 @@ func TestWrite(t *testing.T) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)
 	}
 
-	if createdAt, exists := file.metadata[CreatedAtKey]; !exists || createdAt != createdAtValue {
+	if createdAt, exists := file.metadata[MetadataCreatedAtKey]; !exists || createdAt != createdAtValue {
 		t.Errorf("got created_at = %v, want = %v", createdAt, createdAtValue)
 	}
 
-	if updatedAt, exists := file.metadata[UpdatedAtKey]; !exists {
+	if updatedAt, exists := file.metadata[MetadataUpdatedAtKey]; !exists {
 		t.Errorf("got updated_at = %v, want > %v && < %v", updatedAt, before, after)
 	} else if unixUpdatedAt, err := strconv.ParseInt(updatedAt, TimestampBase, 64); err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
@@ -458,7 +462,7 @@ func TestWriteWithCustomMetadata(t *testing.T) {
 
 	meta := make(Metadata)
 	createdAtValue := "000"
-	meta[CreatedAtKey] = createdAtValue
+	meta[MetadataCreatedAtKey] = createdAtValue
 
 	repo := &fileRepositoryMock{
 		find: func(repo *fileRepositoryMock, ctx context.Context, id string) (*File, error) {
@@ -487,7 +491,7 @@ func TestWriteWithCustomMetadata(t *testing.T) {
 
 	customMeta := make(Metadata)
 	customMeta[customFieldKey] = customFieldValue
-	customMeta[CreatedAtKey] = strconv.FormatInt(time.Now().Add(time.Hour*24).Unix(), TimestampBase)
+	customMeta[MetadataCreatedAtKey] = strconv.FormatInt(time.Now().Add(time.Hour*24).Unix(), TimestampBase)
 
 	file, err := app.Write(context.Background(), 111, fid, data, customMeta)
 
@@ -495,7 +499,7 @@ func TestWriteWithCustomMetadata(t *testing.T) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)
 	}
 
-	if createdAt, exists := file.metadata[CreatedAtKey]; !exists || createdAt != createdAtValue {
+	if createdAt, exists := file.metadata[MetadataCreatedAtKey]; !exists || createdAt != createdAtValue {
 		t.Errorf("got created_at = %v, want = %v", createdAt, createdAtValue)
 	}
 
@@ -623,7 +627,7 @@ func TestDeleteWhenIsNotOwner(t *testing.T) {
 		t.Errorf("got error = %v, want = %v", err, nil)
 	}
 
-	if deletedAt, exists := file.metadata[DeletedAtKey]; exists {
+	if deletedAt, exists := file.metadata[MetadataDeletedAtKey]; exists {
 		t.Errorf("got deleted_at = %v, want = %v", deletedAt, nil)
 	}
 
@@ -673,7 +677,7 @@ func TestDeleteWhenMoreThanOneOwner(t *testing.T) {
 		t.Errorf("got error = %v, want = %v", err, nil)
 	}
 
-	if deletedAt, exists := file.metadata[DeletedAtKey]; exists {
+	if deletedAt, exists := file.metadata[MetadataDeletedAtKey]; exists {
 		t.Errorf("got deleted_at = %v, want = %v", deletedAt, nil)
 	}
 
@@ -730,7 +734,7 @@ func TestDeleteWhenSingleOwner(t *testing.T) {
 		t.Errorf("got error = %v, want = %v", err, nil)
 	}
 
-	if deletedAt, exists := file.metadata[DeletedAtKey]; !exists {
+	if deletedAt, exists := file.metadata[MetadataDeletedAtKey]; !exists {
 		t.Errorf("got deleted_at = %v, want > %v && < %v", deletedAt, before, after)
 	} else if unixDeletedAt, err := strconv.ParseInt(deletedAt, TimestampBase, 64); err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)

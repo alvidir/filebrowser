@@ -2,17 +2,28 @@ package file
 
 import (
 	"regexp"
+	"strconv"
+	"time"
 
 	fb "github.com/alvidir/filebrowser"
 )
 
 const (
-	Public        uint8  = 0x01
-	Read          uint8  = 0x02
-	Write         uint8  = 0x04
-	Grant         uint8  = 0x08
-	Owner         uint8  = 0x10
-	FilenameRegex string = "^[^/]+$"
+	Public uint8 = 0x01
+	Read   uint8 = 0x02
+	Write  uint8 = 0x04
+	Grant  uint8 = 0x08
+	Owner  uint8 = 0x10
+
+	FilenameRegex    string = "^[^/]+$"
+	FileOriginFormat string = "%s@%s"
+
+	MetadataCreatedAtKey = "created_at"
+	MetadataUpdatedAtKey = "updated_at"
+	MetadataDeletedAtKey = "deleted_at"
+	MetadataOriginKey    = "origin"
+
+	TimestampBase = 16
 )
 
 var (
@@ -36,10 +47,15 @@ func NewFile(id string, filename string) (*File, error) {
 		return nil, fb.ErrInvalidFormat
 	}
 
+	meta := make(Metadata)
+
+	meta[MetadataCreatedAtKey] = strconv.FormatInt(time.Now().Unix(), TimestampBase)
+	meta[MetadataUpdatedAtKey] = meta[MetadataCreatedAtKey]
+
 	return &File{
 		id:          id,
 		name:        filename,
-		metadata:    make(Metadata),
+		metadata:    meta,
 		permissions: make(Permissions),
 		flags:       0,
 		data:        make([]byte, 0),
@@ -150,4 +166,14 @@ func (file *File) AddValue(key string, value string) (old string, exists bool) {
 
 func (file *File) Data() []byte {
 	return file.data
+}
+
+func (file *File) HideProtectedFields(uid int32) {
+	for id, p := range file.permissions {
+		// hide all those permissions that do not belong to any of both, the user or owners
+		// WARNING: DO NOT SAVE THE FOLLOWING FILE CHANGES
+		if id != uid && p&Owner == 0 {
+			delete(file.permissions, id)
+		}
+	}
 }

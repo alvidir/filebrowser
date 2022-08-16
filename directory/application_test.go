@@ -61,10 +61,11 @@ func (mock *directoryRepositoryMock) Delete(ctx context.Context, dir *Directory)
 }
 
 type fileRepositoryMock struct {
-	create func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
-	find   func(repo *fileRepositoryMock, ctx context.Context, id string) (*file.File, error)
-	save   func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
-	delete func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
+	create  func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
+	find    func(repo *fileRepositoryMock, ctx context.Context, id string) (*file.File, error)
+	findAll func(repo *fileRepositoryMock, ctx context.Context, ids []string) ([]*file.File, error)
+	save    func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
+	delete  func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
 }
 
 func (mock *fileRepositoryMock) Create(ctx context.Context, file *file.File) error {
@@ -78,6 +79,14 @@ func (mock *fileRepositoryMock) Create(ctx context.Context, file *file.File) err
 func (mock *fileRepositoryMock) Find(ctx context.Context, id string) (*file.File, error) {
 	if mock.find != nil {
 		return mock.find(mock, ctx, id)
+	}
+
+	return nil, fb.ErrNotFound
+}
+
+func (mock *fileRepositoryMock) FindAll(ctx context.Context, ids []string) ([]*file.File, error) {
+	if mock.findAll != nil {
+		return mock.findAll(mock, ctx, ids)
 	}
 
 	return nil, fb.ErrNotFound
@@ -175,6 +184,10 @@ func TestRetrieve(t *testing.T) {
 	}
 
 	fileRepo := &fileRepositoryMock{}
+	fileRepo.findAll = func(repo *fileRepositoryMock, ctx context.Context, ids []string) ([]*file.File, error) {
+		return nil, nil
+	}
+
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
 	if dir, err := app.Retrieve(context.TODO(), 999); err != nil {
@@ -240,7 +253,7 @@ func TestDeleteWhenUserIsSingleOwner(t *testing.T) {
 
 	after := time.Now().Unix()
 
-	if deletedAt, exists := f.Value(file.DeletedAtKey); !exists {
+	if deletedAt, exists := f.Value(file.MetadataDeletedAtKey); !exists {
 		t.Errorf("got deleted_at = %v, want > %v && < %v", deletedAt, before, after)
 	} else if unixDeletedAt, err := strconv.ParseInt(deletedAt, file.TimestampBase, 64); err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
@@ -284,7 +297,7 @@ func TestDeleteWhenUserIsNotSingleOwner(t *testing.T) {
 		t.Errorf("got error = %v, want = %v", err, nil)
 	}
 
-	if deletedAt, exists := f.Value(file.DeletedAtKey); exists {
+	if deletedAt, exists := f.Value(file.MetadataDeletedAtKey); exists {
 		t.Errorf("got deleted_at = %v, want = %v", deletedAt, nil)
 	}
 }
@@ -321,7 +334,7 @@ func TestDeleteWhenUserIsNotOwner(t *testing.T) {
 		t.Errorf("got error = %v, want = %v", err, nil)
 	}
 
-	if deletedAt, exists := f.Value(file.DeletedAtKey); exists {
+	if deletedAt, exists := f.Value(file.MetadataDeletedAtKey); exists {
 		t.Errorf("got deleted_at = %v, want = %v", deletedAt, nil)
 	}
 }
@@ -430,7 +443,7 @@ func TestUnregisterFileWhenFileIsDeleted(t *testing.T) {
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
 	f, _ := file.NewFile("test", "filename")
-	f.AddValue(file.DeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
+	f.AddValue(file.MetadataDeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
 	f.AddPermissions(999, file.Owner)
 	d.AddFile(f, "path/to/file")
 
@@ -467,7 +480,7 @@ func TestUnregisterFileWhenFileIsShared(t *testing.T) {
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
 	f, _ := file.NewFile("test", "filename")
-	f.AddValue(file.DeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
+	f.AddValue(file.MetadataDeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
 	f.AddPermissions(999, file.Owner)
 	f.AddPermissions(888, file.Read|file.Write|file.Grant)
 

@@ -57,7 +57,7 @@ func newFilebrowserGrpcServer(conn *mongo.Database, logger *zap.Logger) *grpc.Se
 	}
 
 	fileRepo := file.NewMongoFileRepository(conn, logger)
-	directoryRepo := dir.NewMongoDirectoryRepository(conn, logger)
+	directoryRepo := dir.NewMongoDirectoryRepository(conn, fileRepo, logger)
 	directoryApp := dir.NewDirectoryApplication(directoryRepo, fileRepo, logger)
 
 	fileApp := file.NewFileApplication(fileRepo, directoryApp, logger)

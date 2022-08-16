@@ -24,17 +24,13 @@ type mongoFile struct {
 	Data        []byte             `bson:"data,omitempty"`
 }
 
-func newMongoFile(f *File, logger *zap.Logger) (*mongoFile, error) {
+func newMongoFile(f *File) (*mongoFile, error) {
 	oid := primitive.NilObjectID
 
 	if len(f.id) > 0 {
 		var err error
 		if oid, err = primitive.ObjectIDFromHex(f.id); err != nil {
-			logger.Error("parsing file id to ObjectID",
-				zap.String("file_id", f.id),
-				zap.Error(err))
-
-			return nil, fb.ErrUnknown
+			return nil, err
 		}
 	}
 
@@ -46,17 +42,6 @@ func newMongoFile(f *File, logger *zap.Logger) (*mongoFile, error) {
 		Metadata:    f.metadata,
 		Data:        f.data,
 	}, nil
-}
-
-func (mfile *mongoFile) build() *File {
-	return &File{
-		id:          mfile.ID.Hex(),
-		name:        mfile.Name,
-		metadata:    mfile.Metadata,
-		permissions: mfile.Permissions,
-		flags:       mfile.Flags,
-		data:        mfile.Data,
-	}
 }
 
 type MongoFileRepository struct {
@@ -72,9 +57,13 @@ func NewMongoFileRepository(db *mongo.Database, logger *zap.Logger) *MongoFileRe
 }
 
 func (repo *MongoFileRepository) Create(ctx context.Context, file *File) error {
-	mongoFile, err := newMongoFile(file, repo.logger)
+	mongoFile, err := newMongoFile(file)
 	if err != nil {
-		return err
+		repo.logger.Error("building mongo file",
+			zap.String("file_id", file.id),
+			zap.Error(err))
+
+		return fb.ErrUnknown
 	}
 
 	res, err := repo.conn.InsertOne(ctx, mongoFile)
@@ -118,7 +107,7 @@ func (repo *MongoFileRepository) Find(ctx context.Context, id string) (*File, er
 		return nil, fb.ErrUnknown
 	}
 
-	return mfile.build(), nil
+	return repo.build(&mfile), nil
 }
 
 // FindAll returns all those files matching the given ids, excluding the data field
@@ -149,7 +138,7 @@ func (repo *MongoFileRepository) FindAll(ctx context.Context, ids []string) ([]*
 	}
 
 	mfiles := make([]mongoFile, len(ids))
-	if err := cursor.All(ctx, mfiles); err != nil {
+	if err := cursor.All(ctx, &mfiles); err != nil {
 		repo.logger.Error("decoding found items",
 			zap.Error(err))
 
@@ -158,16 +147,20 @@ func (repo *MongoFileRepository) FindAll(ctx context.Context, ids []string) ([]*
 
 	files := make([]*File, len(ids))
 	for index, mfile := range mfiles {
-		files[index] = mfile.build()
+		files[index] = repo.build(&mfile)
 	}
 
 	return files, nil
 }
 
 func (repo *MongoFileRepository) Save(ctx context.Context, file *File) error {
-	mFile, err := newMongoFile(file, repo.logger)
+	mFile, err := newMongoFile(file)
 	if err != nil {
-		return err
+		repo.logger.Error("building mongo file",
+			zap.String("file_id", file.id),
+			zap.Error(err))
+
+		return fb.ErrUnknown
 	}
 
 	result, err := repo.conn.ReplaceOne(ctx, bson.M{"_id": mFile.ID}, mFile)
@@ -218,4 +211,15 @@ func (repo *MongoFileRepository) Delete(ctx context.Context, file *File) error {
 	}
 
 	return nil
+}
+
+func (repo *MongoFileRepository) build(mfile *mongoFile) *File {
+	return &File{
+		id:          mfile.ID.Hex(),
+		name:        mfile.Name,
+		metadata:    mfile.Metadata,
+		permissions: mfile.Permissions,
+		flags:       mfile.Flags,
+		data:        mfile.Data,
+	}
 }

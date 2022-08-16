@@ -106,7 +106,7 @@ func main() {
 
 	mongoConn := newMongoConnection(logger)
 	fileRepo := file.NewMongoFileRepository(mongoConn, logger)
-	directoryRepo := dir.NewMongoDirectoryRepository(mongoConn, logger)
+	directoryRepo := dir.NewMongoDirectoryRepository(mongoConn, fileRepo, logger)
 	directoryApp := dir.NewDirectoryApplication(directoryRepo, fileRepo, logger)
 	fileApp := file.NewFileApplication(fileRepo, directoryApp, logger)
 	userEventHandler := event.NewUserEventHandler(directoryApp, fileApp, logger)
