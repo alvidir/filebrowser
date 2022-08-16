@@ -1,4 +1,4 @@
-FROM docker.io/golang:1.18 as builder
+FROM docker.io/golang:1.19 as builder
 
 RUN apt update && \
     apt install -y protobuf-compiler
