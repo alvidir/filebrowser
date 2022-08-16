@@ -61,11 +61,12 @@ func (mock *directoryRepositoryMock) Delete(ctx context.Context, dir *Directory)
 }
 
 type fileRepositoryMock struct {
-	create  func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
-	find    func(repo *fileRepositoryMock, ctx context.Context, id string) (*file.File, error)
-	findAll func(repo *fileRepositoryMock, ctx context.Context, ids []string) ([]*file.File, error)
-	save    func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
-	delete  func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
+	create          func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
+	find            func(repo *fileRepositoryMock, ctx context.Context, id string) (*file.File, error)
+	findAll         func(repo *fileRepositoryMock, ctx context.Context, ids []string) ([]*file.File, error)
+	findPermissions func(repo *fileRepositoryMock, ctx context.Context, id string) (file.Permissions, error)
+	save            func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
+	delete          func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
 }
 
 func (mock *fileRepositoryMock) Create(ctx context.Context, file *file.File) error {
@@ -87,6 +88,14 @@ func (mock *fileRepositoryMock) Find(ctx context.Context, id string) (*file.File
 func (mock *fileRepositoryMock) FindAll(ctx context.Context, ids []string) ([]*file.File, error) {
 	if mock.findAll != nil {
 		return mock.findAll(mock, ctx, ids)
+	}
+
+	return nil, fb.ErrNotFound
+}
+
+func (mock *fileRepositoryMock) FindPermissions(ctx context.Context, id string) (file.Permissions, error) {
+	if mock.findPermissions != nil {
+		return mock.findPermissions(mock, ctx, id)
 	}
 
 	return nil, fb.ErrNotFound
@@ -482,7 +491,7 @@ func TestUnregisterFileWhenFileIsShared(t *testing.T) {
 	f, _ := file.NewFile("test", "filename")
 	f.AddValue(file.MetadataDeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
 	f.AddPermissions(999, file.Owner)
-	f.AddPermissions(888, file.Read|file.Write|file.Grant)
+	f.AddPermissions(888, file.Read|file.Write)
 
 	d1.AddFile(f, "path/to/file")
 	d2.AddFile(f, "path/to/file")

@@ -31,6 +31,14 @@ func NewFileDescriptor(file *File) *proto.FileDescriptor {
 	return descriptor
 }
 
+func NewFilePermissions(perm uint8) *proto.FilePermissions {
+	return &proto.FilePermissions{
+		Read:  perm&Read != 0,
+		Write: perm&Write != 0,
+		Owner: perm&Owner != 0,
+	}
+}
+
 func NewFileServer(app *FileApplication, authHeader string, logger *zap.Logger) *FileServer {
 	return &FileServer{
 		app:    app,
@@ -103,4 +111,18 @@ func (server *FileServer) Delete(ctx context.Context, req *proto.FileLocator) (*
 
 	_, err = server.app.Delete(ctx, uid, req.GetId())
 	return nil, err
+}
+
+func (server *FileServer) Permissions(ctx context.Context, req *proto.FileLocator) (*proto.FilePermissions, error) {
+	uid, err := fb.GetUid(ctx, server.header, server.logger)
+	if err != nil {
+		return nil, err
+	}
+
+	perm, err := server.app.Permissions(ctx, uid, req.GetId())
+	if err != nil {
+		return nil, err
+	}
+
+	return NewFilePermissions(perm), err
 }

@@ -65,6 +65,10 @@ func (mock *fileRepositoryMock) FindAll(context.Context, []string) ([]*File, err
 	return nil, errors.New("unimplemented")
 }
 
+func (mock *fileRepositoryMock) FindPermissions(context.Context, string) (Permissions, error) {
+	return nil, errors.New("unimplemented")
+}
+
 func (mock *fileRepositoryMock) Save(ctx context.Context, file *File) error {
 	if mock.save != nil {
 		return mock.save(mock, ctx, file)
@@ -263,7 +267,7 @@ func TestRead(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    make(Metadata),
-				permissions: Permissions{111: Owner, 222: Read, 333: Grant | Read},
+				permissions: Permissions{111: Owner, 222: Read, 333: Write | Read},
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil
@@ -278,7 +282,7 @@ func TestRead(t *testing.T) {
 		return
 	}
 
-	want := Permissions{111: Owner, 222: Read, 333: Grant | Read}
+	want := Permissions{111: Owner, 222: Read, 333: Write | Read}
 	if len(file.permissions) != len(want) {
 		t.Errorf("got permissions = %+v, want = %+v", file.permissions, want)
 	}
@@ -289,6 +293,7 @@ func TestRead(t *testing.T) {
 		return
 	}
 
+	want = Permissions{111: Owner, 333: Write | Read}
 	if len(file.permissions) != len(want) {
 		t.Errorf("got permissions = %+v, want = %+v", file.permissions, want)
 	}
@@ -308,18 +313,6 @@ func TestRead(t *testing.T) {
 	if !errors.Is(err, fb.ErrNotAvailable) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)
 		return
-	}
-
-	repo.flags = Public
-	file, err = app.Read(context.Background(), 444, "")
-	if err != nil {
-		t.Errorf("got error = %v, want = %v", err, nil)
-		return
-	}
-
-	want = Permissions{111: Owner}
-	if len(file.permissions) != len(want) {
-		t.Errorf("got permissions = %+v, want = %+v", file.permissions, want)
 	}
 }
 
@@ -360,7 +353,7 @@ func TestWriteWhenHasNoPermissions(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    make(Metadata),
-				permissions: Permissions{111: Owner, 222: Read, 333: Grant | Read},
+				permissions: Permissions{111: Owner, 222: Read, 333: Write | Read},
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil
@@ -388,7 +381,7 @@ func TestWriteWhenCannotSave(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    make(Metadata),
-				permissions: Permissions{111: Owner, 222: Read, 333: Grant | Read},
+				permissions: Permissions{111: Owner, 222: Read, 333: Write | Read},
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil
@@ -418,7 +411,7 @@ func TestWrite(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    meta,
-				permissions: Permissions{111: Owner, 222: Read, 333: Grant | Read},
+				permissions: Permissions{111: Owner, 222: Read, 333: Write | Read},
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil
@@ -470,7 +463,7 @@ func TestWriteWithCustomMetadata(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    meta,
-				permissions: Permissions{111: Owner, 222: Read, 333: Grant | Read},
+				permissions: Permissions{111: Owner, 222: Read, 333: Write | Read},
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil

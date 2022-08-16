@@ -9,11 +9,9 @@ import (
 )
 
 const (
-	Public uint8 = 0x01
-	Read   uint8 = 0x02
-	Write  uint8 = 0x04
-	Grant  uint8 = 0x08
-	Owner  uint8 = 0x10
+	Read  uint8 = 0x02
+	Write uint8 = 0x04
+	Owner uint8 = 0x08
 
 	FilenameRegex    string = "^[^/]+$"
 	FileOriginFormat string = "%s@%s"

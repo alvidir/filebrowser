@@ -14,6 +14,7 @@ type FileRepository interface {
 	Create(ctx context.Context, file *File) error
 	Find(context.Context, string) (*File, error)
 	FindAll(context.Context, []string) ([]*File, error)
+	FindPermissions(context.Context, string) (Permissions, error)
 	Save(ctx context.Context, file *File) error
 	Delete(ctx context.Context, file *File) error
 }
@@ -54,7 +55,7 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 		return nil, err
 	}
 
-	file.AddPermissions(uid, Read|Write|Grant|Owner)
+	file.AddPermissions(uid, Read|Write|Owner)
 	file.metadata = meta
 	file.data = data
 
@@ -77,16 +78,14 @@ func (app *FileApplication) Read(ctx context.Context, uid int32, fid string) (*F
 	}
 
 	perm := file.Permissions(uid)
-	if file.flags&Public == 0 && perm&(Read|Owner) == 0 {
-		return nil, fb.ErrNotAvailable
-	}
-
-	if perm&(Owner|Grant) > 0 {
+	if perm&(Owner) > 0 {
+		return file, nil
+	} else if perm&(Read) > 0 {
+		file.HideProtectedFields(uid)
 		return file, nil
 	}
 
-	file.HideProtectedFields(uid)
-	return file, nil
+	return nil, fb.ErrNotAvailable
 }
 
 func (app *FileApplication) Write(ctx context.Context, uid int32, fid string, data []byte, meta Metadata) (*File, error) {
@@ -103,7 +102,10 @@ func (app *FileApplication) Write(ctx context.Context, uid int32, fid string, da
 		return nil, fb.ErrNotAvailable
 	}
 
-	file.data = data
+	if data != nil {
+		file.data = data
+	}
+
 	if meta != nil {
 		// ensure immutable data is not overwrited
 		meta[MetadataCreatedAtKey] = file.metadata[MetadataCreatedAtKey]
@@ -148,4 +150,22 @@ func (app *FileApplication) Delete(ctx context.Context, uid int32, fid string) (
 
 	err = app.dirApp.UnregisterFile(ctx, f, uid)
 	return f, err
+}
+
+func (app *FileApplication) Permissions(ctx context.Context, uid int32, fid string) (uint8, error) {
+	app.logger.Info("processing a \"permissions\" request",
+		zap.String("file_id", fid),
+		zap.Int32("user_id", uid))
+
+	allPermissions, err := app.fileRepo.FindPermissions(ctx, fid)
+	if err != nil {
+		return 0, err
+	}
+
+	userPermissions, exists := allPermissions[uid]
+	if !exists {
+		return 0, fb.ErrNotFound
+	}
+
+	return userPermissions, nil
 }

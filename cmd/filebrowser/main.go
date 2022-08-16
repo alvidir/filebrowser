@@ -19,7 +19,8 @@ const (
 	ENV_SERVICE_NETW   = "SERVICE_NETW"
 	ENV_AUTH_HEADER    = "AUTH_HEADER"
 	ENV_MONGO_DSN      = "MONGO_DSN"
-	ENV_MONGO_DATABASE = "MONGO_INITDB_DATABASE"
+	ENV_MONGO_DATABASE = "MONGO_DATABASE"
+	ENV_REDIS_DSN      = "REDIS_DSN"
 )
 
 var (
@@ -51,19 +52,19 @@ func newMongoConnection(logger *zap.Logger) *mongo.Database {
 	return mongoConn
 }
 
-func newFilebrowserGrpcServer(conn *mongo.Database, logger *zap.Logger) *grpc.Server {
+func newFilebrowserGrpcServer(mongoConn *mongo.Database, logger *zap.Logger) *grpc.Server {
 	if header, exists := os.LookupEnv(ENV_AUTH_HEADER); exists {
 		authHeader = header
 	}
 
-	fileRepo := file.NewMongoFileRepository(conn, logger)
-	directoryRepo := dir.NewMongoDirectoryRepository(conn, fileRepo, logger)
+	fileRepo := file.NewMongoFileRepository(mongoConn, logger)
+
+	directoryRepo := dir.NewMongoDirectoryRepository(mongoConn, fileRepo, logger)
 	directoryApp := dir.NewDirectoryApplication(directoryRepo, fileRepo, logger)
+	directoryServer := dir.NewDirectoryServer(directoryApp, logger, authHeader)
 
 	fileApp := file.NewFileApplication(fileRepo, directoryApp, logger)
 	fileServer := file.NewFileServer(fileApp, authHeader, logger)
-
-	directoryServer := dir.NewDirectoryServer(directoryApp, logger, authHeader)
 
 	grpcSrv := grpc.NewServer()
 	proto.RegisterDirectoryServer(grpcSrv, directoryServer)
