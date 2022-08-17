@@ -9,17 +9,17 @@ import (
 )
 
 const (
-	Read  uint8 = 0x02
-	Write uint8 = 0x04
-	Owner uint8 = 0x08
+	Read  uint8 = 0x01
+	Write uint8 = 0x02
+	Owner uint8 = 0x04
 
-	FilenameRegex    string = "^[^/]+$"
-	FileOriginFormat string = "%s@%s"
+	FilenameRegex string = "^[^/]+$"
 
 	MetadataCreatedAtKey = "created_at"
 	MetadataUpdatedAtKey = "updated_at"
 	MetadataDeletedAtKey = "deleted_at"
 	MetadataOriginKey    = "origin"
+	MetadataAppKey       = "app"
 
 	TimestampBase = 16
 )
