@@ -11,8 +11,8 @@ import (
 
 type FileEventPayload struct {
 	UserID   int32  `json:"user_id"`
-	AppID    string `json:"app_id"`
-	FileID   string `json:"id"`
+	App      string `json:"app"`
+	Url      string `json:"url"`
 	FileName string `json:"name"`
 	Kind     string `json:"kind"`
 }
@@ -56,15 +56,15 @@ func (handler *FileEventHandler) OnEvent(ctx context.Context, body []byte) {
 
 func (handler *FileEventHandler) onFileCreatedEvent(ctx context.Context, event *FileEventPayload) {
 	meta := file.Metadata{
-		file.MetadataAppKey:    event.AppID,
-		file.MetadataOriginKey: event.FileID,
+		file.MetadataAppKey: event.App,
+		file.MetadataUrlKey: event.Url,
 	}
 
 	_, err := handler.fileApp.Create(ctx, event.UserID, event.FileName, nil, meta)
 	if err != nil {
 		handler.logger.Error("creating file",
-			zap.String("origin", event.FileID),
-			zap.String("app", event.AppID),
+			zap.String("url", event.Url),
+			zap.String("app", event.App),
 			zap.String("file_name", event.FileName),
 			zap.Int32("user_id", event.UserID),
 			zap.Error(err))

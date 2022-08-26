@@ -9,16 +9,17 @@ import (
 )
 
 const (
-	Read  uint8 = 0x01
-	Write uint8 = 0x02
-	Owner uint8 = 0x04
+	Read    uint8 = 0x01
+	Write   uint8 = 0x02
+	Owner   uint8 = 0x04
+	Blurred uint8 = 0x80
 
 	FilenameRegex string = "^[^/]+$"
 
 	MetadataCreatedAtKey = "created_at"
 	MetadataUpdatedAtKey = "updated_at"
 	MetadataDeletedAtKey = "deleted_at"
-	MetadataOriginKey    = "origin"
+	MetadataUrlKey       = "url"
 	MetadataAppKey       = "app"
 
 	TimestampBase = 16
@@ -167,6 +168,7 @@ func (file *File) Data() []byte {
 }
 
 func (file *File) HideProtectedFields(uid int32) {
+	file.flags |= Blurred
 	for id, p := range file.permissions {
 		// hide all those permissions that do not belong to any of both, the user or owners
 		// WARNING: DO NOT SAVE THE FOLLOWING FILE CHANGES

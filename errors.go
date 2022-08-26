@@ -12,5 +12,6 @@ var (
 	ErrWrongCredentials = errors.New("E008")
 	ErrAlreadyExists    = errors.New("E010")
 
-	ErrChannelClosed = errors.New("channel closed")
+	ErrChannelClosed  = errors.New("channel closed")
+	ErrBlurredContent = errors.New("blurred content")
 )

@@ -186,6 +186,14 @@ func (repo *MongoFileRepository) FindPermissions(ctx context.Context, id string)
 }
 
 func (repo *MongoFileRepository) Save(ctx context.Context, file *File) error {
+	if file.flags&Blurred > 0 {
+		repo.logger.Error("saving file",
+			zap.String("file_id", file.id),
+			zap.Error(fb.ErrBlurredContent))
+
+		return fb.ErrUnknown
+	}
+
 	mFile, err := newMongoFile(file)
 	if err != nil {
 		repo.logger.Error("building mongo file",
