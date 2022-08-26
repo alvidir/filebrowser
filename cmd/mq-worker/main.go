@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"os"
+	"sync"
 
 	fb "github.com/alvidir/filebrowser"
 	dir "github.com/alvidir/filebrowser/directory"
@@ -17,6 +18,8 @@ import (
 const (
 	ENV_RABBITMQ_USERS_EXCHANGE = "RABBITMQ_USERS_EXCHANGE"
 	ENV_RABBITMQ_USERS_QUEUE    = "RABBITMQ_USERS_QUEUE"
+	ENV_RABBITMQ_FILES_EXCHANGE = "RABBITMQ_FILES_EXCHANGE"
+	ENV_RABBITMQ_FILES_QUEUE    = "RABBITMQ_FILES_QUEUE"
 	ENV_RABBITMQ_DSN            = "RABBITMQ_DSN"
 	ENV_MONGO_DSN               = "MONGO_DSN"
 	ENV_MONGO_DATABASE          = "MONGO_INITDB_DATABASE"
@@ -72,17 +75,21 @@ func newAmqpChannel(conn *amqp.Connection, logger *zap.Logger) *amqp.Channel {
 	return ch
 }
 
-func handleRabbitMqUserEvents(ctx context.Context, bus *event.RabbitMqEventBus, handler *event.UserEventHandler, logger *zap.Logger) {
+func handleRabbitMqUserEvents(ctx context.Context, bus *event.RabbitMqEventBus, handler *event.UserEventHandler, logger *zap.Logger) error {
 	exchange, exists := os.LookupEnv(ENV_RABBITMQ_USERS_EXCHANGE)
 	if !exists {
-		logger.Fatal("must be set",
+		logger.Error("must be set",
 			zap.String("varname", ENV_RABBITMQ_USERS_EXCHANGE))
+
+		return fb.ErrUnknown
 	}
 
 	queue, exists := os.LookupEnv(ENV_RABBITMQ_USERS_QUEUE)
 	if !exists {
-		logger.Fatal("must be set",
+		logger.Error("must be set",
 			zap.String("varname", ENV_RABBITMQ_USERS_QUEUE))
+
+		return fb.ErrUnknown
 	}
 
 	if err := bus.QueueBind(exchange, queue); err != nil {
@@ -90,9 +97,40 @@ func handleRabbitMqUserEvents(ctx context.Context, bus *event.RabbitMqEventBus, 
 			zap.String("queue", queue),
 			zap.String("exchange", exchange),
 			zap.Error(err))
+
+		return fb.ErrUnknown
 	}
 
-	bus.Consume(ctx, queue, handler.OnEvent)
+	return bus.Consume(ctx, queue, handler.OnEvent)
+}
+
+func handleRabbitMqFileEvents(ctx context.Context, bus *event.RabbitMqEventBus, handler *event.FileEventHandler, logger *zap.Logger) error {
+	exchange, exists := os.LookupEnv(ENV_RABBITMQ_FILES_EXCHANGE)
+	if !exists {
+		logger.Error("must be set",
+			zap.String("varname", ENV_RABBITMQ_FILES_EXCHANGE))
+
+		return fb.ErrUnknown
+	}
+
+	queue, exists := os.LookupEnv(ENV_RABBITMQ_FILES_QUEUE)
+	if !exists {
+		logger.Error("must be set",
+			zap.String("varname", ENV_RABBITMQ_FILES_QUEUE))
+
+		return fb.ErrUnknown
+	}
+
+	if err := bus.QueueBind(exchange, queue); err != nil {
+		logger.Error("binding queue",
+			zap.String("queue", queue),
+			zap.String("exchange", exchange),
+			zap.Error(err))
+
+		return fb.ErrUnknown
+	}
+
+	return bus.Consume(ctx, queue, handler.OnEvent)
 }
 
 func main() {
@@ -110,6 +148,7 @@ func main() {
 	directoryApp := dir.NewDirectoryApplication(directoryRepo, fileRepo, logger)
 	fileApp := file.NewFileApplication(fileRepo, directoryApp, logger)
 	userEventHandler := event.NewUserEventHandler(directoryApp, fileApp, logger)
+	fileEventHandler := event.NewFileEventHandler(directoryApp, fileApp, logger)
 
 	conn := newAmqpConnection(logger)
 	defer conn.Close()
@@ -117,7 +156,29 @@ func main() {
 	ch := newAmqpChannel(conn, logger)
 	defer ch.Close()
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
 	bus := event.NewRabbitMqEventBus(ch, logger)
-	handleRabbitMqUserEvents(ctx, bus, userEventHandler, logger)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	defer wg.Wait()
+
+	go func() {
+		defer wg.Done()
+
+		err := handleRabbitMqUserEvents(ctx, bus, userEventHandler, logger)
+		if err != nil {
+			cancel()
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+
+		err := handleRabbitMqFileEvents(ctx, bus, fileEventHandler, logger)
+		if err != nil {
+			cancel()
+		}
+	}()
 }
