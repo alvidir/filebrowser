@@ -14,7 +14,6 @@ type FileRepository interface {
 	Create(ctx context.Context, file *File) error
 	Find(context.Context, string) (*File, error)
 	FindAll(context.Context, []string) ([]*File, error)
-	FindPermissions(context.Context, string) (Permissions, error)
 	Save(ctx context.Context, file *File) error
 	Delete(ctx context.Context, file *File) error
 }
@@ -150,22 +149,4 @@ func (app *FileApplication) Delete(ctx context.Context, uid int32, fid string) (
 
 	err = app.dirApp.UnregisterFile(ctx, f, uid)
 	return f, err
-}
-
-func (app *FileApplication) Permissions(ctx context.Context, uid int32, fid string) (uint8, error) {
-	app.logger.Info("processing a \"permissions\" request",
-		zap.String("file_id", fid),
-		zap.Int32("user_id", uid))
-
-	allPermissions, err := app.fileRepo.FindPermissions(ctx, fid)
-	if err != nil {
-		return 0, err
-	}
-
-	userPermissions, exists := allPermissions[uid]
-	if !exists {
-		return 0, fb.ErrNotFound
-	}
-
-	return userPermissions, nil
 }

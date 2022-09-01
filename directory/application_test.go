@@ -64,7 +64,7 @@ type fileRepositoryMock struct {
 	create          func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
 	find            func(repo *fileRepositoryMock, ctx context.Context, id string) (*file.File, error)
 	findAll         func(repo *fileRepositoryMock, ctx context.Context, ids []string) ([]*file.File, error)
-	findPermissions func(repo *fileRepositoryMock, ctx context.Context, id string) (file.Permissions, error)
+	findPermissions func(repo *fileRepositoryMock, ctx context.Context, id string) (map[int32]file.Permissions, error)
 	save            func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
 	delete          func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
 }
@@ -93,7 +93,7 @@ func (mock *fileRepositoryMock) FindAll(ctx context.Context, ids []string) ([]*f
 	return nil, fb.ErrNotFound
 }
 
-func (mock *fileRepositoryMock) FindPermissions(ctx context.Context, id string) (file.Permissions, error) {
+func (mock *fileRepositoryMock) FindPermissions(ctx context.Context, id string) (map[int32]file.Permissions, error) {
 	if mock.findPermissions != nil {
 		return mock.findPermissions(mock, ctx, id)
 	}

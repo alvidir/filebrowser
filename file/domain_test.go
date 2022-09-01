@@ -22,7 +22,7 @@ func TestNewFile(t *testing.T) {
 	} else if file.metadata == nil {
 		t.Errorf("got metadata = %v, want = %v", file.metadata, Metadata{})
 	} else if file.permissions == nil {
-		t.Errorf("got permissions = %v, want = %v", file.permissions, Permissions{})
+		t.Errorf("got permissions = %v, want = %v", file.permissions, map[int32]Permissions{})
 	} else if file.data == nil || len(file.data) > 0 {
 		t.Errorf("got data = %v, want = %v", file.data, []byte{})
 	}
@@ -98,7 +98,7 @@ func TestPermissions(t *testing.T) {
 	}
 
 	var uid int32 = 999
-	var want uint8 = 0
+	var want Permissions = 0
 	if got := file.Permissions(uid); got != want {
 		t.Errorf("got permissions = %v, want = %v", got, want)
 	}

@@ -37,5 +37,4 @@ service File {
     rpc Read(FileLocator) returns (FileDescriptor);
     rpc Write(FileDescriptor) returns (FileDescriptor);
     rpc Delete(FileLocator) returns (FileDescriptor); 
-    rpc Permissions(FileLocator) returns (FilePermissions);
 }

@@ -16,12 +16,12 @@ const (
 )
 
 type mongoFile struct {
-	ID          primitive.ObjectID `bson:"_id,omitempty"`
-	Name        string             `bson:"name"`
-	Flags       uint8              `bson:"flags"`
-	Permissions map[int32]uint8    `bson:"permissions,omitempty"`
-	Metadata    map[string]string  `bson:"metadata,omitempty"`
-	Data        []byte             `bson:"data,omitempty"`
+	ID          primitive.ObjectID    `bson:"_id,omitempty"`
+	Name        string                `bson:"name"`
+	Flags       Flags                 `bson:"flags"`
+	Permissions map[int32]Permissions `bson:"permissions,omitempty"`
+	Metadata    map[string]string     `bson:"metadata,omitempty"`
+	Data        []byte                `bson:"data,omitempty"`
 }
 
 func newMongoFile(f *File) (*mongoFile, error) {
@@ -153,7 +153,7 @@ func (repo *MongoFileRepository) FindAll(ctx context.Context, ids []string) ([]*
 	return files, nil
 }
 
-func (repo *MongoFileRepository) FindPermissions(ctx context.Context, id string) (Permissions, error) {
+func (repo *MongoFileRepository) FindPermissions(ctx context.Context, id string) (map[int32]Permissions, error) {
 	objID, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		repo.logger.Error("parsing file id to ObjectID",

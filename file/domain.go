@@ -9,10 +9,10 @@ import (
 )
 
 const (
-	Read    uint8 = 0x01
-	Write   uint8 = 0x02
-	Owner   uint8 = 0x04
-	Blurred uint8 = 0x80
+	Read    Permissions = 0x01
+	Write   Permissions = 0x02
+	Owner   Permissions = 0x04
+	Blurred Flags       = 0x08
 
 	FilenameRegex string = "^[^/]+$"
 
@@ -30,14 +30,15 @@ var (
 )
 
 type Metadata map[string]string
-type Permissions map[int32]uint8
+type Flags uint8
+type Permissions uint8
 
 type File struct {
 	id          string
 	name        string
 	metadata    Metadata
-	permissions Permissions
-	flags       uint8
+	permissions map[int32]Permissions
+	flags       Flags
 	data        []byte
 }
 
@@ -55,7 +56,7 @@ func NewFile(id string, filename string) (*File, error) {
 		id:          id,
 		name:        filename,
 		metadata:    meta,
-		permissions: make(Permissions),
+		permissions: make(map[int32]Permissions),
 		flags:       0,
 		data:        make([]byte, 0),
 	}, nil
@@ -110,7 +111,7 @@ func (file *File) SharedWith() []int32 {
 	return shared
 }
 
-func (file *File) Permissions(uid int32) (perm uint8) {
+func (file *File) Permissions(uid int32) (perm Permissions) {
 	if file.permissions != nil {
 		perm = file.permissions[uid]
 	}
@@ -118,15 +119,15 @@ func (file *File) Permissions(uid int32) (perm uint8) {
 	return
 }
 
-func (file *File) AddPermissions(uid int32, perm uint8) {
+func (file *File) AddPermissions(uid int32, perm Permissions) {
 	if file.permissions == nil {
-		file.permissions = make(Permissions)
+		file.permissions = make(map[int32]Permissions)
 	}
 
 	file.permissions[uid] |= perm
 }
 
-func (file *File) RevokePermissions(uid int32, perm uint8) {
+func (file *File) RevokePermissions(uid int32, perm Permissions) {
 	if file.permissions == nil {
 		return
 	}
