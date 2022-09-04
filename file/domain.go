@@ -9,10 +9,11 @@ import (
 )
 
 const (
-	Read    Permissions = 0x01
-	Write   Permissions = 0x02
-	Owner   Permissions = 0x04
-	Blurred Flags       = 0x08
+	Read  Permissions = 0x01
+	Write Permissions = 0x02
+	Owner Permissions = 0x04
+
+	Blurred Flags = 0x08
 
 	FilenameRegex string = "^[^/]+$"
 
@@ -32,6 +33,18 @@ var (
 type Metadata map[string]string
 type Flags uint8
 type Permissions uint8
+
+func (perm *Permissions) Read() bool {
+	return *perm&Read != 0
+}
+
+func (perm *Permissions) Write() bool {
+	return *perm&Write != 0
+}
+
+func (perm *Permissions) Owner() bool {
+	return *perm&Owner != 0
+}
 
 type File struct {
 	id          string
