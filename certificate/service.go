@@ -39,24 +39,29 @@ type claims struct {
 }
 
 type CertificateService struct {
-	privateKey *ecdsa.PrivateKey
-	logger     *zap.Logger
+	signKey *ecdsa.PrivateKey
+	ttl     *time.Duration
+	logger  *zap.Logger
 }
 
-func NewCertificateService(key *ecdsa.PrivateKey, logger *zap.Logger) *CertificateService {
+func NewCertificateService(ttl *time.Duration, sign *ecdsa.PrivateKey, logger *zap.Logger) *CertificateService {
 	return &CertificateService{
-		privateKey: key,
-		logger:     logger,
+		signKey: sign,
+		ttl:     ttl,
+		logger:  logger,
 	}
 }
 
-func (service *CertificateService) Create(uid int32, fid string, perm Permissions) (string, error) {
+func (service *CertificateService) NewUserAuthorization(uid int32, fid string, perm Permissions) (string, error) {
 	claims := claims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    TokenIssuer,
 			Subject:   strconv.Itoa(int(uid)),
-			ExpiresAt: nil,
+			Audience:  []string{},
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(*service.ttl)),
+			NotBefore: &jwt.NumericDate{},
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ID:        "",
 		},
 		FileId: fid,
 		Read:   perm.Read(),
@@ -73,7 +78,7 @@ func (service *CertificateService) Create(uid int32, fid string, perm Permission
 		Valid:     false,
 	}
 
-	certificate, err := token.SignedString(service.privateKey)
+	certificate, err := token.SignedString(service.signKey)
 	if err != nil {
 		service.logger.Error("signing certificate",
 			zap.Int32("user_id", uid),
