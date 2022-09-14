@@ -6,6 +6,7 @@ import (
 	"time"
 
 	fb "github.com/alvidir/filebrowser"
+	cert "github.com/alvidir/filebrowser/certificate"
 )
 
 const (
@@ -13,7 +14,8 @@ const (
 	Write Permissions = 0x02
 	Owner Permissions = 0x04
 
-	Blurred Flags = 0x08
+	Blurred Flags = 0x01
+	Remote  Flags = 0x02
 
 	FilenameRegex string = "^[^/]+$"
 
@@ -47,12 +49,13 @@ func (perm *Permissions) Owner() bool {
 }
 
 type File struct {
-	id          string
-	name        string
-	metadata    Metadata
-	permissions map[int32]Permissions
-	flags       Flags
-	data        []byte
+	id           string
+	name         string
+	metadata     Metadata
+	permissions  map[int32]Permissions
+	certificates map[int32]cert.Certificate
+	flags        Flags
+	data         []byte
 }
 
 func NewFile(id string, filename string) (*File, error) {
@@ -184,10 +187,14 @@ func (file *File) Data() []byte {
 func (file *File) HideProtectedFields(uid int32) {
 	file.flags |= Blurred
 	for id, p := range file.permissions {
-		// hide all those permissions that do not belong to any of both, the user or owners
-		// WARNING: DO NOT SAVE THE FOLLOWING FILE CHANGES
 		if id != uid && p&Owner == 0 {
 			delete(file.permissions, id)
+		}
+	}
+
+	for id := range file.certificates {
+		if id != uid {
+			delete(file.certificates, id)
 		}
 	}
 }

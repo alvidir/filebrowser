@@ -77,14 +77,12 @@ func (app *FileApplication) Read(ctx context.Context, uid int32, fid string) (*F
 	}
 
 	perm := file.Permissions(uid)
-	if perm&(Owner) > 0 {
-		return file, nil
-	} else if perm&(Read) > 0 {
-		file.HideProtectedFields(uid)
-		return file, nil
+	if perm&(Owner|Read) == 0 {
+		return nil, fb.ErrNotAvailable
 	}
 
-	return nil, fb.ErrNotAvailable
+	file.HideProtectedFields(uid)
+	return file, nil
 }
 
 func (app *FileApplication) Write(ctx context.Context, uid int32, fid string, data []byte, meta Metadata) (*File, error) {

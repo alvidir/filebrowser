@@ -52,7 +52,7 @@ func NewCertificateService(ttl *time.Duration, sign *ecdsa.PrivateKey, logger *z
 	}
 }
 
-func (service *CertificateService) NewUserAuthorization(uid int32, fid string, perm Permissions) (string, error) {
+func (service *CertificateService) NewAuthorization(uid int32, fid string, perm Permissions) (*Certificate, error) {
 	claims := claims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    TokenIssuer,
@@ -78,15 +78,17 @@ func (service *CertificateService) NewUserAuthorization(uid int32, fid string, p
 		Valid:     false,
 	}
 
-	certificate, err := token.SignedString(service.signKey)
+	signed, err := token.SignedString(service.signKey)
 	if err != nil {
-		service.logger.Error("signing certificate",
+		service.logger.Error("signing jwt",
 			zap.Int32("user_id", uid),
 			zap.String("file_id", fid),
 			zap.Error(err))
 
-		return "", fb.ErrUnknown
+		return nil, fb.ErrUnknown
 	}
 
-	return certificate, nil
+	return &Certificate{
+		token: signed,
+	}, nil
 }
