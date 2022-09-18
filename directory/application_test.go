@@ -452,7 +452,7 @@ func TestUnregisterFileWhenFileIsDeleted(t *testing.T) {
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
 	f, _ := file.NewFile("test", "filename")
-	f.AddValue(file.MetadataDeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
+	f.AddMetadata(file.MetadataDeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
 	f.AddPermissions(999, file.Owner)
 	d.AddFile(f, "path/to/file")
 
@@ -489,7 +489,7 @@ func TestUnregisterFileWhenFileIsShared(t *testing.T) {
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
 	f, _ := file.NewFile("test", "filename")
-	f.AddValue(file.MetadataDeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
+	f.AddMetadata(file.MetadataDeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
 	f.AddPermissions(999, file.Owner)
 	f.AddPermissions(888, file.Read|file.Write)
 

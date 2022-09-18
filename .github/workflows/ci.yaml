@@ -4,15 +4,35 @@ on:
   - push
   - pull_request
 
+env:
+  GO_VERSION: 1.19.x
+
 jobs:
+  changelog:
+    name: Changelog
+    runs-on: ubuntu-latest
+
+    outputs:
+      changelog: ${{ steps.changed-files.outputs.all_changed_files }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v29.0.4
+
   run_unitary_tests:
     name: Run unitary tests
-    strategy:
-      matrix:
-        go-version: [1.19.x]
-        os: [ubuntu-latest]
+    runs-on: ubuntu-latest
 
-    runs-on: ${{ matrix.os }}
+    needs: changelog
+    if: |
+      contains(needs.changelog.outputs.changelog, 'go') ||
+      contains(needs.changelog.outputs.changelog, 'proto')
 
     steps:
       - name: Checkout code
@@ -23,7 +43,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v3
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: $GO_VERSION
 
       - name: Install protoc
         uses: arduino/setup-protoc@v1
@@ -43,10 +63,8 @@ release_version:
   name: Release version
   runs-on: ubuntu-latest
 
-  needs:
-    - run_unitary_tests
-
-  if: ${{ github.ref == 'refs/heads/main' && !contains(join(needs.*.conclusion), 'failure') }}
+  needs: run_unitary_tests
+  if: github.ref == 'refs/heads/main'
 
   steps:
     - name: Checkout code

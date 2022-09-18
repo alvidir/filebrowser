@@ -14,4 +14,5 @@ var (
 
 	ErrChannelClosed  = errors.New("channel closed")
 	ErrBlurredContent = errors.New("blurred content")
+	ErrUnidentified   = errors.New("unidentified")
 )

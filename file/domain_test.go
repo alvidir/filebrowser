@@ -243,7 +243,7 @@ func TestAddValue(t *testing.T) {
 
 	key := "testing"
 	want := "testing"
-	file.AddValue(key, want)
+	file.AddMetadata(key, want)
 
 	if got, exists := file.metadata[key]; !exists || got != want {
 		t.Errorf("got metadata = %v, want = %v", got, want)
@@ -266,7 +266,7 @@ func TestValue(t *testing.T) {
 		t.Errorf("got value = %v, want = %v", got, nil)
 	}
 
-	file.AddValue(key, want)
+	file.AddMetadata(key, want)
 	if got, exists := file.Value(key); !exists || got != want {
 		t.Errorf("got metadata = %v, want = %v", got, want)
 	}

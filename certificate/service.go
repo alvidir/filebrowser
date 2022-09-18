@@ -24,18 +24,34 @@ var (
 	}
 )
 
-type Permissions interface {
-	Read() bool
-	Write() bool
-	Owner() bool
-}
-
-type claims struct {
+type fileAccessClaims struct {
 	jwt.RegisteredClaims `json:",inline"`
 	FileId               string `json:"file_id"`
 	Read                 bool   `json:"can_read"`
 	Write                bool   `json:"can_write"`
 	Owner                bool   `json:"is_owner"`
+}
+
+func newFileAccessClaims(cert *FileAccessCertificate, ttl time.Duration) (*fileAccessClaims, error) {
+	if len(cert.id) == 0 {
+		return nil, fb.ErrUnidentified
+	}
+
+	return &fileAccessClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    TokenIssuer,
+			Subject:   strconv.Itoa(int(cert.userId)),
+			Audience:  []string{},
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(ttl)),
+			NotBefore: &jwt.NumericDate{},
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			ID:        cert.id,
+		},
+		FileId: cert.fileId,
+		Read:   cert.read,
+		Write:  cert.write,
+		Owner:  cert.owner,
+	}, nil
 }
 
 type CertificateService struct {
@@ -52,21 +68,10 @@ func NewCertificateService(ttl *time.Duration, sign *ecdsa.PrivateKey, logger *z
 	}
 }
 
-func (service *CertificateService) NewAuthorization(uid int32, fid string, perm Permissions) (*Certificate, error) {
-	claims := claims{
-		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    TokenIssuer,
-			Subject:   strconv.Itoa(int(uid)),
-			Audience:  []string{},
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(*service.ttl)),
-			NotBefore: &jwt.NumericDate{},
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			ID:        "",
-		},
-		FileId: fid,
-		Read:   perm.Read(),
-		Write:  perm.Write(),
-		Owner:  perm.Owner(),
+func (service *CertificateService) SignCertificate(cert *FileAccessCertificate) error {
+	claims, err := newFileAccessClaims(cert, *service.ttl)
+	if err != nil {
+		return err
 	}
 
 	token := &jwt.Token{
@@ -81,14 +86,13 @@ func (service *CertificateService) NewAuthorization(uid int32, fid string, perm 
 	signed, err := token.SignedString(service.signKey)
 	if err != nil {
 		service.logger.Error("signing jwt",
-			zap.Int32("user_id", uid),
-			zap.String("file_id", fid),
+			zap.Int32("user_id", cert.userId),
+			zap.String("file_id", cert.fileId),
 			zap.Error(err))
 
-		return nil, fb.ErrUnknown
+		return fb.ErrUnknown
 	}
 
-	return &Certificate{
-		token: signed,
-	}, nil
+	cert.token = []byte(signed)
+	return nil
 }

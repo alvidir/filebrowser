@@ -90,7 +90,7 @@ func (app *DirectoryApplication) Delete(ctx context.Context, uid int32) error {
 
 			if len(f.Owners()) == 1 {
 				// uid is the only owner of file f
-				f.AddValue(file.MetadataDeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
+				f.AddMetadata(file.MetadataDeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
 				app.fileRepo.Delete(ctx, f)
 			}
 		}(ctx, &wg, f.Id())

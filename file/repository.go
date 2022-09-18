@@ -60,7 +60,7 @@ func (repo *MongoFileRepository) Create(ctx context.Context, file *File) error {
 	mongoFile, err := newMongoFile(file)
 	if err != nil {
 		repo.logger.Error("building mongo file",
-			zap.String("file_id", file.id),
+			zap.String("file_name", file.name),
 			zap.Error(err))
 
 		return fb.ErrUnknown

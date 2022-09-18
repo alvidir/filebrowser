@@ -6,7 +6,6 @@ import (
 	"time"
 
 	fb "github.com/alvidir/filebrowser"
-	cert "github.com/alvidir/filebrowser/certificate"
 )
 
 const (
@@ -49,13 +48,12 @@ func (perm *Permissions) Owner() bool {
 }
 
 type File struct {
-	id           string
-	name         string
-	metadata     Metadata
-	permissions  map[int32]Permissions
-	certificates map[int32]cert.Certificate
-	flags        Flags
-	data         []byte
+	id          string
+	name        string
+	metadata    Metadata
+	permissions map[int32]Permissions
+	flags       Flags
+	data        []byte
 }
 
 func NewFile(id string, filename string) (*File, error) {
@@ -170,7 +168,7 @@ func (file *File) RevokeAccess(uid int32) bool {
 	return true
 }
 
-func (file *File) AddValue(key string, value string) (old string, exists bool) {
+func (file *File) AddMetadata(key string, value string) (old string, exists bool) {
 	if file.metadata == nil {
 		file.metadata = make(Metadata)
 	}
@@ -187,14 +185,8 @@ func (file *File) Data() []byte {
 func (file *File) HideProtectedFields(uid int32) {
 	file.flags |= Blurred
 	for id, p := range file.permissions {
-		if id != uid && p&Owner == 0 {
+		if id != uid && p&(Owner|Write) == 0 {
 			delete(file.permissions, id)
-		}
-	}
-
-	for id := range file.certificates {
-		if id != uid {
-			delete(file.certificates, id)
 		}
 	}
 }

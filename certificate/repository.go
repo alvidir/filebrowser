@@ -14,12 +14,17 @@ const (
 	mongoCertificateCollectionName = "certificates"
 )
 
-type mongoCertificate struct {
-	ID    primitive.ObjectID `bson:"_id,omitempty"`
-	Token string             `bson:"token"`
+type mongoFileAccessAuthorization struct {
+	ID     primitive.ObjectID `bson:"_id,omitempty"`
+	FileID primitive.ObjectID `bson:"file_id"`
+	UserID int32              `bson:"user_id"`
+	Read   bool               `bson:"can_read"`
+	Write  bool               `bson:"can_write"`
+	Owner  bool               `bson:"is_owner"`
+	Token  []byte             `bson:"token,omitempty"`
 }
 
-func newMongoCertificate(cert *Certificate) (*mongoCertificate, error) {
+func newMongoFileAccessAuthorization(cert *FileAccessCertificate) (*mongoFileAccessAuthorization, error) {
 	oid := primitive.NilObjectID
 
 	if len(cert.id) > 0 {
@@ -29,52 +34,77 @@ func newMongoCertificate(cert *Certificate) (*mongoCertificate, error) {
 		}
 	}
 
-	return &mongoCertificate{
-		ID:    oid,
-		Token: cert.token,
+	fid := primitive.NilObjectID
+	if len(cert.fileId) > 0 {
+		var err error
+		if fid, err = primitive.ObjectIDFromHex(cert.fileId); err != nil {
+			return nil, err
+		}
+	}
+
+	return &mongoFileAccessAuthorization{
+		ID:     oid,
+		FileID: fid,
+		UserID: cert.userId,
+		Read:   cert.read,
+		Write:  cert.write,
+		Owner:  cert.owner,
+		Token:  cert.token,
 	}, nil
 }
 
-type MongoCertificateRepository struct {
+type MongoAuthorizationRepository struct {
 	conn   *mongo.Collection
 	logger *zap.Logger
 }
 
-func NewMongoCertificateRepository(db *mongo.Database, logger *zap.Logger) *MongoCertificateRepository {
-	return &MongoCertificateRepository{
+func NewMongoAuthorizationRepository(db *mongo.Database, logger *zap.Logger) *MongoAuthorizationRepository {
+	return &MongoAuthorizationRepository{
 		conn:   db.Collection(mongoCertificateCollectionName),
 		logger: logger,
 	}
 }
 
-func (repo *MongoCertificateRepository) Find(ctx context.Context, id string) (*Certificate, error) {
-	objID, err := primitive.ObjectIDFromHex(id)
+func (repo *MongoAuthorizationRepository) FindByFileIdAndUserId(ctx context.Context, fileId string, userId int32) (*FileAccessCertificate, error) {
+	objID, err := primitive.ObjectIDFromHex(fileId)
 	if err != nil {
-		repo.logger.Error("parsing file id to ObjectID",
-			zap.String("file_id", id),
+		repo.logger.Error("parsing authorization id to ObjectID",
+			zap.String("file_id", fileId),
+			zap.Int32("user_id", userId),
 			zap.Error(err))
 
 		return nil, fb.ErrUnknown
 	}
 
-	var mCertificate mongoCertificate
-	err = repo.conn.FindOne(ctx, bson.M{"_id": objID}).Decode(&mCertificate)
+	var mAuthorization mongoFileAccessAuthorization
+	err = repo.conn.FindOne(ctx, bson.M{"file_id": objID, "user_id": userId}).Decode(&mAuthorization)
 	if err != nil {
 		repo.logger.Error("performing find one on mongo",
-			zap.String("file_id", id),
+			zap.String("file_id", fileId),
+			zap.Int32("user_id", userId),
 			zap.Error(err))
 
 		return nil, fb.ErrUnknown
 	}
 
-	return repo.build(ctx, &mCertificate)
+	return repo.build(ctx, &mAuthorization)
 }
 
-func (repo *MongoCertificateRepository) Create(ctx context.Context, cert *Certificate) error {
-	mdir, err := newMongoCertificate(cert)
+func (repo *MongoAuthorizationRepository) Create(ctx context.Context, cert *FileAccessCertificate) error {
+	_, err := repo.FindByFileIdAndUserId(ctx, cert.fileId, cert.userId)
+	if err == nil {
+		repo.logger.Warn("creating certificate",
+			zap.String("file_id", cert.fileId),
+			zap.Int32("user_id", cert.userId),
+			zap.Error(fb.ErrAlreadyExists))
+
+		return fb.ErrAlreadyExists
+	}
+
+	mdir, err := newMongoFileAccessAuthorization(cert)
 	if err != nil {
-		repo.logger.Error("building mongo certificate",
-			zap.String("certificate", cert.id),
+		repo.logger.Error("building mongo authorization",
+			zap.String("user_id", cert.id),
 			zap.Error(err))
 
 		return fb.ErrUnknown
@@ -99,11 +129,11 @@ func (repo *MongoCertificateRepository) Create(ctx context.Context, cert *Certif
 	return fb.ErrUnknown
 }
 
-func (repo *MongoCertificateRepository) Delete(ctx context.Context, cert *Certificate) error {
+func (repo *MongoAuthorizationRepository) Delete(ctx context.Context, cert *FileAccessCertificate) error {
 	objID, err := primitive.ObjectIDFromHex(cert.id)
 	if err != nil {
-		repo.logger.Error("parsing certificate id to ObjectID",
-			zap.String("certificate", cert.id),
+		repo.logger.Error("parsing authorization id to ObjectID",
+			zap.String("authorization", cert.id),
 			zap.Error(err))
 
 		return fb.ErrUnknown
@@ -119,7 +149,7 @@ func (repo *MongoCertificateRepository) Delete(ctx context.Context, cert *Certif
 
 	if result.DeletedCount == 0 {
 		repo.logger.Error("performing delete one on mongo",
-			zap.String("certificate_id", cert.id),
+			zap.String("authorization_id", cert.id),
 			zap.Int64("deleted_count", result.DeletedCount))
 
 		return fb.ErrUnknown
@@ -128,8 +158,8 @@ func (repo *MongoCertificateRepository) Delete(ctx context.Context, cert *Certif
 	return nil
 }
 
-func (repo *MongoCertificateRepository) build(ctx context.Context, mdir *mongoCertificate) (*Certificate, error) {
-	return &Certificate{
+func (repo *MongoAuthorizationRepository) build(ctx context.Context, mdir *mongoFileAccessAuthorization) (*FileAccessCertificate, error) {
+	return &FileAccessCertificate{
 		id:    mdir.ID.Hex(),
 		token: mdir.Token,
 	}, nil
