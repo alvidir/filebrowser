@@ -15,13 +15,11 @@ const (
 )
 
 type mongoFileAccessAuthorization struct {
-	ID     primitive.ObjectID `bson:"_id,omitempty"`
-	FileID primitive.ObjectID `bson:"file_id"`
-	UserID int32              `bson:"user_id"`
-	Read   bool               `bson:"can_read"`
-	Write  bool               `bson:"can_write"`
-	Owner  bool               `bson:"is_owner"`
-	Token  []byte             `bson:"token,omitempty"`
+	ID          primitive.ObjectID `bson:"_id,omitempty"`
+	FileID      primitive.ObjectID `bson:"file_id"`
+	UserID      int32              `bson:"user_id"`
+	Permissions fb.Permissions     `bson:"permissions"`
+	Token       []byte             `bson:"token,omitempty"`
 }
 
 func newMongoFileAccessAuthorization(cert *FileAccessCertificate) (*mongoFileAccessAuthorization, error) {
@@ -43,13 +41,11 @@ func newMongoFileAccessAuthorization(cert *FileAccessCertificate) (*mongoFileAcc
 	}
 
 	return &mongoFileAccessAuthorization{
-		ID:     oid,
-		FileID: fid,
-		UserID: cert.userId,
-		Read:   cert.read,
-		Write:  cert.write,
-		Owner:  cert.owner,
-		Token:  cert.token,
+		ID:          oid,
+		FileID:      fid,
+		UserID:      cert.userId,
+		Permissions: cert.permissions,
+		Token:       cert.token,
 	}, nil
 }
 
@@ -68,7 +64,7 @@ func NewMongoAuthorizationRepository(db *mongo.Database, logger *zap.Logger) *Mo
 func (repo *MongoAuthorizationRepository) FindByFileIdAndUserId(ctx context.Context, fileId string, userId int32) (*FileAccessCertificate, error) {
 	objID, err := primitive.ObjectIDFromHex(fileId)
 	if err != nil {
-		repo.logger.Error("parsing authorization id to ObjectID",
+		repo.logger.Error("parsing certificate id to ObjectID",
 			zap.String("file_id", fileId),
 			zap.Int32("user_id", userId),
 			zap.Error(err))
@@ -103,7 +99,7 @@ func (repo *MongoAuthorizationRepository) Create(ctx context.Context, cert *File
 
 	mdir, err := newMongoFileAccessAuthorization(cert)
 	if err != nil {
-		repo.logger.Error("building mongo authorization",
+		repo.logger.Error("building mongo certificate",
 			zap.String("user_id", cert.id),
 			zap.Error(err))
 
@@ -129,11 +125,33 @@ func (repo *MongoAuthorizationRepository) Create(ctx context.Context, cert *File
 	return fb.ErrUnknown
 }
 
+func (repo *MongoAuthorizationRepository) Save(ctx context.Context, cert *FileAccessCertificate) error {
+	mdir, err := newMongoFileAccessAuthorization(cert)
+	if err != nil {
+		repo.logger.Error("building mongo certificate",
+			zap.String("certificate_id", cert.id),
+			zap.Int32("user_id", cert.userId),
+			zap.Error(err))
+
+		return fb.ErrUnknown
+	}
+
+	if _, err = repo.conn.ReplaceOne(ctx, bson.M{"_id": mdir.ID}, mdir); err != nil {
+		repo.logger.Error("performing replace one on mongo",
+			zap.String("certificate_id", cert.id),
+			zap.Error(err))
+
+		return fb.ErrUnknown
+	}
+
+	return nil
+}
+
 func (repo *MongoAuthorizationRepository) Delete(ctx context.Context, cert *FileAccessCertificate) error {
 	objID, err := primitive.ObjectIDFromHex(cert.id)
 	if err != nil {
-		repo.logger.Error("parsing authorization id to ObjectID",
-			zap.String("authorization", cert.id),
+		repo.logger.Error("parsing certificate id to ObjectID",
+			zap.String("certificate_id", cert.id),
 			zap.Error(err))
 
 		return fb.ErrUnknown
@@ -141,7 +159,7 @@ func (repo *MongoAuthorizationRepository) Delete(ctx context.Context, cert *File
 
 	result, err := repo.conn.DeleteOne(ctx, bson.M{"_id": objID})
 	if err != nil {
-		repo.logger.Error("performing replace one on mongo",
+		repo.logger.Error("performing delete one on mongo",
 			zap.Error(err))
 
 		return fb.ErrUnknown
@@ -149,7 +167,7 @@ func (repo *MongoAuthorizationRepository) Delete(ctx context.Context, cert *File
 
 	if result.DeletedCount == 0 {
 		repo.logger.Error("performing delete one on mongo",
-			zap.String("authorization_id", cert.id),
+			zap.String("certificate_id", cert.id),
 			zap.Int64("deleted_count", result.DeletedCount))
 
 		return fb.ErrUnknown

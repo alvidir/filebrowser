@@ -12,7 +12,6 @@ import (
 )
 
 const (
-	TokenIssuer     = "filebrowser.alvidir.com"
 	TokenHeaderType = "JWT"
 )
 
@@ -32,14 +31,14 @@ type fileAccessClaims struct {
 	Owner                bool   `json:"is_owner"`
 }
 
-func newFileAccessClaims(cert *FileAccessCertificate, ttl time.Duration) (*fileAccessClaims, error) {
+func newFileAccessClaims(cert *FileAccessCertificate, ttl time.Duration, issuer string) (*fileAccessClaims, error) {
 	if len(cert.id) == 0 {
 		return nil, fb.ErrUnidentified
 	}
 
 	return &fileAccessClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    TokenIssuer,
+			Issuer:    issuer,
 			Subject:   strconv.Itoa(int(cert.userId)),
 			Audience:  []string{},
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(ttl)),
@@ -48,28 +47,29 @@ func newFileAccessClaims(cert *FileAccessCertificate, ttl time.Duration) (*fileA
 			ID:        cert.id,
 		},
 		FileId: cert.fileId,
-		Read:   cert.read,
-		Write:  cert.write,
-		Owner:  cert.owner,
+		Read:   cert.permissions&fb.Read != 0,
+		Write:  cert.permissions&fb.Write != 0,
+		Owner:  cert.permissions&fb.Owner != 0,
 	}, nil
 }
 
-type CertificateService struct {
+type JWTCertificateService struct {
 	signKey *ecdsa.PrivateKey
 	ttl     *time.Duration
+	issuer  string
 	logger  *zap.Logger
 }
 
-func NewCertificateService(ttl *time.Duration, sign *ecdsa.PrivateKey, logger *zap.Logger) *CertificateService {
-	return &CertificateService{
+func NewCertificateService(ttl *time.Duration, sign *ecdsa.PrivateKey, logger *zap.Logger) *JWTCertificateService {
+	return &JWTCertificateService{
 		signKey: sign,
 		ttl:     ttl,
 		logger:  logger,
 	}
 }
 
-func (service *CertificateService) SignCertificate(cert *FileAccessCertificate) error {
-	claims, err := newFileAccessClaims(cert, *service.ttl)
+func (service *JWTCertificateService) SignFileAccessCertificate(cert *FileAccessCertificate) error {
+	claims, err := newFileAccessClaims(cert, *service.ttl, service.issuer)
 	if err != nil {
 		return err
 	}

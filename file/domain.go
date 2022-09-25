@@ -9,10 +9,6 @@ import (
 )
 
 const (
-	Read  Permissions = 0x01
-	Write Permissions = 0x02
-	Owner Permissions = 0x04
-
 	Blurred Flags = 0x01
 	Remote  Flags = 0x02
 
@@ -33,25 +29,12 @@ var (
 
 type Metadata map[string]string
 type Flags uint8
-type Permissions uint8
-
-func (perm *Permissions) Read() bool {
-	return *perm&Read != 0
-}
-
-func (perm *Permissions) Write() bool {
-	return *perm&Write != 0
-}
-
-func (perm *Permissions) Owner() bool {
-	return *perm&Owner != 0
-}
 
 type File struct {
 	id          string
 	name        string
 	metadata    Metadata
-	permissions map[int32]Permissions
+	permissions map[int32]fb.Permissions
 	flags       Flags
 	data        []byte
 }
@@ -70,7 +53,7 @@ func NewFile(id string, filename string) (*File, error) {
 		id:          id,
 		name:        filename,
 		metadata:    meta,
-		permissions: make(map[int32]Permissions),
+		permissions: make(map[int32]fb.Permissions),
 		flags:       0,
 		data:        make([]byte, 0),
 	}, nil
@@ -99,7 +82,7 @@ func (file *File) Metadata() Metadata {
 func (file *File) Owners() []int32 {
 	owners := make([]int32, 1) // a file has, for sure, at least one owner
 	for uid, perm := range file.permissions {
-		if perm&Owner == 0 {
+		if perm&fb.Owner == 0 {
 			continue
 		}
 
@@ -125,7 +108,7 @@ func (file *File) SharedWith() []int32 {
 	return shared
 }
 
-func (file *File) Permissions(uid int32) (perm Permissions) {
+func (file *File) Permissions(uid int32) (perm fb.Permissions) {
 	if file.permissions != nil {
 		perm = file.permissions[uid]
 	}
@@ -133,15 +116,15 @@ func (file *File) Permissions(uid int32) (perm Permissions) {
 	return
 }
 
-func (file *File) AddPermissions(uid int32, perm Permissions) {
+func (file *File) AddPermissions(uid int32, perm fb.Permissions) {
 	if file.permissions == nil {
-		file.permissions = make(map[int32]Permissions)
+		file.permissions = make(map[int32]fb.Permissions)
 	}
 
 	file.permissions[uid] |= perm
 }
 
-func (file *File) RevokePermissions(uid int32, perm Permissions) {
+func (file *File) RevokePermissions(uid int32, perm fb.Permissions) {
 	if file.permissions == nil {
 		return
 	}
@@ -185,8 +168,13 @@ func (file *File) Data() []byte {
 func (file *File) HideProtectedFields(uid int32) {
 	file.flags |= Blurred
 	for id, p := range file.permissions {
-		if id != uid && p&(Owner|Write) == 0 {
+		if id != uid && p&(fb.Owner|fb.Write) == 0 {
 			delete(file.permissions, id)
 		}
 	}
+}
+
+func (file *File) IsRemote() bool {
+	_, exists := file.metadata[MetadataAppKey]
+	return exists
 }

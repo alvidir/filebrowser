@@ -84,7 +84,7 @@ func (app *DirectoryApplication) Delete(ctx context.Context, uid int32) error {
 				return
 			}
 
-			if f.Permissions(uid)&file.Owner == 0 {
+			if f.Permissions(uid)&fb.Owner == 0 {
 				return
 			}
 
@@ -128,7 +128,7 @@ func (app *DirectoryApplication) UnregisterFile(ctx context.Context, f *file.Fil
 		return err
 	}
 
-	if f.Permissions(uid)&file.Owner == 0 {
+	if f.Permissions(uid)&fb.Owner == 0 {
 		dir.RemoveFile(f)
 		return app.dirRepo.Save(ctx, dir)
 	}

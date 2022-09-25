@@ -31,11 +31,11 @@ func NewFileDescriptor(file *File) *proto.FileDescriptor {
 	return descriptor
 }
 
-func NewFilePermissions(perm Permissions) *proto.FilePermissions {
+func NewFilePermissions(perm fb.Permissions) *proto.FilePermissions {
 	return &proto.FilePermissions{
-		Read:  perm&Read != 0,
-		Write: perm&Write != 0,
-		Owner: perm&Owner != 0,
+		Read:  perm&fb.Read != 0,
+		Write: perm&fb.Write != 0,
+		Owner: perm&fb.Owner != 0,
 	}
 }
 

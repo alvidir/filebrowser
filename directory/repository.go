@@ -143,7 +143,7 @@ func (repo *MongoDirectoryRepository) Delete(ctx context.Context, dir *Directory
 
 	result, err := repo.conn.DeleteOne(ctx, bson.M{"_id": objID})
 	if err != nil {
-		repo.logger.Error("performing replace one on mongo",
+		repo.logger.Error("performing delete one on mongo",
 			zap.Int32("user_id", dir.userId),
 			zap.Error(err))
 
