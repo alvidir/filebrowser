@@ -22,7 +22,7 @@ func TestNewFile(t *testing.T) {
 	} else if file.metadata == nil {
 		t.Errorf("got metadata = %v, want = %v", file.metadata, Metadata{})
 	} else if file.permissions == nil {
-		t.Errorf("got permissions = %v, want = %v", file.permissions, map[int32]fb.Permissions{})
+		t.Errorf("got permissions = %v, want = %v", file.permissions, map[int32]fb.Permission{})
 	} else if file.data == nil || len(file.data) > 0 {
 		t.Errorf("got data = %v, want = %v", file.data, []byte{})
 	}
@@ -72,14 +72,14 @@ func TestAddPermissions(t *testing.T) {
 	}
 
 	var uid int32 = 999
-	file.AddPermissions(uid, fb.Read)
+	file.AddPermission(uid, fb.Read)
 
 	want := fb.Read
 	if got, exists := file.permissions[uid]; !exists || got != want {
 		t.Errorf("got permissions = %v, want = %v", got, want)
 	}
 
-	file.AddPermissions(uid, fb.Write)
+	file.AddPermission(uid, fb.Write)
 
 	want = fb.Write | fb.Read
 	if got, exists := file.permissions[uid]; !exists || got != want {
@@ -98,15 +98,15 @@ func TestPermissions(t *testing.T) {
 	}
 
 	var uid int32 = 999
-	var want fb.Permissions = 0
-	if got := file.Permissions(uid); got != want {
+	var want fb.Permission = 0
+	if got := file.Permission(uid); got != want {
 		t.Errorf("got permissions = %v, want = %v", got, want)
 	}
 
 	want = fb.Write | fb.Read
-	file.AddPermissions(uid, want)
+	file.AddPermission(uid, want)
 
-	if got := file.Permissions(uid); got != want {
+	if got := file.Permission(uid); got != want {
 		t.Errorf("got permissions = %v, want = %v", got, want)
 	}
 }
@@ -122,15 +122,15 @@ func TestRevokePermissions(t *testing.T) {
 	}
 
 	var uid int32 = 999
-	file.AddPermissions(uid, fb.Write|fb.Read)
-	file.RevokePermissions(uid, fb.Write)
+	file.AddPermission(uid, fb.Write|fb.Read)
+	file.RevokePermission(uid, fb.Write)
 
 	want := fb.Read
 	if got, exists := file.permissions[uid]; !exists || got != want {
 		t.Errorf("got permissions = %v, want = %v", got, want)
 	}
 
-	file.RevokePermissions(uid, fb.Owner)
+	file.RevokePermission(uid, fb.Owner)
 	if got, exists := file.permissions[uid]; !exists || got != want {
 		t.Errorf("got permissions = %v, want = %v", got, want)
 	}
@@ -151,7 +151,7 @@ func TestRevokeAccess(t *testing.T) {
 		t.Errorf("got ok = %v, want = %v", ok, false)
 	}
 
-	file.AddPermissions(uid, fb.Write|fb.Read)
+	file.AddPermission(uid, fb.Write|fb.Read)
 	if ok := file.RevokeAccess(uid); !ok {
 		t.Errorf("got ok = %v, want = %v", ok, true)
 	}
@@ -173,7 +173,7 @@ func TestSharedWith(t *testing.T) {
 
 	want := []int32{777, 888, 999}
 	for _, uid := range want {
-		file.AddPermissions(uid, fb.Read)
+		file.AddPermission(uid, fb.Read)
 	}
 
 	got := file.SharedWith()
@@ -206,9 +206,9 @@ func TestOwners(t *testing.T) {
 		return
 	}
 
-	file.AddPermissions(777, fb.Read)
-	file.AddPermissions(888, fb.Write|fb.Owner)
-	file.AddPermissions(999, fb.Owner)
+	file.AddPermission(777, fb.Read)
+	file.AddPermission(888, fb.Write|fb.Owner)
+	file.AddPermission(999, fb.Owner)
 
 	want := []int32{888, 999}
 	got := file.Owners()

@@ -15,11 +15,11 @@ const (
 )
 
 type mongoFileAccessAuthorization struct {
-	ID          primitive.ObjectID `bson:"_id,omitempty"`
-	FileID      primitive.ObjectID `bson:"file_id"`
-	UserID      int32              `bson:"user_id"`
-	Permissions fb.Permissions     `bson:"permissions"`
-	Token       []byte             `bson:"token,omitempty"`
+	ID         primitive.ObjectID `bson:"_id,omitempty"`
+	FileID     primitive.ObjectID `bson:"file_id"`
+	UserID     int32              `bson:"user_id"`
+	Permission fb.Permission      `bson:"permission"`
+	Token      []byte             `bson:"token,omitempty"`
 }
 
 func newMongoFileAccessAuthorization(cert *FileAccessCertificate) (*mongoFileAccessAuthorization, error) {
@@ -41,11 +41,11 @@ func newMongoFileAccessAuthorization(cert *FileAccessCertificate) (*mongoFileAcc
 	}
 
 	return &mongoFileAccessAuthorization{
-		ID:          oid,
-		FileID:      fid,
-		UserID:      cert.userId,
-		Permissions: cert.permissions,
-		Token:       cert.token,
+		ID:         oid,
+		FileID:     fid,
+		UserID:     cert.userId,
+		Permission: cert.permission,
+		Token:      cert.token,
 	}, nil
 }
 
@@ -61,7 +61,7 @@ func NewMongoCertificateRepository(db *mongo.Database, logger *zap.Logger) *Mong
 	}
 }
 
-func (repo *MongoCertificateRepository) FindByFileIdAndUserId(ctx context.Context, fileId string, userId int32) (*FileAccessCertificate, error) {
+func (repo *MongoCertificateRepository) FindByFileIdAndUserId(ctx context.Context, userId int32, fileId string) (*FileAccessCertificate, error) {
 	objID, err := primitive.ObjectIDFromHex(fileId)
 	if err != nil {
 		repo.logger.Error("parsing certificate id to ObjectID",
@@ -87,7 +87,7 @@ func (repo *MongoCertificateRepository) FindByFileIdAndUserId(ctx context.Contex
 }
 
 func (repo *MongoCertificateRepository) Create(ctx context.Context, cert *FileAccessCertificate) error {
-	_, err := repo.FindByFileIdAndUserId(ctx, cert.fileId, cert.userId)
+	_, err := repo.FindByFileIdAndUserId(ctx, cert.userId, cert.fileId)
 	if err == nil {
 		repo.logger.Warn("creating certificate",
 			zap.String("file_id", cert.fileId),
@@ -178,10 +178,10 @@ func (repo *MongoCertificateRepository) Delete(ctx context.Context, cert *FileAc
 
 func (repo *MongoCertificateRepository) build(ctx context.Context, mdir *mongoFileAccessAuthorization) *FileAccessCertificate {
 	return &FileAccessCertificate{
-		id:          mdir.ID.Hex(),
-		fileId:      mdir.FileID.Hex(),
-		userId:      mdir.UserID,
-		permissions: mdir.Permissions,
-		token:       mdir.Token,
+		id:         mdir.ID.Hex(),
+		fileId:     mdir.FileID.Hex(),
+		userId:     mdir.UserID,
+		permission: mdir.Permission,
+		token:      mdir.Token,
 	}
 }

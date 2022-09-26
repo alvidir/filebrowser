@@ -1,9 +1,9 @@
 package filebrowser
 
 const (
-	Read  Permissions = 0x01
-	Write Permissions = 0x02
-	Owner Permissions = 0x04
+	Read  Permission = 0x01
+	Write Permission = 0x02
+	Owner Permission = 0x04
 )
 
-type Permissions uint8
+type Permission uint8

@@ -22,12 +22,11 @@ message FileDescriptor {
     string id = 1;
     string name = 2;
     map<string, string> metadata = 3;
-    map<int32, int32> permissions = 4;
-    bytes authorization = 5;
-    bytes data = 6;
+    map<int32, Permissions> permissions = 4;
+    bytes data = 5;
 }
 
-message FilePermissions {
+message Permissions {
     bool read = 1;
     bool write = 2;
     bool owner = 3;

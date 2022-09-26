@@ -65,7 +65,7 @@ func (mock *fileRepositoryMock) FindAll(context.Context, []string) ([]*File, err
 	return nil, errors.New("unimplemented")
 }
 
-func (mock *fileRepositoryMock) FindPermissions(context.Context, string) (map[int32]fb.Permissions, error) {
+func (mock *fileRepositoryMock) FindPermissions(context.Context, string) (map[int32]fb.Permission, error) {
 	return nil, errors.New("unimplemented")
 }
 
@@ -267,7 +267,7 @@ func TestRead(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    make(Metadata),
-				permissions: map[int32]fb.Permissions{111: fb.Owner, 222: fb.Read, 333: fb.Write | fb.Read, 444: fb.Read},
+				permissions: map[int32]fb.Permission{111: fb.Owner, 222: fb.Read, 333: fb.Write | fb.Read, 444: fb.Read},
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil
@@ -282,7 +282,7 @@ func TestRead(t *testing.T) {
 		return
 	}
 
-	want := map[int32]fb.Permissions{111: fb.Owner, 222: fb.Read, 333: fb.Write | fb.Read, 444: fb.Read}
+	want := map[int32]fb.Permission{111: fb.Owner, 222: fb.Read, 333: fb.Write | fb.Read, 444: fb.Read}
 	if len(file.permissions) != len(want) {
 		t.Errorf("got permissions = %+v, want = %+v", file.permissions, want)
 	}
@@ -293,7 +293,7 @@ func TestRead(t *testing.T) {
 		return
 	}
 
-	want = map[int32]fb.Permissions{111: fb.Owner, 222: fb.Read, 333: fb.Write | fb.Read, 444: fb.Read}
+	want = map[int32]fb.Permission{111: fb.Owner, 222: fb.Read, 333: fb.Write | fb.Read, 444: fb.Read}
 	if len(file.permissions) != len(want) {
 		t.Errorf("got permissions = %+v, want = %+v", file.permissions, want)
 	}
@@ -304,7 +304,7 @@ func TestRead(t *testing.T) {
 		return
 	}
 
-	want = map[int32]fb.Permissions{111: fb.Owner, 222: fb.Read, 333: fb.Write | fb.Read}
+	want = map[int32]fb.Permission{111: fb.Owner, 222: fb.Read, 333: fb.Write | fb.Read}
 	if _, exists := file.permissions[444]; exists {
 		t.Errorf("got permission = %v, want = %v", file.permissions, want)
 	}
@@ -353,7 +353,7 @@ func TestWriteWhenHasNoPermissions(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    make(Metadata),
-				permissions: map[int32]fb.Permissions{111: fb.Owner, 222: fb.Read, 333: fb.Write | fb.Read},
+				permissions: map[int32]fb.Permission{111: fb.Owner, 222: fb.Read, 333: fb.Write | fb.Read},
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil
@@ -381,7 +381,7 @@ func TestWriteWhenCannotSave(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    make(Metadata),
-				permissions: map[int32]fb.Permissions{111: fb.Owner, 222: fb.Read, 333: fb.Write | fb.Read},
+				permissions: map[int32]fb.Permission{111: fb.Owner, 222: fb.Read, 333: fb.Write | fb.Read},
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil
@@ -411,7 +411,7 @@ func TestWrite(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    meta,
-				permissions: map[int32]fb.Permissions{111: fb.Owner, 222: fb.Read, 333: fb.Write | fb.Read},
+				permissions: map[int32]fb.Permission{111: fb.Owner, 222: fb.Read, 333: fb.Write | fb.Read},
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil
@@ -463,7 +463,7 @@ func TestWriteWithCustomMetadata(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    meta,
-				permissions: map[int32]fb.Permissions{111: fb.Owner, 222: fb.Read, 333: fb.Write | fb.Read},
+				permissions: map[int32]fb.Permission{111: fb.Owner, 222: fb.Read, 333: fb.Write | fb.Read},
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil
@@ -538,7 +538,7 @@ func TestDeleteWhenHasNoPermissions(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    make(Metadata),
-				permissions: make(map[int32]fb.Permissions),
+				permissions: make(map[int32]fb.Permission),
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil
@@ -568,7 +568,7 @@ func TestDeleteWhenCannotSave(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    make(Metadata),
-				permissions: map[int32]fb.Permissions{222: fb.Read},
+				permissions: map[int32]fb.Permission{222: fb.Read},
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil
@@ -601,7 +601,7 @@ func TestDeleteWhenIsNotOwner(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    make(Metadata),
-				permissions: map[int32]fb.Permissions{111: fb.Read},
+				permissions: map[int32]fb.Permission{111: fb.Read},
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil
@@ -651,7 +651,7 @@ func TestDeleteWhenMoreThanOneOwner(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    make(Metadata),
-				permissions: map[int32]fb.Permissions{111: fb.Owner, 222: fb.Owner},
+				permissions: map[int32]fb.Permission{111: fb.Owner, 222: fb.Owner},
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil
@@ -705,7 +705,7 @@ func TestDeleteWhenSingleOwner(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    make(Metadata),
-				permissions: map[int32]fb.Permissions{111: fb.Owner},
+				permissions: map[int32]fb.Permission{111: fb.Owner},
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil

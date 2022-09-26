@@ -34,7 +34,7 @@ type File struct {
 	id          string
 	name        string
 	metadata    Metadata
-	permissions map[int32]fb.Permissions
+	permissions map[int32]fb.Permission
 	flags       Flags
 	data        []byte
 }
@@ -53,7 +53,7 @@ func NewFile(id string, filename string) (*File, error) {
 		id:          id,
 		name:        filename,
 		metadata:    meta,
-		permissions: make(map[int32]fb.Permissions),
+		permissions: make(map[int32]fb.Permission),
 		flags:       0,
 		data:        make([]byte, 0),
 	}, nil
@@ -108,7 +108,7 @@ func (file *File) SharedWith() []int32 {
 	return shared
 }
 
-func (file *File) Permissions(uid int32) (perm fb.Permissions) {
+func (file *File) Permission(uid int32) (perm fb.Permission) {
 	if file.permissions != nil {
 		perm = file.permissions[uid]
 	}
@@ -116,15 +116,15 @@ func (file *File) Permissions(uid int32) (perm fb.Permissions) {
 	return
 }
 
-func (file *File) AddPermissions(uid int32, perm fb.Permissions) {
+func (file *File) AddPermission(uid int32, perm fb.Permission) {
 	if file.permissions == nil {
-		file.permissions = make(map[int32]fb.Permissions)
+		file.permissions = make(map[int32]fb.Permission)
 	}
 
 	file.permissions[uid] |= perm
 }
 
-func (file *File) RevokePermissions(uid int32, perm fb.Permissions) {
+func (file *File) RevokePermission(uid int32, perm fb.Permission) {
 	if file.permissions == nil {
 		return
 	}

@@ -10,7 +10,7 @@ message CertificateLocator {
 
 message CertificateDescriptor {
     string id = 1;
-    FilePermissions permissions = 2;
+    Permissions permissions = 2;
     bytes token = 3;
 }
 

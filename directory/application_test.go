@@ -61,12 +61,11 @@ func (mock *directoryRepositoryMock) Delete(ctx context.Context, dir *Directory)
 }
 
 type fileRepositoryMock struct {
-	create          func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
-	find            func(repo *fileRepositoryMock, ctx context.Context, id string) (*file.File, error)
-	findAll         func(repo *fileRepositoryMock, ctx context.Context, ids []string) ([]*file.File, error)
-	findPermissions func(repo *fileRepositoryMock, ctx context.Context, id string) (map[int32]fb.Permissions, error)
-	save            func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
-	delete          func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
+	create  func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
+	find    func(repo *fileRepositoryMock, ctx context.Context, id string) (*file.File, error)
+	findAll func(repo *fileRepositoryMock, ctx context.Context, ids []string) ([]*file.File, error)
+	save    func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
+	delete  func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error
 }
 
 func (mock *fileRepositoryMock) Create(ctx context.Context, file *file.File) error {
@@ -88,14 +87,6 @@ func (mock *fileRepositoryMock) Find(ctx context.Context, id string) (*file.File
 func (mock *fileRepositoryMock) FindAll(ctx context.Context, ids []string) ([]*file.File, error) {
 	if mock.findAll != nil {
 		return mock.findAll(mock, ctx, ids)
-	}
-
-	return nil, fb.ErrNotFound
-}
-
-func (mock *fileRepositoryMock) FindPermissions(ctx context.Context, id string) (map[int32]fb.Permissions, error) {
-	if mock.findPermissions != nil {
-		return mock.findPermissions(mock, ctx, id)
 	}
 
 	return nil, fb.ErrNotFound
@@ -230,7 +221,7 @@ func TestDeleteWhenUserIsSingleOwner(t *testing.T) {
 	defer logger.Sync()
 
 	f, _ := file.NewFile("test", "filename")
-	f.AddPermissions(999, fb.Owner)
+	f.AddPermission(999, fb.Owner)
 
 	dirRepo := &directoryRepositoryMock{
 		delete: func(ctx context.Context, dir *Directory) error {
@@ -276,8 +267,8 @@ func TestDeleteWhenUserIsNotSingleOwner(t *testing.T) {
 	defer logger.Sync()
 
 	f, _ := file.NewFile("test", "filename")
-	f.AddPermissions(999, fb.Owner)
-	f.AddPermissions(888, fb.Owner)
+	f.AddPermission(999, fb.Owner)
+	f.AddPermission(888, fb.Owner)
 
 	dirRepo := &directoryRepositoryMock{
 		delete: func(ctx context.Context, dir *Directory) error {
@@ -425,7 +416,7 @@ func TestUnregisterFileWhenUserIsNoOwner(t *testing.T) {
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
 	f, _ := file.NewFile("test", "filename")
-	f.AddPermissions(999, fb.Read)
+	f.AddPermission(999, fb.Read)
 	d.AddFile(f, "path/to/file")
 
 	if err := app.UnregisterFile(context.TODO(), f, 999); err != nil {
@@ -453,7 +444,7 @@ func TestUnregisterFileWhenFileIsDeleted(t *testing.T) {
 
 	f, _ := file.NewFile("test", "filename")
 	f.AddMetadata(file.MetadataDeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
-	f.AddPermissions(999, fb.Owner)
+	f.AddPermission(999, fb.Owner)
 	d.AddFile(f, "path/to/file")
 
 	if err := app.UnregisterFile(context.TODO(), f, 999); err != nil {
@@ -490,8 +481,8 @@ func TestUnregisterFileWhenFileIsShared(t *testing.T) {
 
 	f, _ := file.NewFile("test", "filename")
 	f.AddMetadata(file.MetadataDeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
-	f.AddPermissions(999, fb.Owner)
-	f.AddPermissions(888, fb.Read|fb.Write)
+	f.AddPermission(999, fb.Owner)
+	f.AddPermission(888, fb.Read|fb.Write)
 
 	d1.AddFile(f, "path/to/file")
 	d2.AddFile(f, "path/to/file")

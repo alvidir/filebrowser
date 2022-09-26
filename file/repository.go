@@ -16,12 +16,12 @@ const (
 )
 
 type mongoFile struct {
-	ID          primitive.ObjectID       `bson:"_id,omitempty"`
-	Name        string                   `bson:"name"`
-	Flags       Flags                    `bson:"flags"`
-	Permissions map[int32]fb.Permissions `bson:"permissions,omitempty"`
-	Metadata    map[string]string        `bson:"metadata,omitempty"`
-	Data        []byte                   `bson:"data,omitempty"`
+	ID          primitive.ObjectID      `bson:"_id,omitempty"`
+	Name        string                  `bson:"name"`
+	Flags       Flags                   `bson:"flags"`
+	Permissions map[int32]fb.Permission `bson:"permissions,omitempty"`
+	Metadata    map[string]string       `bson:"metadata,omitempty"`
+	Data        []byte                  `bson:"data,omitempty"`
 }
 
 func newMongoFile(f *File) (*mongoFile, error) {

@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	"crypto/ecdsa"
-	"crypto/x509"
-	"encoding/pem"
 	"os"
 	"sync"
 	"time"
@@ -89,15 +87,9 @@ func getPrivateKey(logger *zap.Logger) *ecdsa.PrivateKey {
 			zap.String("varname", ENV_JWT_SECRET))
 	}
 
-	block, _ := pem.Decode([]byte(secret))
-	if block == nil {
-		logger.Fatal("no PEM found",
-			zap.String("varname", ENV_JWT_SECRET))
-	}
-
-	privateKey, err := x509.ParseECPrivateKey(block.Bytes)
+	privateKey, err := cert.ParsePKCS8PrivateKey(secret)
 	if err != nil {
-		logger.Fatal("parsing PEM data",
+		logger.Fatal("parsing PKCS8 private key",
 			zap.Error(err))
 	}
 

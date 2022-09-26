@@ -2,7 +2,7 @@ name: Publish images
 
 on:
   release:
-    types: [published]
+    types: published
 
   workflow_dispatch:
 

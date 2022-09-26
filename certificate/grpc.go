@@ -36,10 +36,10 @@ func (server *CertificateServer) Retrieve(ctx context.Context, req *proto.Certif
 
 	descriptor := &proto.CertificateDescriptor{
 		Id: cert.id,
-		Permissions: &proto.FilePermissions{
-			Read:  cert.permissions&fb.Read != 0,
-			Write: cert.permissions&fb.Write != 0,
-			Owner: cert.permissions&fb.Owner != 0,
+		Permissions: &proto.Permissions{
+			Read:  cert.permission&fb.Read != 0,
+			Write: cert.permission&fb.Write != 0,
+			Owner: cert.permission&fb.Owner != 0,
 		},
 		Token: cert.token,
 	}

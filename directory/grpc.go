@@ -4,6 +4,7 @@ import (
 	"context"
 
 	fb "github.com/alvidir/filebrowser"
+	"github.com/alvidir/filebrowser/file"
 	"github.com/alvidir/filebrowser/proto"
 	"go.uber.org/zap"
 )
@@ -66,16 +67,7 @@ func (server *DirectoryServer) Retrieve(ctx context.Context, req *proto.Director
 	}
 
 	for p, fs := range dir.Files() {
-		permissions := make(map[int32]int32)
-		for _, uid := range fs.SharedWith() {
-			permissions[uid] = int32(fs.Permissions(uid))
-		}
-
-		descriptor.Files[p] = &proto.FileDescriptor{
-			Id:          fs.Id(),
-			Metadata:    fs.Metadata(),
-			Permissions: permissions,
-		}
+		descriptor.Files[p] = file.NewFileDescriptor(fs)
 	}
 
 	return descriptor, nil

@@ -2,6 +2,9 @@ package certificate
 
 import (
 	"crypto/ecdsa"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
 	"strconv"
 	"time"
 
@@ -46,9 +49,9 @@ func newFileAccessClaims(cert *FileAccessCertificate, ttl *time.Duration, issuer
 			ID:        cert.id,
 		},
 		FileId: cert.fileId,
-		Read:   cert.permissions&fb.Read != 0,
-		Write:  cert.permissions&fb.Write != 0,
-		Owner:  cert.permissions&fb.Owner != 0,
+		Read:   cert.permission&fb.Read != 0,
+		Write:  cert.permission&fb.Write != 0,
+		Owner:  cert.permission&fb.Owner != 0,
 	}
 
 	if ttl != nil {
@@ -100,4 +103,28 @@ func (service *JWTCertificateService) SignFileAccessCertificate(cert *FileAccess
 
 	cert.token = []byte(signed)
 	return nil
+}
+
+func ParsePKCS8PrivateKey(b64 string) (*ecdsa.PrivateKey, error) {
+	raw, err := base64.RawStdEncoding.DecodeString(b64)
+	if err != nil {
+		return nil, err
+	}
+
+	block, _ := pem.Decode([]byte(raw))
+	if block == nil {
+		return nil, fb.ErrNotFound
+	}
+
+	value, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	privateKey, ok := value.(*ecdsa.PrivateKey)
+	if !ok {
+		return nil, fb.ErrUnknown
+	}
+
+	return privateKey, nil
 }

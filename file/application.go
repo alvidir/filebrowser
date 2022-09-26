@@ -54,7 +54,7 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 		return nil, err
 	}
 
-	file.AddPermissions(uid, fb.Owner)
+	file.AddPermission(uid, fb.Owner)
 	file.metadata = meta
 	file.data = data
 
@@ -76,7 +76,7 @@ func (app *FileApplication) Read(ctx context.Context, uid int32, fid string) (*F
 		return nil, err
 	}
 
-	perm := file.Permissions(uid)
+	perm := file.Permission(uid)
 	if perm&(fb.Read|fb.Owner) == 0 {
 		return nil, fb.ErrNotAvailable
 	}
@@ -95,7 +95,7 @@ func (app *FileApplication) Write(ctx context.Context, uid int32, fid string, da
 		return nil, err
 	}
 
-	if file.Permissions(uid)&(fb.Write|fb.Owner) == 0 {
+	if file.Permission(uid)&(fb.Write|fb.Owner) == 0 {
 		return nil, fb.ErrNotAvailable
 	}
 
@@ -128,7 +128,7 @@ func (app *FileApplication) Delete(ctx context.Context, uid int32, fid string) (
 		return nil, err
 	}
 
-	if f.Permissions(uid)&fb.Owner != 0 && len(f.Owners()) == 1 {
+	if f.Permission(uid)&fb.Owner != 0 && len(f.Owners()) == 1 {
 		// uid is the only owner of file f
 		f.metadata[MetadataDeletedAtKey] = strconv.FormatInt(time.Now().Unix(), TimestampBase)
 		err = app.fileRepo.Delete(ctx, f)

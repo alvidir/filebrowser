@@ -9,7 +9,7 @@ import (
 
 type CertificateRepository interface {
 	Create(ctx context.Context, cert *FileAccessCertificate) error
-	FindByFileIdAndUserId(ctx context.Context, fileId string, userId int32) (*FileAccessCertificate, error)
+	FindByFileIdAndUserId(ctx context.Context, userId int32, fileId string) (*FileAccessCertificate, error)
 	Save(ctx context.Context, cert *FileAccessCertificate) error
 	Delete(ctx context.Context, cert *FileAccessCertificate) error
 }
@@ -50,5 +50,5 @@ func (app *CertificateApplication) CreateFileAccessCertificate(ctx context.Conte
 }
 
 func (app *CertificateApplication) GetFileAccessCertificate(ctx context.Context, uid int32, fid string) (*FileAccessCertificate, error) {
-	return app.certRepo.FindByFileIdAndUserId(ctx, fid, uid)
+	return app.certRepo.FindByFileIdAndUserId(ctx, uid, fid)
 }
