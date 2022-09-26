@@ -49,19 +49,19 @@ func newMongoFileAccessAuthorization(cert *FileAccessCertificate) (*mongoFileAcc
 	}, nil
 }
 
-type MongoAuthorizationRepository struct {
+type MongoCertificateRepository struct {
 	conn   *mongo.Collection
 	logger *zap.Logger
 }
 
-func NewMongoAuthorizationRepository(db *mongo.Database, logger *zap.Logger) *MongoAuthorizationRepository {
-	return &MongoAuthorizationRepository{
+func NewMongoCertificateRepository(db *mongo.Database, logger *zap.Logger) *MongoCertificateRepository {
+	return &MongoCertificateRepository{
 		conn:   db.Collection(mongoCertificateCollectionName),
 		logger: logger,
 	}
 }
 
-func (repo *MongoAuthorizationRepository) FindByFileIdAndUserId(ctx context.Context, fileId string, userId int32) (*FileAccessCertificate, error) {
+func (repo *MongoCertificateRepository) FindByFileIdAndUserId(ctx context.Context, fileId string, userId int32) (*FileAccessCertificate, error) {
 	objID, err := primitive.ObjectIDFromHex(fileId)
 	if err != nil {
 		repo.logger.Error("parsing certificate id to ObjectID",
@@ -72,8 +72,8 @@ func (repo *MongoAuthorizationRepository) FindByFileIdAndUserId(ctx context.Cont
 		return nil, fb.ErrUnknown
 	}
 
-	var mAuthorization mongoFileAccessAuthorization
-	err = repo.conn.FindOne(ctx, bson.M{"file_id": objID, "user_id": userId}).Decode(&mAuthorization)
+	var mCertificate mongoFileAccessAuthorization
+	err = repo.conn.FindOne(ctx, bson.M{"file_id": objID, "user_id": userId}).Decode(&mCertificate)
 	if err != nil {
 		repo.logger.Error("performing find one on mongo",
 			zap.String("file_id", fileId),
@@ -83,10 +83,10 @@ func (repo *MongoAuthorizationRepository) FindByFileIdAndUserId(ctx context.Cont
 		return nil, fb.ErrUnknown
 	}
 
-	return repo.build(ctx, &mAuthorization)
+	return repo.build(ctx, &mCertificate), nil
 }
 
-func (repo *MongoAuthorizationRepository) Create(ctx context.Context, cert *FileAccessCertificate) error {
+func (repo *MongoCertificateRepository) Create(ctx context.Context, cert *FileAccessCertificate) error {
 	_, err := repo.FindByFileIdAndUserId(ctx, cert.fileId, cert.userId)
 	if err == nil {
 		repo.logger.Warn("creating certificate",
@@ -125,7 +125,7 @@ func (repo *MongoAuthorizationRepository) Create(ctx context.Context, cert *File
 	return fb.ErrUnknown
 }
 
-func (repo *MongoAuthorizationRepository) Save(ctx context.Context, cert *FileAccessCertificate) error {
+func (repo *MongoCertificateRepository) Save(ctx context.Context, cert *FileAccessCertificate) error {
 	mdir, err := newMongoFileAccessAuthorization(cert)
 	if err != nil {
 		repo.logger.Error("building mongo certificate",
@@ -147,7 +147,7 @@ func (repo *MongoAuthorizationRepository) Save(ctx context.Context, cert *FileAc
 	return nil
 }
 
-func (repo *MongoAuthorizationRepository) Delete(ctx context.Context, cert *FileAccessCertificate) error {
+func (repo *MongoCertificateRepository) Delete(ctx context.Context, cert *FileAccessCertificate) error {
 	objID, err := primitive.ObjectIDFromHex(cert.id)
 	if err != nil {
 		repo.logger.Error("parsing certificate id to ObjectID",
@@ -176,9 +176,12 @@ func (repo *MongoAuthorizationRepository) Delete(ctx context.Context, cert *File
 	return nil
 }
 
-func (repo *MongoAuthorizationRepository) build(ctx context.Context, mdir *mongoFileAccessAuthorization) (*FileAccessCertificate, error) {
+func (repo *MongoCertificateRepository) build(ctx context.Context, mdir *mongoFileAccessAuthorization) *FileAccessCertificate {
 	return &FileAccessCertificate{
-		id:    mdir.ID.Hex(),
-		token: mdir.Token,
-	}, nil
+		id:          mdir.ID.Hex(),
+		fileId:      mdir.FileID.Hex(),
+		userId:      mdir.UserID,
+		permissions: mdir.Permissions,
+		token:       mdir.Token,
+	}
 }

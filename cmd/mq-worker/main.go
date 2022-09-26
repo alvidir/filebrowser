@@ -2,10 +2,15 @@ package main
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/x509"
+	"encoding/pem"
 	"os"
 	"sync"
+	"time"
 
 	fb "github.com/alvidir/filebrowser"
+	cert "github.com/alvidir/filebrowser/certificate"
 	dir "github.com/alvidir/filebrowser/directory"
 	"github.com/alvidir/filebrowser/event"
 	"github.com/alvidir/filebrowser/file"
@@ -23,9 +28,11 @@ const (
 	ENV_RABBITMQ_DSN            = "RABBITMQ_DSN"
 	ENV_MONGO_DSN               = "MONGO_DSN"
 	ENV_MONGO_DATABASE          = "MONGO_INITDB_DATABASE"
+	ENV_TOKEN_TIMEOUT           = "TOKEN_TIMEOUT"
+	ENV_JWT_SECRET              = "JWT_SECRET"
 )
 
-func newMongoConnection(logger *zap.Logger) *mongo.Database {
+func getMongoConnection(logger *zap.Logger) *mongo.Database {
 	mongoUri, exists := os.LookupEnv(ENV_MONGO_DSN)
 	if !exists {
 		logger.Fatal("mongo dsn must be set")
@@ -48,7 +55,7 @@ func newMongoConnection(logger *zap.Logger) *mongo.Database {
 	return mongoConn
 }
 
-func newAmqpConnection(logger *zap.Logger) *amqp.Connection {
+func getAmqpConnection(logger *zap.Logger) *amqp.Connection {
 	addr, exists := os.LookupEnv(ENV_RABBITMQ_DSN)
 	if !exists {
 		logger.Fatal("must be set",
@@ -65,7 +72,7 @@ func newAmqpConnection(logger *zap.Logger) *amqp.Connection {
 	return conn
 }
 
-func newAmqpChannel(conn *amqp.Connection, logger *zap.Logger) *amqp.Channel {
+func getAmqpChannel(conn *amqp.Connection, logger *zap.Logger) *amqp.Channel {
 	ch, err := conn.Channel()
 	if err != nil {
 		logger.Fatal("openning channel",
@@ -73,6 +80,44 @@ func newAmqpChannel(conn *amqp.Connection, logger *zap.Logger) *amqp.Channel {
 	}
 
 	return ch
+}
+
+func getPrivateKey(logger *zap.Logger) *ecdsa.PrivateKey {
+	secret, exists := os.LookupEnv(ENV_JWT_SECRET)
+	if !exists {
+		logger.Fatal("must be set",
+			zap.String("varname", ENV_JWT_SECRET))
+	}
+
+	block, _ := pem.Decode([]byte(secret))
+	if block == nil {
+		logger.Fatal("no PEM found",
+			zap.String("varname", ENV_JWT_SECRET))
+	}
+
+	privateKey, err := x509.ParseECPrivateKey(block.Bytes)
+	if err != nil {
+		logger.Fatal("parsing PEM data",
+			zap.Error(err))
+	}
+
+	return privateKey
+}
+
+func getTokenTTL(logger *zap.Logger) *time.Duration {
+	value, exists := os.LookupEnv(ENV_TOKEN_TIMEOUT)
+	if !exists {
+		return nil
+	}
+
+	ttl, err := time.ParseDuration(value)
+	if err != nil {
+		logger.Fatal("invalid token ttl",
+			zap.String("value", value),
+			zap.Error(err))
+	}
+
+	return &ttl
 }
 
 func handleRabbitMqUserEvents(ctx context.Context, bus *event.RabbitMqEventBus, handler *event.UserEventHandler, logger *zap.Logger) error {
@@ -142,18 +187,24 @@ func main() {
 			zap.Error(err))
 	}
 
-	mongoConn := newMongoConnection(logger)
+	mongoConn := getMongoConnection(logger)
 	fileRepo := file.NewMongoFileRepository(mongoConn, logger)
 	directoryRepo := dir.NewMongoDirectoryRepository(mongoConn, fileRepo, logger)
 	directoryApp := dir.NewDirectoryApplication(directoryRepo, fileRepo, logger)
 	fileApp := file.NewFileApplication(fileRepo, directoryApp, logger)
 	userEventHandler := event.NewUserEventHandler(directoryApp, fileApp, logger)
-	fileEventHandler := event.NewFileEventHandler(directoryApp, fileApp, logger)
 
-	conn := newAmqpConnection(logger)
+	privateKey := getPrivateKey(logger)
+	tokenTTL := getTokenTTL(logger)
+	certSrv := cert.NewCertificateService(privateKey, tokenTTL, logger)
+	certRepo := cert.NewMongoCertificateRepository(mongoConn, logger)
+	certApp := cert.NewCertificateApplication(certRepo, certSrv, logger)
+	fileEventHandler := event.NewFileEventHandler(directoryApp, fileApp, certApp, logger)
+
+	conn := getAmqpConnection(logger)
 	defer conn.Close()
 
-	ch := newAmqpChannel(conn, logger)
+	ch := getAmqpChannel(conn, logger)
 	defer ch.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())

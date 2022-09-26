@@ -1,10 +1,15 @@
 package main
 
 import (
+	"crypto/ecdsa"
+	"crypto/x509"
+	"encoding/pem"
 	"net"
 	"os"
+	"time"
 
 	fb "github.com/alvidir/filebrowser"
+	cert "github.com/alvidir/filebrowser/certificate"
 	dir "github.com/alvidir/filebrowser/directory"
 	file "github.com/alvidir/filebrowser/file"
 	proto "github.com/alvidir/filebrowser/proto"
@@ -21,6 +26,8 @@ const (
 	ENV_MONGO_DSN      = "MONGO_DSN"
 	ENV_MONGO_DATABASE = "MONGO_DATABASE"
 	ENV_REDIS_DSN      = "REDIS_DSN"
+	ENV_TOKEN_TIMEOUT  = "TOKEN_TIMEOUT"
+	ENV_JWT_SECRET     = "JWT_SECRET"
 )
 
 var (
@@ -29,7 +36,7 @@ var (
 	authHeader  = "X-Auth"
 )
 
-func newMongoConnection(logger *zap.Logger) *mongo.Database {
+func getMongoConnection(logger *zap.Logger) *mongo.Database {
 	mongoUri, exists := os.LookupEnv(ENV_MONGO_DSN)
 	if !exists {
 		logger.Fatal("mongo dsn must be set")
@@ -52,7 +59,45 @@ func newMongoConnection(logger *zap.Logger) *mongo.Database {
 	return mongoConn
 }
 
-func newFilebrowserGrpcServer(mongoConn *mongo.Database, logger *zap.Logger) *grpc.Server {
+func getPrivateKey(logger *zap.Logger) *ecdsa.PrivateKey {
+	secret, exists := os.LookupEnv(ENV_JWT_SECRET)
+	if !exists {
+		logger.Fatal("must be set",
+			zap.String("varname", ENV_JWT_SECRET))
+	}
+
+	block, _ := pem.Decode([]byte(secret))
+	if block == nil {
+		logger.Fatal("no PEM found",
+			zap.String("varname", ENV_JWT_SECRET))
+	}
+
+	privateKey, err := x509.ParseECPrivateKey(block.Bytes)
+	if err != nil {
+		logger.Fatal("parsing PEM data",
+			zap.Error(err))
+	}
+
+	return privateKey
+}
+
+func getTokenTTL(logger *zap.Logger) *time.Duration {
+	value, exists := os.LookupEnv(ENV_TOKEN_TIMEOUT)
+	if !exists {
+		return nil
+	}
+
+	ttl, err := time.ParseDuration(value)
+	if err != nil {
+		logger.Fatal("invalid token ttl",
+			zap.String("value", value),
+			zap.Error(err))
+	}
+
+	return &ttl
+}
+
+func getFilebrowserGrpcServer(mongoConn *mongo.Database, logger *zap.Logger) *grpc.Server {
 	if header, exists := os.LookupEnv(ENV_AUTH_HEADER); exists {
 		authHeader = header
 	}
@@ -66,14 +111,22 @@ func newFilebrowserGrpcServer(mongoConn *mongo.Database, logger *zap.Logger) *gr
 	fileApp := file.NewFileApplication(fileRepo, directoryApp, logger)
 	fileServer := file.NewFileServer(fileApp, authHeader, logger)
 
+	privateKey := getPrivateKey(logger)
+	tokenTTL := getTokenTTL(logger)
+	certSrv := cert.NewCertificateService(privateKey, tokenTTL, logger)
+	certRepo := cert.NewMongoCertificateRepository(mongoConn, logger)
+	certApp := cert.NewCertificateApplication(certRepo, certSrv, logger)
+	certServer := cert.NewCertificateServer(certApp, logger, authHeader)
+
 	grpcSrv := grpc.NewServer()
 	proto.RegisterDirectoryServer(grpcSrv, directoryServer)
 	proto.RegisterFileServer(grpcSrv, fileServer)
+	proto.RegisterCertificateServer(grpcSrv, certServer)
 
 	return grpcSrv
 }
 
-func newNetworkListener(logger *zap.Logger) net.Listener {
+func getNetworkListener(logger *zap.Logger) net.Listener {
 	if addr, exists := os.LookupEnv(ENV_SERVICE_ADDR); exists {
 		serviceAddr = addr
 	}
@@ -100,9 +153,9 @@ func main() {
 			zap.Error(err))
 	}
 
-	mongoConn := newMongoConnection(logger)
-	grpcServer := newFilebrowserGrpcServer(mongoConn, logger)
-	lis := newNetworkListener(logger)
+	mongoConn := getMongoConnection(logger)
+	grpcServer := getFilebrowserGrpcServer(mongoConn, logger)
+	lis := getNetworkListener(logger)
 
 	logger.Info("server ready to accept connections",
 		zap.String("address", serviceAddr))

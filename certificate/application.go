@@ -24,7 +24,7 @@ type CertificateApplication struct {
 	logger      *zap.Logger
 }
 
-func NewFileApplication(repo CertificateRepository, srv CertificateService, logger *zap.Logger) *CertificateApplication {
+func NewCertificateApplication(repo CertificateRepository, srv CertificateService, logger *zap.Logger) *CertificateApplication {
 	return &CertificateApplication{
 		certRepo:    repo,
 		certService: srv,
@@ -47,4 +47,8 @@ func (app *CertificateApplication) CreateFileAccessCertificate(ctx context.Conte
 	}
 
 	return cert, nil
+}
+
+func (app *CertificateApplication) GetFileAccessCertificate(ctx context.Context, uid int32, fid string) (*FileAccessCertificate, error) {
+	return app.certRepo.FindByFileIdAndUserId(ctx, fid, uid)
 }

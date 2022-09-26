@@ -267,7 +267,7 @@ func TestRead(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    make(Metadata),
-				permissions: map[int32]fb.Permissions{111: fb.Owner, 222: fb.Read, 333: fb.Write | fb.Read},
+				permissions: map[int32]fb.Permissions{111: fb.Owner, 222: fb.Read, 333: fb.Write | fb.Read, 444: fb.Read},
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil
@@ -282,7 +282,7 @@ func TestRead(t *testing.T) {
 		return
 	}
 
-	want := map[int32]fb.Permissions{111: fb.Owner, 222: fb.Read, 333: fb.Write | fb.Read}
+	want := map[int32]fb.Permissions{111: fb.Owner, 222: fb.Read, 333: fb.Write | fb.Read, 444: fb.Read}
 	if len(file.permissions) != len(want) {
 		t.Errorf("got permissions = %+v, want = %+v", file.permissions, want)
 	}
@@ -293,7 +293,7 @@ func TestRead(t *testing.T) {
 		return
 	}
 
-	want = map[int32]fb.Permissions{111: fb.Owner, 333: fb.Write | fb.Read}
+	want = map[int32]fb.Permissions{111: fb.Owner, 222: fb.Read, 333: fb.Write | fb.Read, 444: fb.Read}
 	if len(file.permissions) != len(want) {
 		t.Errorf("got permissions = %+v, want = %+v", file.permissions, want)
 	}
@@ -304,12 +304,12 @@ func TestRead(t *testing.T) {
 		return
 	}
 
-	want = map[int32]fb.Permissions{111: fb.Owner, 222: fb.Read}
-	if _, exists := file.permissions[333]; exists {
+	want = map[int32]fb.Permissions{111: fb.Owner, 222: fb.Read, 333: fb.Write | fb.Read}
+	if _, exists := file.permissions[444]; exists {
 		t.Errorf("got permission = %v, want = %v", file.permissions, want)
 	}
 
-	_, err = app.Read(context.Background(), 444, "")
+	_, err = app.Read(context.Background(), 555, "")
 	if !errors.Is(err, fb.ErrNotAvailable) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)
 		return

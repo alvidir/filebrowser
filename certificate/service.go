@@ -31,17 +31,16 @@ type fileAccessClaims struct {
 	Owner                bool   `json:"is_owner"`
 }
 
-func newFileAccessClaims(cert *FileAccessCertificate, ttl time.Duration, issuer string) (*fileAccessClaims, error) {
+func newFileAccessClaims(cert *FileAccessCertificate, ttl *time.Duration, issuer string) (*fileAccessClaims, error) {
 	if len(cert.id) == 0 {
 		return nil, fb.ErrUnidentified
 	}
 
-	return &fileAccessClaims{
+	claims := &fileAccessClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    issuer,
 			Subject:   strconv.Itoa(int(cert.userId)),
 			Audience:  []string{},
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(ttl)),
 			NotBefore: &jwt.NumericDate{},
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			ID:        cert.id,
@@ -50,7 +49,13 @@ func newFileAccessClaims(cert *FileAccessCertificate, ttl time.Duration, issuer 
 		Read:   cert.permissions&fb.Read != 0,
 		Write:  cert.permissions&fb.Write != 0,
 		Owner:  cert.permissions&fb.Owner != 0,
-	}, nil
+	}
+
+	if ttl != nil {
+		claims.ExpiresAt = jwt.NewNumericDate(time.Now().Add(*ttl))
+	}
+
+	return claims, nil
 }
 
 type JWTCertificateService struct {
@@ -60,7 +65,7 @@ type JWTCertificateService struct {
 	logger  *zap.Logger
 }
 
-func NewCertificateService(ttl *time.Duration, sign *ecdsa.PrivateKey, logger *zap.Logger) *JWTCertificateService {
+func NewCertificateService(sign *ecdsa.PrivateKey, ttl *time.Duration, logger *zap.Logger) *JWTCertificateService {
 	return &JWTCertificateService{
 		signKey: sign,
 		ttl:     ttl,
@@ -69,7 +74,7 @@ func NewCertificateService(ttl *time.Duration, sign *ecdsa.PrivateKey, logger *z
 }
 
 func (service *JWTCertificateService) SignFileAccessCertificate(cert *FileAccessCertificate) error {
-	claims, err := newFileAccessClaims(cert, *service.ttl, service.issuer)
+	claims, err := newFileAccessClaims(cert, service.ttl, service.issuer)
 	if err != nil {
 		return err
 	}

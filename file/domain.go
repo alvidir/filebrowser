@@ -166,8 +166,16 @@ func (file *File) Data() []byte {
 }
 
 func (file *File) HideProtectedFields(uid int32) {
+	if file.IsContributor(uid) {
+		// if the user itself is contributor it has the right to know
+		// who can read and write the file
+		return
+	}
+
 	file.flags |= Blurred
 	for id, p := range file.permissions {
+		// if the user has read-only permissions it has the right to know
+		// who are the contributors of the file
 		if id != uid && p&(fb.Owner|fb.Write) == 0 {
 			delete(file.permissions, id)
 		}
@@ -177,4 +185,9 @@ func (file *File) HideProtectedFields(uid int32) {
 func (file *File) IsRemote() bool {
 	_, exists := file.metadata[MetadataAppKey]
 	return exists
+}
+
+func (file *File) IsContributor(uid int32) bool {
+	// is contributor if, and only if, the user is owner or has write permissions
+	return file.permissions[uid]&(fb.Owner|fb.Write) != 0
 }

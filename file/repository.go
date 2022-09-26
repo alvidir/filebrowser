@@ -153,38 +153,6 @@ func (repo *MongoFileRepository) FindAll(ctx context.Context, ids []string) ([]*
 	return files, nil
 }
 
-func (repo *MongoFileRepository) FindPermissions(ctx context.Context, id string) (map[int32]fb.Permissions, error) {
-	objID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		repo.logger.Error("parsing file id to ObjectID",
-			zap.String("file_id", id),
-			zap.Error(err))
-
-		return nil, fb.ErrUnknown
-	}
-
-	// exclude all fields except permissions
-	opts := options.FindOne().SetProjection(bson.D{
-		{Key: "_id", Value: 0},
-		{Key: "name", Value: 0},
-		{Key: "flags", Value: 0},
-		{Key: "metadata", Value: 0},
-		{Key: "data", Value: 0},
-	})
-
-	var mfile mongoFile
-	err = repo.conn.FindOne(ctx, bson.M{"_id": objID}, opts).Decode(&mfile)
-	if err != nil {
-		repo.logger.Error("performing find one on mongo",
-			zap.String("file_id", id),
-			zap.Error(err))
-
-		return nil, fb.ErrUnknown
-	}
-
-	return mfile.Permissions, nil
-}
-
 func (repo *MongoFileRepository) Save(ctx context.Context, file *File) error {
 	if file.flags&Blurred != 0 {
 		repo.logger.Error("saving file",
