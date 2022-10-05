@@ -5,10 +5,9 @@ go 1.19
 require (
 	github.com/joho/godotenv v1.4.0
 	github.com/streadway/amqp v1.0.0
-	go.mongodb.org/mongo-driver v1.10.1
+	go.mongodb.org/mongo-driver v1.10.3
 	go.uber.org/zap v1.22.0
 	google.golang.org/grpc v1.48.0
-	google.golang.org/protobuf v1.28.1
 )
 
 require (
@@ -30,4 +29,5 @@ require (
 	golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/genproto v0.0.0-20220815135757-37a418bb8959 // indirect
+	google.golang.org/protobuf v1.28.1 // indirect
 )
