@@ -16,6 +16,8 @@ import (
 
 const (
 	TokenHeaderType = "JWT"
+	userIdBase      = 16
+	userIdBitSize   = 32
 )
 
 var (
@@ -34,6 +36,22 @@ type fileAccessClaims struct {
 	Owner                bool   `json:"is_owner"`
 }
 
+func (claims *fileAccessClaims) permission() (perms fb.Permission) {
+	if claims.Read {
+		perms |= fb.Read
+	}
+
+	if claims.Write {
+		perms |= fb.Write
+	}
+
+	if claims.Owner {
+		perms |= fb.Owner
+	}
+
+	return
+}
+
 func newFileAccessClaims(cert *FileAccessCertificate, ttl *time.Duration, issuer string) (*fileAccessClaims, error) {
 	if len(cert.id) == 0 {
 		return nil, fb.ErrUnidentified
@@ -42,7 +60,7 @@ func newFileAccessClaims(cert *FileAccessCertificate, ttl *time.Duration, issuer
 	claims := &fileAccessClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    issuer,
-			Subject:   strconv.Itoa(int(cert.userId)),
+			Subject:   strconv.FormatInt(int64(cert.userId), userIdBase),
 			Audience:  []string{},
 			NotBefore: &jwt.NumericDate{},
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -103,6 +121,38 @@ func (service *JWTCertificateService) SignFileAccessCertificate(cert *FileAccess
 
 	cert.token = []byte(signed)
 	return nil
+}
+
+func (service *JWTCertificateService) ParseFileAccessCertificate(tokenStr string) (*FileAccessCertificate, error) {
+	claims := new(fileAccessClaims)
+	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
+		return &service.signKey.PublicKey, nil
+	})
+
+	if err != nil || !token.Valid {
+		service.logger.Error("parsing jwt",
+			zap.String("token", tokenStr),
+			zap.Bool("is_valid", token.Valid),
+			zap.Error(err))
+
+		return nil, fb.ErrInvalidToken
+	}
+
+	userId, err := strconv.ParseInt(claims.Subject, userIdBase, userIdBitSize)
+	if err != nil {
+		service.logger.Error("parsing string to int32",
+			zap.Error(err))
+
+		return nil, fb.ErrUnknown
+	}
+
+	return &FileAccessCertificate{
+		id:         claims.ID,
+		fileId:     claims.FileId,
+		userId:     int32(userId),
+		permission: claims.permission(),
+		token:      []byte(tokenStr),
+	}, nil
 }
 
 func ParsePKCS8PrivateKey(b64 string) (*ecdsa.PrivateKey, error) {
