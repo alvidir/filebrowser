@@ -4,9 +4,6 @@ on:
   - push
   - pull_request
 
-env:
-  GO_VERSION: 1.19.x
-
 jobs:
   changelog:
     name: Changelog
@@ -43,7 +40,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v3
         with:
-          go-version: $GO_VERSION
+          go-version: 1.19.x
 
       - name: Install protoc
         uses: arduino/setup-protoc@v1
