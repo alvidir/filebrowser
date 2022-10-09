@@ -7,6 +7,7 @@ var (
 	ErrNotFound         = errors.New("E002")
 	ErrNotAvailable     = errors.New("E003")
 	ErrUnauthorized     = errors.New("E004")
+	ErrInvalidToken     = errors.New("E005")
 	ErrInvalidFormat    = errors.New("E006")
 	ErrInvalidHeader    = errors.New("E007")
 	ErrWrongCredentials = errors.New("E008")
@@ -14,4 +15,5 @@ var (
 
 	ErrChannelClosed  = errors.New("channel closed")
 	ErrBlurredContent = errors.New("blurred content")
+	ErrUnidentified   = errors.New("unidentified")
 )

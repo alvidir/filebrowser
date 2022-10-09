@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	cert "github.com/alvidir/filebrowser/certificate"
 	dir "github.com/alvidir/filebrowser/directory"
 	"github.com/alvidir/filebrowser/file"
 	"go.uber.org/zap"
@@ -20,13 +21,15 @@ type FileEventPayload struct {
 type FileEventHandler struct {
 	dirApp  *dir.DirectoryApplication
 	fileApp *file.FileApplication
+	certApp *cert.CertificateApplication
 	logger  *zap.Logger
 }
 
-func NewFileEventHandler(dirApp *dir.DirectoryApplication, fileApp *file.FileApplication, logger *zap.Logger) *FileEventHandler {
+func NewFileEventHandler(dirApp *dir.DirectoryApplication, fileApp *file.FileApplication, certApp *cert.CertificateApplication, logger *zap.Logger) *FileEventHandler {
 	return &FileEventHandler{
 		dirApp:  dirApp,
 		fileApp: fileApp,
+		certApp: certApp,
 		logger:  logger,
 	}
 }
@@ -60,9 +63,21 @@ func (handler *FileEventHandler) onFileCreatedEvent(ctx context.Context, event *
 		file.MetadataUrlKey: event.Url,
 	}
 
-	_, err := handler.fileApp.Create(ctx, event.UserID, event.FileName, nil, meta)
+	file, err := handler.fileApp.Create(ctx, event.UserID, event.FileName, nil, meta)
 	if err != nil {
 		handler.logger.Error("creating file",
+			zap.String("url", event.Url),
+			zap.String("app", event.App),
+			zap.String("file_name", event.FileName),
+			zap.Int32("user_id", event.UserID),
+			zap.Error(err))
+
+		return
+	}
+
+	_, err = handler.certApp.CreateFileAccessCertificate(ctx, event.UserID, file)
+	if err != nil {
+		handler.logger.Error("creating file access certificate",
 			zap.String("url", event.Url),
 			zap.String("app", event.App),
 			zap.String("file_name", event.FileName),

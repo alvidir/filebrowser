@@ -16,12 +16,12 @@ const (
 )
 
 type mongoFile struct {
-	ID          primitive.ObjectID `bson:"_id,omitempty"`
-	Name        string             `bson:"name"`
-	Flags       uint8              `bson:"flags"`
-	Permissions map[int32]uint8    `bson:"permissions,omitempty"`
-	Metadata    map[string]string  `bson:"metadata,omitempty"`
-	Data        []byte             `bson:"data,omitempty"`
+	ID          primitive.ObjectID      `bson:"_id,omitempty"`
+	Name        string                  `bson:"name"`
+	Flags       Flags                   `bson:"flags"`
+	Permissions map[int32]fb.Permission `bson:"permissions,omitempty"`
+	Metadata    map[string]string       `bson:"metadata,omitempty"`
+	Data        []byte                  `bson:"data,omitempty"`
 }
 
 func newMongoFile(f *File) (*mongoFile, error) {
@@ -60,7 +60,7 @@ func (repo *MongoFileRepository) Create(ctx context.Context, file *File) error {
 	mongoFile, err := newMongoFile(file)
 	if err != nil {
 		repo.logger.Error("building mongo file",
-			zap.String("file_id", file.id),
+			zap.String("file_name", file.name),
 			zap.Error(err))
 
 		return fb.ErrUnknown
@@ -153,40 +153,8 @@ func (repo *MongoFileRepository) FindAll(ctx context.Context, ids []string) ([]*
 	return files, nil
 }
 
-func (repo *MongoFileRepository) FindPermissions(ctx context.Context, id string) (Permissions, error) {
-	objID, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		repo.logger.Error("parsing file id to ObjectID",
-			zap.String("file_id", id),
-			zap.Error(err))
-
-		return nil, fb.ErrUnknown
-	}
-
-	// exclude all fields except permissions
-	opts := options.FindOne().SetProjection(bson.D{
-		{Key: "_id", Value: 0},
-		{Key: "name", Value: 0},
-		{Key: "flags", Value: 0},
-		{Key: "metadata", Value: 0},
-		{Key: "data", Value: 0},
-	})
-
-	var mfile mongoFile
-	err = repo.conn.FindOne(ctx, bson.M{"_id": objID}, opts).Decode(&mfile)
-	if err != nil {
-		repo.logger.Error("performing find one on mongo",
-			zap.String("file_id", id),
-			zap.Error(err))
-
-		return nil, fb.ErrUnknown
-	}
-
-	return mfile.Permissions, nil
-}
-
 func (repo *MongoFileRepository) Save(ctx context.Context, file *File) error {
-	if file.flags&Blurred > 0 {
+	if file.flags&Blurred != 0 {
 		repo.logger.Error("saving file",
 			zap.String("file_id", file.id),
 			zap.Error(fb.ErrBlurredContent))

@@ -1,0 +1,19 @@
+syntax = "proto3";
+option go_package = "github.com/alvidir/filebrowser/proto";
+
+package proto;
+import "proto/file.proto";
+
+message CertificateLocator {
+    string fileId = 1;
+}
+
+message CertificateDescriptor {
+    string id = 1;
+    Permissions permissions = 2;
+    bytes token = 3;
+}
+
+service Certificate {
+    rpc Retrieve(CertificateLocator) returns (CertificateDescriptor); 
+}

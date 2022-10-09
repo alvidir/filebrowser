@@ -2,7 +2,7 @@ name: Publish images
 
 on:
   release:
-    types: [published]
+    types: published
 
   workflow_dispatch:
 
@@ -14,10 +14,12 @@ jobs:
   push_server_to_registry:
     name: Push server image to registry
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Build image
         id: build-image
@@ -45,10 +47,12 @@ jobs:
   push_worker_to_registry:
     name: Push worker image to registry
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Build image
         id: build-image
@@ -72,4 +76,3 @@ jobs:
           image: ${{ steps.build-image.outputs.image }}
           tags: ${{ steps.build-image.outputs.tags }}
           registry: ${{ env.IMAGE_REGISTRY }}
-

@@ -81,8 +81,7 @@ func (repo *MongoDirectoryRepository) Create(ctx context.Context, dir *Directory
 	mdir, err := newMongoDirectory(dir)
 	if err != nil {
 		repo.logger.Error("building mongo directory",
-			zap.String("directory", dir.id),
-			zap.Int32("user", dir.userId),
+			zap.Int32("user_id", dir.userId),
 			zap.Error(err))
 
 		return fb.ErrUnknown
@@ -113,8 +112,8 @@ func (repo *MongoDirectoryRepository) Save(ctx context.Context, dir *Directory) 
 	mdir, err := newMongoDirectory(dir)
 	if err != nil {
 		repo.logger.Error("building mongo directory",
-			zap.String("directory", dir.id),
-			zap.Int32("user", dir.userId),
+			zap.String("directory_id", dir.id),
+			zap.Int32("user_id", dir.userId),
 			zap.Error(err))
 
 		return fb.ErrUnknown
@@ -135,8 +134,8 @@ func (repo *MongoDirectoryRepository) Delete(ctx context.Context, dir *Directory
 	objID, err := primitive.ObjectIDFromHex(dir.id)
 	if err != nil {
 		repo.logger.Error("parsing directory id to ObjectID",
-			zap.String("directory", dir.id),
-			zap.Int32("user", dir.userId),
+			zap.String("directory_id", dir.id),
+			zap.Int32("user_id", dir.userId),
 			zap.Error(err))
 
 		return fb.ErrUnknown
@@ -144,7 +143,7 @@ func (repo *MongoDirectoryRepository) Delete(ctx context.Context, dir *Directory
 
 	result, err := repo.conn.DeleteOne(ctx, bson.M{"_id": objID})
 	if err != nil {
-		repo.logger.Error("performing replace one on mongo",
+		repo.logger.Error("performing delete one on mongo",
 			zap.Int32("user_id", dir.userId),
 			zap.Error(err))
 

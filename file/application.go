@@ -14,7 +14,6 @@ type FileRepository interface {
 	Create(ctx context.Context, file *File) error
 	Find(context.Context, string) (*File, error)
 	FindAll(context.Context, []string) ([]*File, error)
-	FindPermissions(context.Context, string) (Permissions, error)
 	Save(ctx context.Context, file *File) error
 	Delete(ctx context.Context, file *File) error
 }
@@ -55,7 +54,7 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 		return nil, err
 	}
 
-	file.AddPermissions(uid, Read|Write|Owner)
+	file.AddPermission(uid, fb.Owner)
 	file.metadata = meta
 	file.data = data
 
@@ -77,15 +76,13 @@ func (app *FileApplication) Read(ctx context.Context, uid int32, fid string) (*F
 		return nil, err
 	}
 
-	perm := file.Permissions(uid)
-	if perm&(Owner) > 0 {
-		return file, nil
-	} else if perm&(Read) > 0 {
-		file.HideProtectedFields(uid)
-		return file, nil
+	perm := file.Permission(uid)
+	if perm&(fb.Read|fb.Owner) == 0 {
+		return nil, fb.ErrNotAvailable
 	}
 
-	return nil, fb.ErrNotAvailable
+	file.HideProtectedFields(uid)
+	return file, nil
 }
 
 func (app *FileApplication) Write(ctx context.Context, uid int32, fid string, data []byte, meta Metadata) (*File, error) {
@@ -98,7 +95,7 @@ func (app *FileApplication) Write(ctx context.Context, uid int32, fid string, da
 		return nil, err
 	}
 
-	if file.Permissions(uid)&(Write|Owner) == 0 {
+	if file.Permission(uid)&(fb.Write|fb.Owner) == 0 {
 		return nil, fb.ErrNotAvailable
 	}
 
@@ -131,7 +128,7 @@ func (app *FileApplication) Delete(ctx context.Context, uid int32, fid string) (
 		return nil, err
 	}
 
-	if f.Permissions(uid)&Owner != 0 && len(f.Owners()) == 1 {
+	if f.Permission(uid)&fb.Owner != 0 && len(f.Owners()) == 1 {
 		// uid is the only owner of file f
 		f.metadata[MetadataDeletedAtKey] = strconv.FormatInt(time.Now().Unix(), TimestampBase)
 		err = app.fileRepo.Delete(ctx, f)
@@ -150,22 +147,4 @@ func (app *FileApplication) Delete(ctx context.Context, uid int32, fid string) (
 
 	err = app.dirApp.UnregisterFile(ctx, f, uid)
 	return f, err
-}
-
-func (app *FileApplication) Permissions(ctx context.Context, uid int32, fid string) (uint8, error) {
-	app.logger.Info("processing a \"permissions\" request",
-		zap.String("file_id", fid),
-		zap.Int32("user_id", uid))
-
-	allPermissions, err := app.fileRepo.FindPermissions(ctx, fid)
-	if err != nil {
-		return 0, err
-	}
-
-	userPermissions, exists := allPermissions[uid]
-	if !exists {
-		return 0, fb.ErrNotFound
-	}
-
-	return userPermissions, nil
 }

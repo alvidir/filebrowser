@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	userProfilePath = ".profile"
+	userSettingsPath = ".settings"
 )
 
 type UserProfile struct {
@@ -78,10 +78,10 @@ func (handler *UserEventHandler) onUserCreatedEvent(ctx context.Context, event *
 		return
 	}
 
-	_, err = handler.fileApp.Create(ctx, event.UserID, userProfilePath, data, nil)
+	_, err = handler.fileApp.Create(ctx, event.UserID, userSettingsPath, data, nil)
 	if err != nil {
 		handler.logger.Error("creating file",
-			zap.String("file_path", userProfilePath),
+			zap.String("file_path", userSettingsPath),
 			zap.Int32("user_id", event.UserID),
 			zap.ByteString("data", data),
 			zap.Error(err))

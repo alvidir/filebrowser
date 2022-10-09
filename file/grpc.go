@@ -20,22 +20,22 @@ func NewFileDescriptor(file *File) *proto.FileDescriptor {
 		Id:          file.id,
 		Name:        file.name,
 		Metadata:    file.metadata,
-		Permissions: make(map[int32]int32),
+		Permissions: map[int32]*proto.Permissions{},
 		Data:        file.data,
 	}
 
 	for uid, perm := range file.permissions {
-		descriptor.Permissions[uid] = int32(perm)
+		descriptor.Permissions[uid] = NewPermissions(perm)
 	}
 
 	return descriptor
 }
 
-func NewFilePermissions(perm uint8) *proto.FilePermissions {
-	return &proto.FilePermissions{
-		Read:  perm&Read != 0,
-		Write: perm&Write != 0,
-		Owner: perm&Owner != 0,
+func NewPermissions(perm fb.Permission) *proto.Permissions {
+	return &proto.Permissions{
+		Read:  perm&fb.Read != 0,
+		Write: perm&fb.Write != 0,
+		Owner: perm&fb.Owner != 0,
 	}
 }
 
@@ -74,19 +74,7 @@ func (server *FileServer) Read(ctx context.Context, req *proto.FileLocator) (*pr
 		return nil, err
 	}
 
-	descriptor := &proto.FileDescriptor{
-		Id:          file.id,
-		Name:        file.name,
-		Metadata:    file.metadata,
-		Permissions: make(map[int32]int32),
-		Data:        file.data,
-	}
-
-	for uid, perm := range file.permissions {
-		descriptor.Permissions[uid] = int32(perm)
-	}
-
-	return descriptor, nil
+	return NewFileDescriptor(file), nil
 }
 
 func (server *FileServer) Write(ctx context.Context, req *proto.FileDescriptor) (*proto.FileDescriptor, error) {
@@ -111,18 +99,4 @@ func (server *FileServer) Delete(ctx context.Context, req *proto.FileLocator) (*
 
 	_, err = server.app.Delete(ctx, uid, req.GetId())
 	return nil, err
-}
-
-func (server *FileServer) Permissions(ctx context.Context, req *proto.FileLocator) (*proto.FilePermissions, error) {
-	uid, err := fb.GetUid(ctx, server.header, server.logger)
-	if err != nil {
-		return nil, err
-	}
-
-	perm, err := server.app.Permissions(ctx, uid, req.GetId())
-	if err != nil {
-		return nil, err
-	}
-
-	return NewFilePermissions(perm), err
 }
