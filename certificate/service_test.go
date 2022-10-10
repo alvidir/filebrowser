@@ -1,7 +1,6 @@
 package certificate
 
 import (
-	"errors"
 	"testing"
 	"time"
 
@@ -41,12 +40,12 @@ func TestCertificateValidation(t *testing.T) {
 	defer logger.Sync()
 
 	tests := []struct {
-		name    string
-		ttl     time.Duration
-		isValid bool
+		name  string
+		ttl   time.Duration
+		valid bool
 	}{
-		{name: "alive certificate should not fail", ttl: 1 * time.Hour, isValid: true},
-		{name: "dead certificate should fail", ttl: -1 * time.Hour, isValid: false},
+		{name: "alive certificate should not fail", ttl: 1 * time.Hour, valid: true},
+		{name: "dead certificate should fail", ttl: -1 * time.Hour, valid: false},
 	}
 
 	for _, test := range tests {
@@ -71,7 +70,9 @@ func TestCertificateValidation(t *testing.T) {
 
 			token := string(cert.token)
 			got, err := service.ParseFileAccessCertificate(token)
-			if errors.Is(err, fb.ErrInvalidToken) && !test.isValid {
+			if valid := err == nil; valid != test.valid {
+				t.Fatalf("%s, got certificate validity = %v, want = %v", test.name, valid, test.valid)
+			} else if !test.valid {
 				return
 			}
 
