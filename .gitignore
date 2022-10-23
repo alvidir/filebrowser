@@ -19,4 +19,6 @@
 *.pb.go
 
 oryxBuildBinary
-.vscode/
+
+# keys and secrets
+.ssh/

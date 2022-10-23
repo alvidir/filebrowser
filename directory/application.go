@@ -48,13 +48,17 @@ func (app *DirectoryApplication) Create(ctx context.Context, uid int32) (*Direct
 	return directory, nil
 }
 
-func (app *DirectoryApplication) Retrieve(ctx context.Context, uid int32) (*Directory, error) {
+func (app *DirectoryApplication) Retrieve(ctx context.Context, uid int32, path string) (*Directory, error) {
 	app.logger.Info("processing a \"retrieve\" directory request",
 		zap.Any("user_id", uid))
 
 	dir, err := app.dirRepo.FindByUserId(ctx, uid)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(path) > 0 {
+		dir.files = dir.List(path)
 	}
 
 	for _, f := range dir.Files() {

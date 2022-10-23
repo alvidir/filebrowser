@@ -1,0 +1,10 @@
+{
+    "[go]": {
+        "editor.defaultFormatter": "golang.go",
+    },
+
+    "editor.formatOnSave": true,
+    "editor.detectIndentation": false,
+    "editor.tabSize": 4,
+    
+}

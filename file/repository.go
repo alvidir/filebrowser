@@ -18,7 +18,7 @@ const (
 type mongoFile struct {
 	ID          primitive.ObjectID      `bson:"_id,omitempty"`
 	Name        string                  `bson:"name"`
-	Flags       Flags                   `bson:"flags"`
+	Flags       Flag                    `bson:"flags"`
 	Permissions map[int32]fb.Permission `bson:"permissions,omitempty"`
 	Metadata    map[string]string       `bson:"metadata,omitempty"`
 	Data        []byte                  `bson:"data,omitempty"`

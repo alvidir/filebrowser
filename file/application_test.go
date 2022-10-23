@@ -42,7 +42,7 @@ type fileRepositoryMock struct {
 	find   func(repo *fileRepositoryMock, ctx context.Context, id string) (*File, error)
 	save   func(repo *fileRepositoryMock, ctx context.Context, file *File) error
 	delete func(repo *fileRepositoryMock, ctx context.Context, file *File) error
-	flags  Flags
+	flags  Flag
 }
 
 func (mock *fileRepositoryMock) Create(ctx context.Context, file *File) error {

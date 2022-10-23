@@ -165,7 +165,7 @@ func TestRetrieveWhenDirectoryDoesNotExists(t *testing.T) {
 	fileRepo := &fileRepositoryMock{}
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
-	if _, err := app.Retrieve(context.TODO(), 999); !errors.Is(err, fb.ErrNotFound) {
+	if _, err := app.Retrieve(context.TODO(), 999, ""); !errors.Is(err, fb.ErrNotFound) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 }
@@ -190,7 +190,7 @@ func TestRetrieve(t *testing.T) {
 
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
-	if dir, err := app.Retrieve(context.TODO(), 999); err != nil {
+	if dir, err := app.Retrieve(context.TODO(), 999, ""); err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
 	} else if dir.id != "test" {
 		t.Errorf("got id = %v, want = %v", dir.id, "test")

@@ -3,8 +3,13 @@ package directory
 import (
 	"fmt"
 	"path"
+	"strings"
 
 	"github.com/alvidir/filebrowser/file"
+)
+
+const (
+	PathSeparator = "/"
 )
 
 type Directory struct {
@@ -50,4 +55,29 @@ func (dir *Directory) RemoveFile(file *file.File) {
 
 func (dir *Directory) Files() map[string]*file.File {
 	return dir.files
+}
+
+func (dir *Directory) List(target string) map[string]*file.File {
+	if len(target) == 0 {
+		return dir.files
+	}
+
+	filtered := make(map[string]*file.File)
+	depth := len(strings.Split(target, PathSeparator))
+	for path, f := range dir.files {
+		if !strings.HasPrefix(path, target) {
+			continue
+		}
+
+		name := strings.Split(path, PathSeparator)[depth]
+		if _, exists := filtered[name]; exists {
+			// if the same filename appears more than once, then it is a directory name
+			filtered[name], _ = file.NewFile("", name)
+			filtered[name].SetFlag(file.Directory)
+		} else {
+			filtered[name] = f
+		}
+	}
+
+	return filtered
 }

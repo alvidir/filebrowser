@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	Blurred Flags = 0x01
-	Remote  Flags = 0x02
+	Blurred   Flag = 0x01
+	Remote    Flag = 0x02
+	Directory Flag = 0x04
 
 	FilenameRegex string = "^[^/]+$"
 
@@ -28,14 +29,14 @@ var (
 )
 
 type Metadata map[string]string
-type Flags uint8
+type Flag uint8
 
 type File struct {
 	id          string
 	name        string
 	metadata    Metadata
 	permissions map[int32]fb.Permission
-	flags       Flags
+	flags       Flag
 	data        []byte
 }
 
@@ -190,4 +191,8 @@ func (file *File) IsRemote() bool {
 func (file *File) IsContributor(uid int32) bool {
 	// is contributor if, and only if, the user is owner or has write permissions
 	return file.permissions[uid]&(fb.Owner|fb.Write) != 0
+}
+
+func (file *File) SetFlag(flag Flag) {
+	file.flags |= flag
 }

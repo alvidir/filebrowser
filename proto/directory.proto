@@ -4,7 +4,9 @@ option go_package = "github.com/alvidir/filebrowser/proto";
 package proto;
 import "proto/file.proto";
 
-message DirectoryLocator {}
+message DirectoryLocator {
+    string path = 1;
+}
 
 message DirectoryDescriptor {
     string id = 1;

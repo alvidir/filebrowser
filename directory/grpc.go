@@ -56,7 +56,7 @@ func (server *DirectoryServer) Retrieve(ctx context.Context, req *proto.Director
 		return nil, err
 	}
 
-	dir, err := server.app.Retrieve(ctx, uid)
+	dir, err := server.app.Retrieve(ctx, uid, req.GetPath())
 	if err != nil {
 		return nil, err
 	}
