@@ -83,8 +83,6 @@ func (dir *Directory) FilesByPath(target string) (map[string]*file.File, error) 
 		items := strings.Split(p, PathSeparator)
 		name := items[depth]
 		if _, exists := filtered[name]; !exists && len(items) > depth+1 {
-			// if the amount of items is greater than the target depth, then the current file
-			// is located somewhere inside 'name' directory
 			filtered[name], _ = file.NewFile("", name)
 			filtered[name].SetFlag(file.Directory)
 		} else {
