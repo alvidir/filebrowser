@@ -48,7 +48,7 @@ jobs:
           version: "3.x"
 
       - name: Install plugins
-        run: make install
+        run: make go-install
 
       - name: Generate protos
         run: make proto -B
