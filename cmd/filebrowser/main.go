@@ -20,7 +20,7 @@ import (
 const (
 	ENV_SERVICE_ADDR   = "SERVICE_ADDR"
 	ENV_SERVICE_NETW   = "SERVICE_NETW"
-	ENV_AUTH_HEADER    = "AUTH_HEADER"
+	ENV_UID_HEADER     = "UID_HEADER"
 	ENV_MONGO_DSN      = "MONGO_DSN"
 	ENV_MONGO_DATABASE = "MONGO_DATABASE"
 	ENV_REDIS_DSN      = "REDIS_DSN"
@@ -90,7 +90,7 @@ func getTokenTTL(logger *zap.Logger) *time.Duration {
 }
 
 func getFilebrowserGrpcServer(mongoConn *mongo.Database, logger *zap.Logger) *grpc.Server {
-	if header, exists := os.LookupEnv(ENV_AUTH_HEADER); exists {
+	if header, exists := os.LookupEnv(ENV_UID_HEADER); exists {
 		authHeader = header
 	}
 

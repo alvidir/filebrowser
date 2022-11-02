@@ -10,7 +10,7 @@ message DirectoryLocator {
 
 message DirectoryDescriptor {
     string id = 1;
-    map<string, FileDescriptor> files = 2;
+    repeated FileDescriptor files = 2;
 }
 
 service Directory {

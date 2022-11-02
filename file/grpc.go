@@ -21,6 +21,7 @@ func NewFileDescriptor(file *File) *proto.FileDescriptor {
 		Name:        file.name,
 		Metadata:    file.metadata,
 		Permissions: map[int32]*proto.Permissions{},
+		Flags:       uint32(file.flags),
 		Data:        file.data,
 	}
 

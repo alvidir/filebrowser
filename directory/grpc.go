@@ -37,14 +37,14 @@ func (server *DirectoryServer) Create(ctx context.Context, req *proto.DirectoryL
 
 	descriptor := &proto.DirectoryDescriptor{
 		Id:    dir.id,
-		Files: make(map[string]*proto.FileDescriptor),
+		Files: make([]*proto.FileDescriptor, 0, len(dir.Files())),
 	}
 
-	for p, fs := range dir.Files() {
-		descriptor.Files[p] = &proto.FileDescriptor{
+	for _, fs := range dir.Files() {
+		descriptor.Files = append(descriptor.Files, &proto.FileDescriptor{
 			Id:       fs.Id(),
 			Metadata: fs.Metadata(),
-		}
+		})
 	}
 
 	return descriptor, nil
@@ -63,11 +63,11 @@ func (server *DirectoryServer) Retrieve(ctx context.Context, req *proto.Director
 
 	descriptor := &proto.DirectoryDescriptor{
 		Id:    dir.id,
-		Files: make(map[string]*proto.FileDescriptor),
+		Files: make([]*proto.FileDescriptor, 0, len(dir.Files())),
 	}
 
-	for p, fs := range dir.Files() {
-		descriptor.Files[p] = file.NewFileDescriptor(fs)
+	for _, fs := range dir.Files() {
+		descriptor.Files = append(descriptor.Files, file.NewFileDescriptor(fs))
 	}
 
 	return descriptor, nil

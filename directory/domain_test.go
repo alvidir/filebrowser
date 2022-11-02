@@ -96,3 +96,32 @@ func TestFiles(t *testing.T) {
 		}
 	}
 }
+
+func TestFilterByPath(t *testing.T) {
+	subject := NewDirectory(1)
+	subject.files["hello/world.txt"], _ = file.NewFile("", "hello/world.txt")
+	subject.files[".profile"], _ = file.NewFile("", "profile")
+	subject.files["a_directory/a_file"], _ = file.NewFile("", "a_file")
+	subject.files["/a_directory/another_file"], _ = file.NewFile("", "another_file")
+	subject.files["/at_root"], _ = file.NewFile("", "at_root")
+
+	want := 1
+	if files, err := subject.FilesByPath("/hello"); err != nil {
+		t.Errorf("got error = %v", err)
+	} else if got := len(files); got != want {
+		t.Errorf("got files len = %v, want = %v", got, want)
+	}
+
+	want = 4
+	if files, err := subject.FilesByPath("/"); err != nil {
+		t.Errorf("got error = %v", err)
+	} else if got := len(files); got != want {
+		t.Errorf("got files len = %v, want = %v", got, want)
+	}
+
+	if files, err := subject.FilesByPath(""); err != nil {
+		t.Errorf("got error = %v", err)
+	} else if got := len(files); got != want {
+		t.Errorf("got files len = %v, want = %v", got, want)
+	}
+}

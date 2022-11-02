@@ -1,62 +1,61 @@
 services:
-    mongo:
-        container_name: filebrowser-mongo
-        image: docker.io/mongo:latest
-        restart: always
-        volumes:
-            - dbdata:/data/db
-        security_opt:
-            label: disable
-        env_file:
-            - .env
+  mongo:
+    container_name: filebrowser-mongo
+    image: docker.io/mongo:latest
+    restart: always
+    volumes:
+      - dbdata:/data/db
+    security_opt:
+      label: disable
+    env_file:
+      - .env
 
-    rabbitmq:
-        container_name: filebrowser-rabbitmq
-        image: docker.io/rabbitmq:3.10.2-alpine
-        hostname: filebrowser-rabbitmq
-        restart: always
-        security_opt:
-            label: disable
+  rabbitmq:
+    container_name: filebrowser-rabbitmq
+    image: docker.io/rabbitmq:3.10.2-alpine
+    hostname: filebrowser-rabbitmq
+    restart: always
+    security_opt:
+      label: disable
 
-    filebrowser:
-        container_name: filebrowser-server
-        image: localhost/alvidir/filebrowser:latest
-        restart: always
-        ports:
-            - 8000:8000
-        security_opt:
-            label: disable
-        depends_on: 
-            - mongo
-        env_file:
-            - .env
+  filebrowser:
+    container_name: filebrowser-server
+    image: localhost/alvidir/filebrowser:latest
+    restart: always
+    ports:
+      - 8000:8000
+    security_opt:
+      label: disable
+    depends_on:
+      - mongo
+    env_file:
+      - .env
 
-    mq-worker:
-        container_name: filebrowser-mq-worker
-        image: localhost/alvidir/filebrowser:latest-mq-worker
-        restart: always
-        security_opt:
-            label: disable
-        depends_on: 
-            - rabbitmq
-        env_file:
-            - .env
+  mq-worker:
+    container_name: filebrowser-mq-worker
+    image: localhost/alvidir/filebrowser:latest-mq-worker
+    restart: always
+    security_opt:
+      label: disable
+    depends_on:
+      - rabbitmq
+    env_file:
+      - .env
 
-    envoy:
-        container_name: filebrowser-envoy
-        image: docker.io/envoyproxy/envoy-alpine:v1.21-latest
-        restart: always
-        ports:
-            - 8080:8080
-            - 9901:9901
-        volumes:
-            - ./envoy:/etc/envoy:ro
-        security_opt:
-            label: disable
-        depends_on: 
-            - filebrowser
-        command: /usr/local/bin/envoy --log-level debug -c /etc/envoy/envoy.yaml
-
+  envoy:
+    container_name: filebrowser-envoy
+    image: docker.io/envoyproxy/envoy-alpine:v1.21-latest
+    restart: always
+    ports:
+      - 8080:8080
+      - 9901:9901
+    volumes:
+      - ./envoy:/etc/envoy:ro
+    security_opt:
+      label: disable
+    depends_on:
+      - filebrowser
+    command: /usr/local/bin/envoy --log-level debug -c /etc/envoy/envoy.yaml
 
 volumes:
-    dbdata:
+  dbdata:

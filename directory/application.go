@@ -57,12 +57,14 @@ func (app *DirectoryApplication) Retrieve(ctx context.Context, uid int32, path s
 		return nil, err
 	}
 
-	if len(path) > 0 {
-		dir.files = dir.List(path)
+	dir.files, err = dir.FilesByPath(path)
+	if err != nil {
+		return nil, err
 	}
 
-	for _, f := range dir.Files() {
+	for p, f := range dir.Files() {
 		f.HideProtectedFields(uid)
+		f.SetName(p)
 	}
 
 	return dir, nil

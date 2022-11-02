@@ -5,6 +5,7 @@ import (
 	"path"
 	"strings"
 
+	fb "github.com/alvidir/filebrowser"
 	"github.com/alvidir/filebrowser/file"
 )
 
@@ -57,21 +58,33 @@ func (dir *Directory) Files() map[string]*file.File {
 	return dir.files
 }
 
-func (dir *Directory) List(target string) map[string]*file.File {
-	if len(target) == 0 {
-		return dir.files
+func (dir *Directory) FilesByPath(target string) (map[string]*file.File, error) {
+	if !path.IsAbs(target) {
+		target = path.Join(PathSeparator, target)
+	}
+
+	if target == PathSeparator {
+		target = ""
 	}
 
 	filtered := make(map[string]*file.File)
 	depth := len(strings.Split(target, PathSeparator))
-	for path, f := range dir.files {
-		if !strings.HasPrefix(path, target) {
+	for p, f := range dir.files {
+		if !path.IsAbs(p) {
+			p = path.Join(PathSeparator, p)
+		}
+
+		if strings.Compare(p, target) == 0 {
+			return nil, fb.ErrNotFound
+		} else if !strings.HasPrefix(p, target) {
 			continue
 		}
 
-		name := strings.Split(path, PathSeparator)[depth]
-		if _, exists := filtered[name]; exists {
-			// if the same filename appears more than once, then it is a directory name
+		items := strings.Split(p, PathSeparator)
+		name := items[depth]
+		if _, exists := filtered[name]; !exists && len(items) > depth+1 {
+			// if the amount of items is greater than the target depth, then the current file
+			// is located somewhere inside 'name' directory
 			filtered[name], _ = file.NewFile("", name)
 			filtered[name].SetFlag(file.Directory)
 		} else {
@@ -79,5 +92,5 @@ func (dir *Directory) List(target string) map[string]*file.File {
 		}
 	}
 
-	return filtered
+	return filtered, nil
 }

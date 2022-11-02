@@ -76,6 +76,10 @@ func (file *File) Value(key string) (value string, exists bool) {
 	return
 }
 
+func (file *File) Flags() Flag {
+	return file.flags
+}
+
 func (file *File) Metadata() Metadata {
 	return file.metadata
 }
@@ -107,6 +111,10 @@ func (file *File) SharedWith() []int32 {
 	}
 
 	return shared
+}
+
+func (file *File) SetName(name string) {
+	file.name = name
 }
 
 func (file *File) Permission(uid int32) (perm fb.Permission) {

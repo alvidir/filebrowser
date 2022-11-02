@@ -23,7 +23,8 @@ message FileDescriptor {
     string name = 2;
     map<string, string> metadata = 3;
     map<int32, Permissions> permissions = 4;
-    bytes data = 5;
+    uint32 flags = 5;
+    bytes data = 6;
 }
 
 message Permissions {
