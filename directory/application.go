@@ -50,7 +50,8 @@ func (app *DirectoryApplication) Create(ctx context.Context, uid int32) (*Direct
 
 func (app *DirectoryApplication) Retrieve(ctx context.Context, uid int32, path string) (*Directory, error) {
 	app.logger.Info("processing a \"retrieve\" directory request",
-		zap.Any("user_id", uid))
+		zap.Int32("user_id", uid),
+		zap.String("path", path))
 
 	dir, err := app.dirRepo.FindByUserId(ctx, uid)
 	if err != nil {
@@ -72,7 +73,7 @@ func (app *DirectoryApplication) Retrieve(ctx context.Context, uid int32, path s
 
 func (app *DirectoryApplication) Delete(ctx context.Context, uid int32) error {
 	app.logger.Info("processing a \"delete\" directory request",
-		zap.Any("user_id", uid))
+		zap.Int32("user_id", uid))
 
 	dir, err := app.dirRepo.FindByUserId(ctx, uid)
 	if err != nil {
@@ -113,7 +114,7 @@ func (app *DirectoryApplication) Delete(ctx context.Context, uid int32) error {
 // RegisterFile is executed when a file has been created
 func (app *DirectoryApplication) RegisterFile(ctx context.Context, file *file.File, uid int32, fpath string) error {
 	app.logger.Info("processing an \"add file\" request",
-		zap.Any("user_id", uid))
+		zap.Int32("user_id", uid))
 
 	dir, err := app.dirRepo.FindByUserId(ctx, uid)
 	if err != nil {
@@ -127,7 +128,7 @@ func (app *DirectoryApplication) RegisterFile(ctx context.Context, file *file.Fi
 // UnregisterFile is executed when a file has been deleted
 func (app *DirectoryApplication) UnregisterFile(ctx context.Context, f *file.File, uid int32) error {
 	app.logger.Info("processing a \"remove file\" request",
-		zap.Any("user_id", uid))
+		zap.Int32("user_id", uid))
 
 	dir, err := app.dirRepo.FindByUserId(ctx, uid)
 	if err != nil {
