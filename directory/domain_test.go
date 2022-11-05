@@ -1,9 +1,11 @@
 package directory
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
+	fb "github.com/alvidir/filebrowser"
 	"github.com/alvidir/filebrowser/file"
 )
 
@@ -99,29 +101,108 @@ func TestFiles(t *testing.T) {
 
 func TestFilterByPath(t *testing.T) {
 	subject := NewDirectory(1)
-	subject.files["hello/world.txt"], _ = file.NewFile("", "hello/world.txt")
-	subject.files[".profile"], _ = file.NewFile("", "profile")
-	subject.files["a_directory/a_file"], _ = file.NewFile("", "a_file")
-	subject.files["/a_directory/another_file"], _ = file.NewFile("", "another_file")
-	subject.files["/at_root"], _ = file.NewFile("", "at_root")
+	subject.files["a_file"], _ = file.NewFile("", "filename")
+	subject.files["/another_file"], _ = file.NewFile("", "filename")
+	subject.files["a_directory/a_file"], _ = file.NewFile("", "filename")
+	subject.files["/a_directory/another_file"], _ = file.NewFile("", "filename")
 
-	want := 1
-	if files, err := subject.FilesByPath("/hello"); err != nil {
-		t.Errorf("got error = %v", err)
-	} else if got := len(files); got != want {
-		t.Errorf("got files len = %v, want = %v", got, want)
+	tests := []struct {
+		name string
+		path string
+		want []struct {
+			path  string
+			isDir bool
+		}
+		err error
+	}{
+		{
+			name: "filter by root",
+			path: "/",
+			want: []struct {
+				path  string
+				isDir bool
+			}{
+				{path: "a_file", isDir: false},
+				{path: "another_file", isDir: false},
+				{path: "a_directory", isDir: true},
+			},
+			err: nil,
+		},
+		{
+			name: "filter by directory",
+			path: "a_directory",
+			want: []struct {
+				path  string
+				isDir bool
+			}{
+				{path: "a_file", isDir: false},
+				{path: "another_file", isDir: false},
+			},
+			err: nil,
+		},
+		{
+			name: "filter by filename",
+			path: "a_file",
+			want: []struct {
+				path  string
+				isDir bool
+			}{},
+			err: fb.ErrNotFound,
+		},
+		{
+			name: "filter by another filename",
+			path: "a_directory/a_file",
+			want: []struct {
+				path  string
+				isDir bool
+			}{},
+			err: fb.ErrNotFound,
+		},
+		{
+			name: "filter by non existing name",
+			path: "another_directory",
+			want: []struct {
+				path  string
+				isDir bool
+			}{},
+			err: fb.ErrNotFound,
+		},
 	}
 
-	want = 4
-	if files, err := subject.FilesByPath("/"); err != nil {
-		t.Errorf("got error = %v", err)
-	} else if got := len(files); got != want {
-		t.Errorf("got files len = %v, want = %v", got, want)
-	}
+	for _, test := range tests {
+		t := t
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			files, err := subject.FilesByPath(test.path)
+			if test.err == nil && err != nil {
+				t.Errorf("got error = %v, want = nil", err)
+			} else if test.err != nil && !errors.Is(test.err, err) {
+				t.Errorf("got error = %v, want = %v", err, test.err)
+			}
 
-	if files, err := subject.FilesByPath(""); err != nil {
-		t.Errorf("got error = %v", err)
-	} else if got := len(files); got != want {
-		t.Errorf("got files len = %v, want = %v", got, want)
+			if len(test.want) != len(files) {
+				t.Errorf("got files length = %v, want = %v", len(test.want), len(files))
+			}
+
+			for _, fwant := range test.want {
+				var exists bool
+				for p, f := range files {
+					if exists = p == fwant.path; !exists {
+						continue
+					}
+
+					if isDir := f.Flags()&file.Directory != 0; isDir != fwant.isDir {
+						t.Errorf("got file path = %v as directory = %v, want = %v", p, isDir, fwant.isDir)
+					}
+
+					break
+				}
+
+				if !exists {
+					t.Errorf("path = %v not found", fwant.path)
+				}
+			}
+		})
 	}
 }

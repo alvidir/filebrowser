@@ -176,10 +176,13 @@ func TestRetrieve(t *testing.T) {
 
 	dirRepo := &directoryRepositoryMock{}
 	dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
+		f, _ := file.NewFile("", "filename")
 		return &Directory{
 			id:     "test",
 			userId: 999,
-			files:  nil,
+			files: map[string]*file.File{
+				"a_file": f,
+			},
 		}, nil
 	}
 

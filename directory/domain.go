@@ -85,9 +85,13 @@ func (dir *Directory) FilesByPath(target string) (map[string]*file.File, error) 
 		if _, exists := filtered[name]; !exists && len(items) > depth+1 {
 			filtered[name], _ = file.NewFile("", name)
 			filtered[name].SetFlag(file.Directory)
-		} else {
+		} else if !exists {
 			filtered[name] = f
 		}
+	}
+
+	if len(filtered) == 0 {
+		return nil, fb.ErrNotFound
 	}
 
 	return filtered, nil
