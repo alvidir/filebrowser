@@ -6,6 +6,7 @@ import "proto/file.proto";
 
 message DirectoryLocator {
     string path = 1;
+    string filter = 2;
 }
 
 message DirectoryDescriptor {

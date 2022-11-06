@@ -10,12 +10,7 @@ message FileConstructor {
 }
 
 message FileLocator {
-    string id = 1;
-    string search = 2;
-}
-
-message FileDescriptorArray {
-   repeated FileDescriptor files = 1;
+    string target = 1;
 }
 
 message FileMetadata {
@@ -47,5 +42,5 @@ service File {
     rpc Create(FileConstructor) returns (FileDescriptor); 
     rpc Read(FileLocator) returns (FileDescriptor);
     rpc Write(FileDescriptor) returns (FileDescriptor);
-    rpc Delete(FileLocator) returns (FileDescriptor); 
+    rpc Delete(FileLocator) returns (FileDescriptor);
 }

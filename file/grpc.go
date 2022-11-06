@@ -80,7 +80,7 @@ func (server *FileServer) Read(ctx context.Context, req *proto.FileLocator) (*pr
 		return nil, err
 	}
 
-	file, err := server.app.Read(ctx, uid, req.GetId())
+	file, err := server.app.Read(ctx, uid, req.GetTarget())
 	if err != nil {
 		return nil, err
 	}
@@ -113,6 +113,6 @@ func (server *FileServer) Delete(ctx context.Context, req *proto.FileLocator) (*
 		return nil, err
 	}
 
-	_, err = server.app.Delete(ctx, uid, req.GetId())
+	_, err = server.app.Delete(ctx, uid, req.GetTarget())
 	return nil, err
 }

@@ -2,7 +2,10 @@ package directory
 
 import (
 	"context"
+	"path"
+	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -32,6 +35,58 @@ func NewDirectoryApplication(dirRepo DirectoryRepository, fileRepo file.FileRepo
 	}
 }
 
+func NewFilterByNameFn(target string) (FilterFileFn, error) {
+	regex, err := regexp.Compile(target)
+	if err != nil {
+		return nil, fb.ErrInvalidFormat
+	}
+
+	filterFn := func(p string, f *file.File) (string, *file.File) {
+		if regex.MatchString(f.Name()) {
+			return p, f
+		}
+
+		return "", nil
+	}
+
+	return filterFn, nil
+}
+
+func NewFilterByPathFn(target string) (FilterFileFn, error) {
+	if !path.IsAbs(target) {
+		target = path.Join(PathSeparator, target)
+	}
+
+	if target == PathSeparator {
+		target = ""
+	}
+
+	depth := len(strings.Split(target, PathSeparator))
+	filterFn := func(p string, f *file.File) (string, *file.File) {
+		if !path.IsAbs(p) {
+			p = path.Join(PathSeparator, p)
+		}
+
+		if strings.Compare(p, target) == 0 {
+			// 0 means p == target, so is not filtering by path, but by a filename
+			return "", nil
+		} else if !strings.HasPrefix(p, target) {
+			return "", nil
+		}
+
+		items := strings.Split(p, PathSeparator)
+		name := items[depth]
+		if len(items) > depth+1 {
+			f, _ = file.NewFile("", name)
+			f.SetFlag(file.Directory)
+		}
+
+		return name, f
+	}
+
+	return filterFn, nil
+}
+
 func (app *DirectoryApplication) Create(ctx context.Context, uid int32) (*Directory, error) {
 	app.logger.Info("processing a \"create\" directory request",
 		zap.Int32("user_id", uid))
@@ -48,17 +103,37 @@ func (app *DirectoryApplication) Create(ctx context.Context, uid int32) (*Direct
 	return directory, nil
 }
 
-func (app *DirectoryApplication) Retrieve(ctx context.Context, uid int32, path string) (*Directory, error) {
+func (app *DirectoryApplication) Retrieve(ctx context.Context, uid int32, path string, filter string) (*Directory, error) {
 	app.logger.Info("processing a \"retrieve\" directory request",
 		zap.Int32("user_id", uid),
-		zap.String("path", path))
+		zap.String("path", path),
+		zap.String("filter", filter))
 
 	dir, err := app.dirRepo.FindByUserId(ctx, uid)
 	if err != nil {
 		return nil, err
 	}
 
-	dir.files, err = dir.FilesByPath(path)
+	filters := make([]FilterFileFn, 0, 2)
+	if len(path) > 0 {
+		filterFn, err := NewFilterByPathFn(path)
+		if err != nil {
+			return nil, err
+		}
+
+		filters = append(filters, filterFn)
+	}
+
+	if len(filter) > 0 {
+		filterFn, err := NewFilterByNameFn(filter)
+		if err != nil {
+			return nil, err
+		}
+
+		filters = append(filters, filterFn)
+	}
+
+	dir.files, err = dir.FilterFiles(filters)
 	if err != nil {
 		return nil, err
 	}

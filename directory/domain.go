@@ -3,7 +3,7 @@ package directory
 import (
 	"fmt"
 	"path"
-	"strings"
+	"regexp"
 
 	fb "github.com/alvidir/filebrowser"
 	"github.com/alvidir/filebrowser/file"
@@ -12,6 +12,8 @@ import (
 const (
 	PathSeparator = "/"
 )
+
+type FilterFileFn func(string, *file.File) (string, *file.File)
 
 type Directory struct {
 	id     string
@@ -58,35 +60,40 @@ func (dir *Directory) Files() map[string]*file.File {
 	return dir.files
 }
 
-func (dir *Directory) FilesByPath(target string) (map[string]*file.File, error) {
-	if !path.IsAbs(target) {
-		target = path.Join(PathSeparator, target)
-	}
-
-	if target == PathSeparator {
-		target = ""
+func (dir *Directory) FilesByName(target string) (map[string]*file.File, error) {
+	regex, err := regexp.Compile(target)
+	if err != nil {
+		return nil, fb.ErrInvalidFormat
 	}
 
 	filtered := make(map[string]*file.File)
-	depth := len(strings.Split(target, PathSeparator))
 	for p, f := range dir.files {
-		if !path.IsAbs(p) {
-			p = path.Join(PathSeparator, p)
+		if regex.MatchString(f.Name()) {
+			filtered[p] = f
+		}
+	}
+
+	return filtered, nil
+}
+
+func (dir *Directory) FilterFiles(filters []FilterFileFn) (map[string]*file.File, error) {
+	filtered := make(map[string]*file.File)
+	for p, file := range dir.files {
+		selected := file
+		key := p
+
+		for _, filter := range filters {
+			if filter == nil {
+				continue
+			}
+
+			if key, selected = filter(p, file); selected == nil {
+				break
+			}
 		}
 
-		if strings.Compare(p, target) == 0 {
-			return nil, fb.ErrNotFound
-		} else if !strings.HasPrefix(p, target) {
-			continue
-		}
-
-		items := strings.Split(p, PathSeparator)
-		name := items[depth]
-		if _, exists := filtered[name]; !exists && len(items) > depth+1 {
-			filtered[name], _ = file.NewFile("", name)
-			filtered[name].SetFlag(file.Directory)
-		} else if !exists {
-			filtered[name] = f
+		if selected != nil {
+			filtered[key] = selected
 		}
 	}
 
@@ -96,3 +103,42 @@ func (dir *Directory) FilesByPath(target string) (map[string]*file.File, error) 
 
 	return filtered, nil
 }
+
+// func (dir *Directory) FilesByPath(target string) (map[string]*file.File, error) {
+// 	if !path.IsAbs(target) {
+// 		target = path.Join(PathSeparator, target)
+// 	}
+
+// 	if target == PathSeparator {
+// 		target = ""
+// 	}
+
+// 	filtered := make(map[string]*file.File)
+// 	depth := len(strings.Split(target, PathSeparator))
+// 	for p, f := range dir.files {
+// 		if !path.IsAbs(p) {
+// 			p = path.Join(PathSeparator, p)
+// 		}
+
+// 		if strings.Compare(p, target) == 0 {
+// 			return nil, fb.ErrNotFound
+// 		} else if !strings.HasPrefix(p, target) {
+// 			continue
+// 		}
+
+// 		items := strings.Split(p, PathSeparator)
+// 		name := items[depth]
+// 		if _, exists := filtered[name]; !exists && len(items) > depth+1 {
+// 			filtered[name], _ = file.NewFile("", name)
+// 			filtered[name].SetFlag(file.Directory)
+// 		} else if !exists {
+// 			filtered[name] = f
+// 		}
+// 	}
+
+// 	if len(filtered) == 0 {
+// 		return nil, fb.ErrNotFound
+// 	}
+
+// 	return filtered, nil
+// }
