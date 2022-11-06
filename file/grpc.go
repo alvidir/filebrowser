@@ -19,14 +19,24 @@ func NewFileDescriptor(file *File) *proto.FileDescriptor {
 	descriptor := &proto.FileDescriptor{
 		Id:          file.id,
 		Name:        file.name,
-		Metadata:    file.metadata,
-		Permissions: map[int32]*proto.Permissions{},
+		Metadata:    make([]*proto.FileMetadata, 0, len(file.metadata)),
+		Permissions: make([]*proto.FilePermissions, 0, len(file.permissions)),
 		Flags:       uint32(file.flags),
 		Data:        file.data,
 	}
 
+	for key, value := range file.metadata {
+		descriptor.Metadata = append(descriptor.Metadata, &proto.FileMetadata{
+			Key:   key,
+			Value: value,
+		})
+	}
+
 	for uid, perm := range file.permissions {
-		descriptor.Permissions[uid] = NewPermissions(perm)
+		descriptor.Permissions = append(descriptor.Permissions, &proto.FilePermissions{
+			Uid:         uid,
+			Permissions: NewPermissions(perm),
+		})
 	}
 
 	return descriptor
@@ -84,7 +94,12 @@ func (server *FileServer) Write(ctx context.Context, req *proto.FileDescriptor) 
 		return nil, err
 	}
 
-	file, err := server.app.Write(ctx, uid, req.GetId(), req.GetData(), req.GetMetadata())
+	metadata := make(Metadata)
+	for _, meta := range req.GetMetadata() {
+		metadata[meta.Key] = meta.Value
+	}
+
+	file, err := server.app.Write(ctx, uid, req.GetId(), req.GetData(), metadata)
 	if err != nil {
 		return nil, err
 	}

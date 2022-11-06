@@ -41,10 +41,19 @@ func (server *DirectoryServer) Create(ctx context.Context, req *proto.DirectoryL
 	}
 
 	for _, fs := range dir.Files() {
-		descriptor.Files = append(descriptor.Files, &proto.FileDescriptor{
+		fileDescriptor := &proto.FileDescriptor{
 			Id:       fs.Id(),
-			Metadata: fs.Metadata(),
-		})
+			Metadata: make([]*proto.FileMetadata, 0, len(fs.Metadata())),
+		}
+
+		for key, value := range fs.Metadata() {
+			fileDescriptor.Metadata = append(fileDescriptor.Metadata, &proto.FileMetadata{
+				Key:   key,
+				Value: value,
+			})
+		}
+
+		descriptor.Files = append(descriptor.Files, fileDescriptor)
 	}
 
 	return descriptor, nil
