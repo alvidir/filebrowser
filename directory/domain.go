@@ -97,48 +97,5 @@ func (dir *Directory) FilterFiles(filters []FilterFileFn) (map[string]*file.File
 		}
 	}
 
-	if len(filtered) == 0 {
-		return nil, fb.ErrNotFound
-	}
-
 	return filtered, nil
 }
-
-// func (dir *Directory) FilesByPath(target string) (map[string]*file.File, error) {
-// 	if !path.IsAbs(target) {
-// 		target = path.Join(PathSeparator, target)
-// 	}
-
-// 	if target == PathSeparator {
-// 		target = ""
-// 	}
-
-// 	filtered := make(map[string]*file.File)
-// 	depth := len(strings.Split(target, PathSeparator))
-// 	for p, f := range dir.files {
-// 		if !path.IsAbs(p) {
-// 			p = path.Join(PathSeparator, p)
-// 		}
-
-// 		if strings.Compare(p, target) == 0 {
-// 			return nil, fb.ErrNotFound
-// 		} else if !strings.HasPrefix(p, target) {
-// 			continue
-// 		}
-
-// 		items := strings.Split(p, PathSeparator)
-// 		name := items[depth]
-// 		if _, exists := filtered[name]; !exists && len(items) > depth+1 {
-// 			filtered[name], _ = file.NewFile("", name)
-// 			filtered[name].SetFlag(file.Directory)
-// 		} else if !exists {
-// 			filtered[name] = f
-// 		}
-// 	}
-
-// 	if len(filtered) == 0 {
-// 		return nil, fb.ErrNotFound
-// 	}
-
-// 	return filtered, nil
-// }
