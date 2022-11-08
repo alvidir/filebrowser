@@ -139,7 +139,7 @@ func (app *DirectoryApplication) Retrieve(ctx context.Context, uid int32, path s
 	}
 
 	for p, f := range dir.Files() {
-		f.HideProtectedFields(uid)
+		f.AuthorizedFieldsOnly(uid)
 		f.SetName(p)
 	}
 

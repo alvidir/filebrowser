@@ -81,7 +81,7 @@ func (app *FileApplication) Read(ctx context.Context, uid int32, fid string) (*F
 		return nil, fb.ErrNotAvailable
 	}
 
-	file.HideProtectedFields(uid)
+	file.AuthorizedFieldsOnly(uid)
 	return file, nil
 }
 

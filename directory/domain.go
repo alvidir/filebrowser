@@ -3,9 +3,7 @@ package directory
 import (
 	"fmt"
 	"path"
-	"regexp"
 
-	fb "github.com/alvidir/filebrowser"
 	"github.com/alvidir/filebrowser/file"
 )
 
@@ -58,22 +56,6 @@ func (dir *Directory) RemoveFile(file *file.File) {
 
 func (dir *Directory) Files() map[string]*file.File {
 	return dir.files
-}
-
-func (dir *Directory) FilesByName(target string) (map[string]*file.File, error) {
-	regex, err := regexp.Compile(target)
-	if err != nil {
-		return nil, fb.ErrInvalidFormat
-	}
-
-	filtered := make(map[string]*file.File)
-	for p, f := range dir.files {
-		if regex.MatchString(f.Name()) {
-			filtered[p] = f
-		}
-	}
-
-	return filtered, nil
 }
 
 func (dir *Directory) FilterFiles(filters []FilterFileFn) (map[string]*file.File, error) {

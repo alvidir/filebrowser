@@ -174,7 +174,7 @@ func (file *File) Data() []byte {
 	return file.data
 }
 
-func (file *File) HideProtectedFields(uid int32) {
+func (file *File) AuthorizedFieldsOnly(uid int32) {
 	if file.IsContributor(uid) {
 		// if the user itself is contributor it has the right to know
 		// who can read and write the file
