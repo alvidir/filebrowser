@@ -81,3 +81,29 @@ func (server *DirectoryServer) Retrieve(ctx context.Context, req *proto.Director
 
 	return descriptor, nil
 }
+
+func (server *DirectoryServer) Delete(ctx context.Context, req *proto.DirectoryLocator) (*proto.Empty, error) {
+	uid, err := fb.GetUid(ctx, server.header, server.logger)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := server.app.Delete(ctx, uid); err != nil {
+		return nil, err
+	}
+
+	return &proto.Empty{}, nil
+}
+
+func (server *DirectoryServer) Locate(ctx context.Context, req *proto.DirectoryLocator) (*proto.Empty, error) {
+	uid, err := fb.GetUid(ctx, server.header, server.logger)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := server.app.Locate(ctx, uid, req.GetPath(), req.GetFilter()); err != nil {
+		return nil, err
+	}
+
+	return &proto.Empty{}, nil
+}

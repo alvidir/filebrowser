@@ -14,8 +14,11 @@ message DirectoryDescriptor {
     repeated FileDescriptor files = 2;
 }
 
+message Empty {}
+
 service Directory {
     rpc Create(DirectoryLocator) returns (DirectoryDescriptor);
     rpc Retrieve(DirectoryLocator) returns (DirectoryDescriptor);
-    rpc Delete(DirectoryLocator) returns (DirectoryDescriptor);
+    rpc Delete(DirectoryLocator) returns (Empty);
+    rpc Locate(DirectoryLocator) returns (Empty);
 }

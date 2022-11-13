@@ -40,7 +40,7 @@ message FileDescriptor {
 
 service File {
     rpc Create(FileConstructor) returns (FileDescriptor); 
-    rpc Read(FileLocator) returns (FileDescriptor);
-    rpc Write(FileDescriptor) returns (FileDescriptor);
+    rpc Retrieve(FileLocator) returns (FileDescriptor);
+    rpc Update(FileDescriptor) returns (FileDescriptor);
     rpc Delete(FileLocator) returns (FileDescriptor);
 }

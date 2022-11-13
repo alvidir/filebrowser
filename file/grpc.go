@@ -74,13 +74,13 @@ func (server *FileServer) Create(ctx context.Context, req *proto.FileConstructor
 	}, nil
 }
 
-func (server *FileServer) Read(ctx context.Context, req *proto.FileLocator) (*proto.FileDescriptor, error) {
+func (server *FileServer) Retrieve(ctx context.Context, req *proto.FileLocator) (*proto.FileDescriptor, error) {
 	uid, err := fb.GetUid(ctx, server.header, server.logger)
 	if err != nil {
 		return nil, err
 	}
 
-	file, err := server.app.Read(ctx, uid, req.GetTarget())
+	file, err := server.app.Retrieve(ctx, uid, req.GetTarget())
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func (server *FileServer) Read(ctx context.Context, req *proto.FileLocator) (*pr
 	return NewFileDescriptor(file), nil
 }
 
-func (server *FileServer) Write(ctx context.Context, req *proto.FileDescriptor) (*proto.FileDescriptor, error) {
+func (server *FileServer) Update(ctx context.Context, req *proto.FileDescriptor) (*proto.FileDescriptor, error) {
 	uid, err := fb.GetUid(ctx, server.header, server.logger)
 	if err != nil {
 		return nil, err
@@ -99,7 +99,7 @@ func (server *FileServer) Write(ctx context.Context, req *proto.FileDescriptor) 
 		metadata[meta.Key] = meta.Value
 	}
 
-	file, err := server.app.Write(ctx, uid, req.GetId(), req.GetData(), metadata)
+	file, err := server.app.Update(ctx, uid, req.GetId(), req.GetName(), req.GetData(), metadata)
 	if err != nil {
 		return nil, err
 	}

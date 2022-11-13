@@ -52,7 +52,7 @@ func NewFilterByNameFn(target string) (FilterFileFn, error) {
 	return filterFn, nil
 }
 
-func NewFilterByPathFn(target string) (FilterFileFn, error) {
+func NewFilterByDirFn(target string) (FilterFileFn, error) {
 	if !path.IsAbs(target) {
 		target = path.Join(PathSeparator, target)
 	}
@@ -116,7 +116,7 @@ func (app *DirectoryApplication) Retrieve(ctx context.Context, uid int32, path s
 
 	filters := make([]FilterFileFn, 0, 2)
 	if len(path) > 0 {
-		filterFn, err := NewFilterByPathFn(path)
+		filterFn, err := NewFilterByDirFn(path)
 		if err != nil {
 			return nil, err
 		}
@@ -183,6 +183,47 @@ func (app *DirectoryApplication) Delete(ctx context.Context, uid int32) error {
 	}
 
 	wg.Wait()
+	return nil
+}
+
+func (app *DirectoryApplication) Locate(ctx context.Context, uid int32, target string, filter string) error {
+	app.logger.Info("processing a \"move\" directory request",
+		zap.Int32("user_id", uid),
+		zap.String("path", target),
+		zap.String("filter", filter))
+
+	if len(target) == 0 {
+		return fb.ErrNotFound
+	}
+
+	regex, err := regexp.Compile(filter)
+	if err != nil {
+		return fb.ErrInvalidFormat
+	}
+
+	dir, err := app.dirRepo.FindByUserId(ctx, uid)
+	if err != nil {
+		return err
+	}
+
+	for subject := range dir.Files() {
+		if !regex.MatchString(path.Clean(subject)) {
+			continue
+		}
+
+		p := path.Join(path.Clean(target), path.Base(subject))
+		if _, exists := dir.Files()[p]; exists {
+			return fb.ErrAlreadyExists
+		}
+
+		dir.Files()[p] = dir.Files()[subject]
+		delete(dir.Files(), subject)
+	}
+
+	if err := app.dirRepo.Save(ctx, dir); err != nil {
+		return err
+	}
+
 	return nil
 }
 

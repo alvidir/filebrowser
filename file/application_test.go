@@ -122,7 +122,7 @@ func TestReadWhenFileDoesNotExists(t *testing.T) {
 	userId := int32(999)
 	fid := "testing"
 
-	if _, err := app.Read(context.Background(), userId, fid); !errors.Is(err, fb.ErrNotFound) {
+	if _, err := app.Retrieve(context.Background(), userId, fid); !errors.Is(err, fb.ErrNotFound) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 }
@@ -252,7 +252,7 @@ func TestReadWhenHasNoPermissions(t *testing.T) {
 	userId := int32(999)
 	fid := "testing"
 
-	if _, err := app.Read(context.Background(), userId, fid); errors.Is(err, fb.ErrNotAvailable) {
+	if _, err := app.Retrieve(context.Background(), userId, fid); errors.Is(err, fb.ErrNotAvailable) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)
 	}
 }
@@ -276,7 +276,7 @@ func TestRead(t *testing.T) {
 
 	dirApp := &directoryApplicationMock{}
 	app := NewFileApplication(repo, dirApp, logger)
-	file, err := app.Read(context.Background(), 111, "")
+	file, err := app.Retrieve(context.Background(), 111, "")
 	if err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
 		return
@@ -287,7 +287,7 @@ func TestRead(t *testing.T) {
 		t.Errorf("got permissions = %+v, want = %+v", file.permissions, want)
 	}
 
-	file, err = app.Read(context.Background(), 333, "")
+	file, err = app.Retrieve(context.Background(), 333, "")
 	if err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
 		return
@@ -298,7 +298,7 @@ func TestRead(t *testing.T) {
 		t.Errorf("got permissions = %+v, want = %+v", file.permissions, want)
 	}
 
-	file, err = app.Read(context.Background(), 222, "")
+	file, err = app.Retrieve(context.Background(), 222, "")
 	if err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
 		return
@@ -309,7 +309,7 @@ func TestRead(t *testing.T) {
 		t.Errorf("got permission = %v, want = %v", file.permissions, want)
 	}
 
-	_, err = app.Read(context.Background(), 555, "")
+	_, err = app.Retrieve(context.Background(), 555, "")
 	if !errors.Is(err, fb.ErrNotAvailable) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)
 		return
@@ -332,7 +332,7 @@ func TestWriteWhenFileDoesNotExists(t *testing.T) {
 	userId := int32(999)
 	fid := "testing"
 
-	if _, err := app.Write(context.Background(), userId, fid, nil, nil); !errors.Is(err, fb.ErrNotFound) {
+	if _, err := app.Update(context.Background(), userId, fid, "", nil, nil); !errors.Is(err, fb.ErrNotFound) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 }
@@ -362,11 +362,11 @@ func TestWriteWhenHasNoPermissions(t *testing.T) {
 	app := NewFileApplication(repo, dirApp, logger)
 
 	fid := "testing"
-	if _, err := app.Write(context.Background(), 222, fid, nil, nil); !errors.Is(err, fb.ErrNotAvailable) {
+	if _, err := app.Update(context.Background(), 222, fid, "", nil, nil); !errors.Is(err, fb.ErrNotAvailable) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)
 	}
 
-	if _, err := app.Write(context.Background(), 999, fid, nil, nil); !errors.Is(err, fb.ErrNotAvailable) {
+	if _, err := app.Update(context.Background(), 999, fid, "", nil, nil); !errors.Is(err, fb.ErrNotAvailable) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)
 	}
 }
@@ -392,7 +392,7 @@ func TestWriteWhenCannotSave(t *testing.T) {
 	app := NewFileApplication(repo, dirApp, logger)
 
 	fid := "testing"
-	if _, err := app.Write(context.Background(), 111, fid, nil, nil); !errors.Is(err, fb.ErrUnknown) {
+	if _, err := app.Update(context.Background(), 111, fid, "", nil, nil); !errors.Is(err, fb.ErrUnknown) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrUnknown)
 	}
 }
@@ -429,7 +429,7 @@ func TestWrite(t *testing.T) {
 	data := []byte{1, 2, 3}
 
 	before := time.Now().Unix()
-	file, err := app.Write(context.Background(), 111, fid, data, nil)
+	file, err := app.Update(context.Background(), 111, fid, "", data, nil)
 	after := time.Now().Unix()
 
 	if err != nil {
@@ -486,7 +486,7 @@ func TestWriteWithCustomMetadata(t *testing.T) {
 	customMeta[customFieldKey] = customFieldValue
 	customMeta[MetadataCreatedAtKey] = strconv.FormatInt(time.Now().Add(time.Hour*24).Unix(), TimestampBase)
 
-	file, err := app.Write(context.Background(), 111, fid, data, customMeta)
+	file, err := app.Update(context.Background(), 111, fid, "", data, customMeta)
 
 	if err != nil {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)

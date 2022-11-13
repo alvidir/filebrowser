@@ -342,6 +342,113 @@ func TestDeleteWhenUserIsNotOwner(t *testing.T) {
 	}
 }
 
+func TestLocate(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	tests := []struct {
+		name   string
+		target string
+		filter string
+		want   []string
+		err    error
+	}{
+		{
+			name:   "move to a new directory",
+			target: "new_directory",
+			filter: "^/?((a_file)|(another_file))",
+			want: []string{
+				"new_directory/a_file",
+				"new_directory/another_file",
+				"a_directory/a_file",
+				"/a_directory/another_file",
+				"unique_name",
+			},
+			err: nil,
+		},
+		{
+			name:   "move to a existing directory",
+			target: "a_directory",
+			filter: "^/?unique_name",
+			want: []string{
+				"a_file",
+				"/another_file",
+				"a_directory/a_file",
+				"/a_directory/another_file",
+				"a_directory/unique_name",
+			},
+			err: nil,
+		},
+		{
+			name:   "move to a directory with a file with the same name",
+			target: "a_directory",
+			filter: "^/?a_file",
+			want: []string{
+				"a_file",
+				"/another_file",
+				"a_directory/a_file",
+				"/a_directory/another_file",
+				"unique_name",
+			},
+			err: fb.ErrAlreadyExists,
+		},
+	}
+
+	for _, test := range tests {
+		t := t
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			f, _ := file.NewFile("test", "filename")
+			dirRepo := &directoryRepositoryMock{}
+			files := map[string]*file.File{
+				"a_file":                    f,
+				"/another_file":             f,
+				"a_directory/a_file":        f,
+				"/a_directory/another_file": f,
+				"unique_name":               f,
+			}
+
+			dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
+				return &Directory{
+					id:     "test",
+					userId: 999,
+					files:  files,
+				}, nil
+			}
+
+			fileRepo := &fileRepositoryMock{
+				find: func(repo *fileRepositoryMock, ctx context.Context, id string) (*file.File, error) {
+					return f, nil
+				},
+			}
+
+			app := NewDirectoryApplication(dirRepo, fileRepo, logger)
+
+			err := app.Locate(context.TODO(), 999, test.target, test.filter)
+			if test.err != nil && !errors.Is(err, test.err) {
+				t.Errorf("got error = %v, want = %v", err, test.err)
+			}
+
+			if test.err == nil && err != nil {
+				t.Errorf("got error = %v, want = nil", err)
+			}
+
+			if len(test.want) != len(files) {
+				t.Errorf("got files = %v, want = %v", files, test.want)
+			}
+
+			for _, expectedPath := range test.want {
+				if _, exists := files[expectedPath]; !exists {
+					t.Errorf("got files = %v, want = %v", files, test.want)
+				}
+			}
+
+		})
+	}
+}
+
 func TestRegisterFileWhenDirectoryDoesNotExists(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
@@ -504,7 +611,7 @@ func TestUnregisterFileWhenFileIsShared(t *testing.T) {
 
 }
 
-func TestFilterByPath(t *testing.T) {
+func TestFilterByDir(t *testing.T) {
 	subject := NewDirectory(1)
 	subject.files["a_file"], _ = file.NewFile("", "filename")
 	subject.files["/another_file"], _ = file.NewFile("", "filename")
@@ -533,45 +640,45 @@ func TestFilterByPath(t *testing.T) {
 			},
 			err: nil,
 		},
-		// {
-		// 	name: "filter by directory",
-		// 	path: "a_directory",
-		// 	want: []struct {
-		// 		path  string
-		// 		isDir bool
-		// 	}{
-		// 		{path: "a_file", isDir: false},
-		// 		{path: "another_file", isDir: false},
-		// 	},
-		// 	err: nil,
-		// },
-		// {
-		// 	name: "filter by filename",
-		// 	path: "a_file",
-		// 	want: []struct {
-		// 		path  string
-		// 		isDir bool
-		// 	}{},
-		// 	err: fb.ErrNotFound,
-		// },
-		// {
-		// 	name: "filter by another filename",
-		// 	path: "a_directory/a_file",
-		// 	want: []struct {
-		// 		path  string
-		// 		isDir bool
-		// 	}{},
-		// 	err: fb.ErrNotFound,
-		// },
-		// {
-		// 	name: "filter by non existing name",
-		// 	path: "another_directory",
-		// 	want: []struct {
-		// 		path  string
-		// 		isDir bool
-		// 	}{},
-		// 	err: fb.ErrNotFound,
-		// },
+		{
+			name: "filter by directory",
+			path: "a_directory",
+			want: []struct {
+				path  string
+				isDir bool
+			}{
+				{path: "a_file", isDir: false},
+				{path: "another_file", isDir: false},
+			},
+			err: nil,
+		},
+		{
+			name: "filter by filename",
+			path: "a_file",
+			want: []struct {
+				path  string
+				isDir bool
+			}{},
+			err: fb.ErrNotFound,
+		},
+		{
+			name: "filter by another filename",
+			path: "a_directory/a_file",
+			want: []struct {
+				path  string
+				isDir bool
+			}{},
+			err: fb.ErrNotFound,
+		},
+		{
+			name: "filter by non existing directory",
+			path: "another_directory",
+			want: []struct {
+				path  string
+				isDir bool
+			}{},
+			err: fb.ErrNotFound,
+		},
 	}
 
 	for _, test := range tests {
@@ -579,7 +686,7 @@ func TestFilterByPath(t *testing.T) {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			filterFn, err := NewFilterByPathFn(test.path)
+			filterFn, err := NewFilterByDirFn(test.path)
 			if err != nil {
 				t.Errorf("got error = %v, want = nil", err)
 			}
