@@ -31,7 +31,7 @@ const (
 var (
 	serviceAddr = "0.0.0.0:8000"
 	serviceNetw = "tcp"
-	authHeader  = "X-Auth"
+	uidHeader   = "X-Uid"
 )
 
 func getMongoConnection(logger *zap.Logger) *mongo.Database {
@@ -91,24 +91,24 @@ func getTokenTTL(logger *zap.Logger) *time.Duration {
 
 func getFilebrowserGrpcServer(mongoConn *mongo.Database, logger *zap.Logger) *grpc.Server {
 	if header, exists := os.LookupEnv(ENV_UID_HEADER); exists {
-		authHeader = header
+		uidHeader = header
 	}
 
 	fileRepo := file.NewMongoFileRepository(mongoConn, logger)
 
 	directoryRepo := dir.NewMongoDirectoryRepository(mongoConn, fileRepo, logger)
 	directoryApp := dir.NewDirectoryApplication(directoryRepo, fileRepo, logger)
-	directoryServer := dir.NewDirectoryServer(directoryApp, logger, authHeader)
+	directoryServer := dir.NewDirectoryServer(directoryApp, logger, uidHeader)
 
 	fileApp := file.NewFileApplication(fileRepo, directoryApp, logger)
-	fileServer := file.NewFileServer(fileApp, authHeader, logger)
+	fileServer := file.NewFileServer(fileApp, uidHeader, logger)
 
 	privateKey := getPrivateKey(logger)
 	tokenTTL := getTokenTTL(logger)
 	certSrv := cert.NewCertificateService(privateKey, tokenTTL, logger)
 	certRepo := cert.NewMongoCertificateRepository(mongoConn, logger)
 	certApp := cert.NewCertificateApplication(certRepo, certSrv, logger)
-	certServer := cert.NewCertificateServer(certApp, logger, authHeader)
+	certServer := cert.NewCertificateServer(certApp, logger, uidHeader)
 
 	grpcSrv := grpc.NewServer()
 	proto.RegisterDirectoryServer(grpcSrv, directoryServer)
@@ -141,7 +141,7 @@ func main() {
 	defer logger.Sync()
 
 	if err := godotenv.Load(); err != nil {
-		logger.Warn("no dotenv file has been found",
+		logger.Warn("loading dotenv file",
 			zap.Error(err))
 	}
 

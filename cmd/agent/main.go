@@ -175,7 +175,7 @@ func main() {
 	defer logger.Sync()
 
 	if err := godotenv.Load(); err != nil {
-		logger.Warn("no dotenv file has been found",
+		logger.Warn("loading dotenv file",
 			zap.Error(err))
 	}
 

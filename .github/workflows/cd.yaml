@@ -59,9 +59,9 @@ jobs:
         uses: redhat-actions/buildah-build@v2
         with:
           image: ${{ env.IMAGE_NAME }}
-          tags: ${{ github.event.release.tag_name }}-mq-worker
+          tags: ${{ github.event.release.tag_name }}-agent
           containerfiles: |
-            ./container/mq-worker/containerfile
+            ./container/agent/containerfile
 
       - name: Log in to registry
         uses: redhat-actions/podman-login@v1

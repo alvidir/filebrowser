@@ -12,8 +12,7 @@ services:
 
   rabbitmq:
     container_name: filebrowser-rabbitmq
-    image: docker.io/rabbitmq:3.10.2-alpine
-    hostname: filebrowser-rabbitmq
+    image: docker.io/rabbitmq:3.11.3-alpine
     restart: always
     security_opt:
       label: disable
@@ -22,8 +21,6 @@ services:
     container_name: filebrowser-server
     image: localhost/alvidir/filebrowser:latest
     restart: always
-    ports:
-      - 8000:8000
     security_opt:
       label: disable
     depends_on:
@@ -31,9 +28,9 @@ services:
     env_file:
       - .env
 
-  mq-worker:
-    container_name: filebrowser-mq-worker
-    image: localhost/alvidir/filebrowser:latest-mq-worker
+  agent:
+    container_name: filebrowser-agent
+    image: localhost/alvidir/filebrowser:latest-agent
     restart: always
     security_opt:
       label: disable
