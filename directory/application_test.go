@@ -659,7 +659,7 @@ func TestFilterByDir(t *testing.T) {
 				path  string
 				isDir bool
 			}{},
-			err: fb.ErrNotFound,
+			err: nil,
 		},
 		{
 			name: "filter by another filename",
@@ -668,7 +668,7 @@ func TestFilterByDir(t *testing.T) {
 				path  string
 				isDir bool
 			}{},
-			err: fb.ErrNotFound,
+			err: nil,
 		},
 		{
 			name: "filter by non existing directory",
@@ -677,7 +677,7 @@ func TestFilterByDir(t *testing.T) {
 				path  string
 				isDir bool
 			}{},
-			err: fb.ErrNotFound,
+			err: nil,
 		},
 	}
 
