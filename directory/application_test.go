@@ -342,7 +342,7 @@ func TestDeleteWhenUserIsNotOwner(t *testing.T) {
 	}
 }
 
-func TestLocate(t *testing.T) {
+func TestRelocate(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 
@@ -426,7 +426,7 @@ func TestLocate(t *testing.T) {
 
 			app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
-			err := app.Locate(context.TODO(), 999, test.target, test.filter)
+			err := app.Relocate(context.TODO(), 999, test.target, test.filter)
 			if test.err != nil && !errors.Is(err, test.err) {
 				t.Errorf("got error = %v, want = %v", err, test.err)
 			}

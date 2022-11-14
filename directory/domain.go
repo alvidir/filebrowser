@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path"
 
-	fb "github.com/alvidir/filebrowser"
 	"github.com/alvidir/filebrowser/file"
 )
 
@@ -78,10 +77,6 @@ func (dir *Directory) FilterFiles(filters []FilterFileFn) (map[string]*file.File
 		if selected != nil {
 			filtered[key] = selected
 		}
-	}
-
-	if len(filtered) == 0 {
-		return nil, fb.ErrNotFound
 	}
 
 	return filtered, nil

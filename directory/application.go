@@ -186,7 +186,7 @@ func (app *DirectoryApplication) Delete(ctx context.Context, uid int32) error {
 	return nil
 }
 
-func (app *DirectoryApplication) Locate(ctx context.Context, uid int32, target string, filter string) error {
+func (app *DirectoryApplication) Relocate(ctx context.Context, uid int32, target string, filter string) error {
 	app.logger.Info("processing a \"move\" directory request",
 		zap.Int32("user_id", uid),
 		zap.String("path", target),
