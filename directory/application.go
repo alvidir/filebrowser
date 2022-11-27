@@ -206,24 +206,30 @@ func (app *DirectoryApplication) Relocate(ctx context.Context, uid int32, target
 		return err
 	}
 
+	matches := 0
+	target = path.Clean(target)
+	if _, exists := dir.Files()[target]; exists {
+		return fb.ErrAlreadyExists
+	}
+
 	for subject := range dir.Files() {
-		if !regex.MatchString(path.Clean(subject)) {
+		subject = path.Clean(subject)
+		if !regex.MatchString(subject) {
 			continue
 		}
 
-		p := path.Join(path.Clean(target), path.Base(subject))
-		root := strings.Split(path.Dir(subject), PathSeparator)[0]
-		absoluteRoot := path.Join(path.Clean(target), root)
-		if _, exists := dir.Files()[absoluteRoot]; exists {
-			return fb.ErrAlreadyExists
-		}
-
+		p := path.Join(target, path.Base(subject))
 		if _, exists := dir.Files()[p]; exists {
 			return fb.ErrAlreadyExists
 		}
 
 		dir.Files()[p] = dir.Files()[subject]
 		delete(dir.Files(), subject)
+		matches++
+	}
+
+	if matches == 0 {
+		return fb.ErrNotFound
 	}
 
 	if err := app.dirRepo.Save(ctx, dir); err != nil {
