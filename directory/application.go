@@ -208,8 +208,12 @@ func (app *DirectoryApplication) Relocate(ctx context.Context, uid int32, target
 
 	matches := 0
 	target = path.Clean(target)
-	if _, exists := dir.Files()[target]; exists {
-		return fb.ErrAlreadyExists
+	dirs := strings.Split(target, PathSeparator)
+	for index := 0; index < len(dirs); index++ {
+		p := path.Join(dirs[0 : len(dirs)-index]...)
+		if _, exists := dir.Files()[p]; exists {
+			return fb.ErrAlreadyExists
+		}
 	}
 
 	for subject := range dir.Files() {
