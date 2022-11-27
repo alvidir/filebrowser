@@ -362,6 +362,7 @@ func TestRelocate(t *testing.T) {
 				"new_directory/another_file",
 				"a_directory/a_file",
 				"/a_directory/another_file",
+				"another_dir/test.txt",
 				"unique_name",
 			},
 			err: nil,
@@ -376,6 +377,21 @@ func TestRelocate(t *testing.T) {
 				"a_directory/a_file",
 				"/a_directory/another_file",
 				"a_directory/unique_name",
+				"another_dir/test.txt",
+			},
+			err: nil,
+		},
+		{
+			name:   "move directory",
+			target: "another_dir/a_directory",
+			filter: "^/?a_directory",
+			want: []string{
+				"a_file",
+				"/another_file",
+				"another_dir/a_directory/a_file",
+				"another_dir/a_directory/another_file",
+				"another_dir/test.txt",
+				"unique_name",
 			},
 			err: nil,
 		},
@@ -388,6 +404,7 @@ func TestRelocate(t *testing.T) {
 				"/another_file",
 				"a_directory/a_file",
 				"/a_directory/another_file",
+				"another_dir/test.txt",
 				"unique_name",
 			},
 			err: fb.ErrAlreadyExists,
@@ -407,6 +424,7 @@ func TestRelocate(t *testing.T) {
 				"/another_file":             f,
 				"a_directory/a_file":        f,
 				"/a_directory/another_file": f,
+				"another_dir/test.txt":      f,
 				"unique_name":               f,
 			}
 
@@ -428,20 +446,20 @@ func TestRelocate(t *testing.T) {
 
 			err := app.Relocate(context.TODO(), 999, test.target, test.filter)
 			if test.err != nil && !errors.Is(err, test.err) {
-				t.Errorf("got error = %v, want = %v", err, test.err)
+				t.Errorf("[%s] got error = %v, want = %v", test.name, err, test.err)
 			}
 
 			if test.err == nil && err != nil {
-				t.Errorf("got error = %v, want = nil", err)
+				t.Errorf("[%s] got error = %v, want = nil", test.name, err)
 			}
 
 			if len(test.want) != len(files) {
-				t.Errorf("got files = %v, want = %v", files, test.want)
+				t.Errorf("[%s] got files = %v, want = %v", test.name, files, test.want)
 			}
 
 			for _, expectedPath := range test.want {
 				if _, exists := files[expectedPath]; !exists {
-					t.Errorf("got files = %v, want = %v", files, test.want)
+					t.Errorf("[%s] got files = %v, want = %v", test.name, files, test.want)
 				}
 			}
 
