@@ -379,6 +379,43 @@ func TestRelocate_2(t *testing.T) {
 	}
 }
 
+func TestRelocate_3(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	f, _ := file.NewFile("test", "filename")
+	dirRepo := &directoryRepositoryMock{}
+	files := map[string]*file.File{
+		"folder/another folder 1/another folder/world.txt": f,
+	}
+
+	dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
+		return &Directory{
+			id:     "test",
+			userId: 999,
+			files:  files,
+		}, nil
+	}
+
+	fileRepo := &fileRepositoryMock{
+		find: func(repo *fileRepositoryMock, ctx context.Context, id string) (*file.File, error) {
+			return f, nil
+		},
+	}
+
+	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
+
+	err := app.Relocate(context.TODO(), 999, "folder1", "^/?folder")
+	if err != nil {
+		t.Errorf("got error = %v, want = %v", err, nil)
+	}
+
+	want := "folder1/folder/another folder 1/another folder/world.txt"
+	if _, exists := files[want]; !exists {
+		t.Errorf("got files = %v, want = %s", files, want)
+	}
+}
+
 func TestRelocate(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()

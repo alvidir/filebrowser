@@ -223,7 +223,7 @@ func (app *DirectoryApplication) Relocate(ctx context.Context, uid int32, target
 	target = path.Clean(target)
 	for subject := range dir.Files() {
 		subject = path.Clean(subject)
-		if !regex.MatchString(subject) {
+		if strings.HasSuffix(subject, target) || !regex.MatchString(subject) {
 			continue
 		}
 
