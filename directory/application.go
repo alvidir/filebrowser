@@ -212,6 +212,12 @@ func (app *DirectoryApplication) Relocate(ctx context.Context, uid int32, target
 		}
 
 		p := path.Join(path.Clean(target), path.Base(subject))
+		root := strings.Split(path.Dir(subject), PathSeparator)[0]
+		absoluteRoot := path.Join(path.Clean(target), root)
+		if _, exists := dir.Files()[absoluteRoot]; exists {
+			return fb.ErrAlreadyExists
+		}
+
 		if _, exists := dir.Files()[p]; exists {
 			return fb.ErrAlreadyExists
 		}
