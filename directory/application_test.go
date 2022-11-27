@@ -342,6 +342,43 @@ func TestDeleteWhenUserIsNotOwner(t *testing.T) {
 	}
 }
 
+func TestRelocate_2(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	f, _ := file.NewFile("test", "filename")
+	dirRepo := &directoryRepositoryMock{}
+	files := map[string]*file.File{
+		"folder/another folder 1/another folder/world.txt": f,
+	}
+
+	dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
+		return &Directory{
+			id:     "test",
+			userId: 999,
+			files:  files,
+		}, nil
+	}
+
+	fileRepo := &fileRepositoryMock{
+		find: func(repo *fileRepositoryMock, ctx context.Context, id string) (*file.File, error) {
+			return f, nil
+		},
+	}
+
+	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
+
+	err := app.Relocate(context.TODO(), 999, "root", "^/?folder")
+	if err != nil {
+		t.Errorf("got error = %v, want = %v", err, nil)
+	}
+
+	want := "root/folder/another folder 1/another folder/world.txt"
+	if _, exists := files[want]; !exists {
+		t.Errorf("got files = %v, want = %s", files, want)
+	}
+}
+
 func TestRelocate(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
@@ -383,7 +420,7 @@ func TestRelocate(t *testing.T) {
 		},
 		{
 			name:   "move directory",
-			target: "another_dir/a_directory",
+			target: "another_dir",
 			filter: "^/?a_directory",
 			want: []string{
 				"a_file",
@@ -412,20 +449,6 @@ func TestRelocate(t *testing.T) {
 		{
 			name:   "move directory with already existing name",
 			target: "another_dir/test.txt",
-			filter: "^/?a_directory",
-			want: []string{
-				"a_file",
-				"/another_file",
-				"a_directory/a_file",
-				"/a_directory/another_file",
-				"another_dir/test.txt",
-				"unique_name",
-			},
-			err: fb.ErrAlreadyExists,
-		},
-		{
-			name:   "move directory with already existing name - 2",
-			target: "another_dir/test.txt/a_directory",
 			filter: "^/?a_directory",
 			want: []string{
 				"a_file",
@@ -474,20 +497,20 @@ func TestRelocate(t *testing.T) {
 
 			err := app.Relocate(context.TODO(), 999, test.target, test.filter)
 			if test.err != nil && !errors.Is(err, test.err) {
-				t.Errorf("[%s] got error = %v, want = %v", test.name, err, test.err)
+				t.Errorf("got error = %v, want = %v", err, test.err)
 			}
 
 			if test.err == nil && err != nil {
-				t.Errorf("[%s] got error = %v, want = nil", test.name, err)
+				t.Errorf("got error = %v, want = nil", err)
 			}
 
 			if len(test.want) != len(files) {
-				t.Errorf("[%s] got files = %v, want = %v", test.name, files, test.want)
+				t.Errorf("got files = %v, want = %v", files, test.want)
 			}
 
 			for _, expectedPath := range test.want {
 				if _, exists := files[expectedPath]; !exists {
-					t.Errorf("[%s] got files = %v, want = %v", test.name, files, test.want)
+					t.Errorf("got files = %v, want = %v", files, test.want)
 				}
 			}
 

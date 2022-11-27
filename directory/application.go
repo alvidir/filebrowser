@@ -186,6 +186,19 @@ func (app *DirectoryApplication) Delete(ctx context.Context, uid int32) error {
 	return nil
 }
 
+func getPathsDivergenceIndex(p1 string, p2 string) (index int) {
+	p1Split := strings.Split(p1, PathSeparator)
+	p2Split := strings.Split(p2, PathSeparator)
+
+	for index = 0; index < len(p1Split) && index < len(p2Split); index++ {
+		if p1Split[index] != p2Split[index] {
+			break
+		}
+	}
+
+	return
+}
+
 func (app *DirectoryApplication) Relocate(ctx context.Context, uid int32, target string, filter string) error {
 	app.logger.Info("processing a \"move\" directory request",
 		zap.Int32("user_id", uid),
@@ -208,21 +221,24 @@ func (app *DirectoryApplication) Relocate(ctx context.Context, uid int32, target
 
 	matches := 0
 	target = path.Clean(target)
-	dirs := strings.Split(target, PathSeparator)
-	for index := 0; index < len(dirs); index++ {
-		p := path.Join(dirs[0 : len(dirs)-index]...)
-		if _, exists := dir.Files()[p]; exists {
-			return fb.ErrAlreadyExists
-		}
-	}
-
 	for subject := range dir.Files() {
 		subject = path.Clean(subject)
 		if !regex.MatchString(subject) {
 			continue
 		}
 
-		p := path.Join(target, path.Base(subject))
+		index := getPathsDivergenceIndex(target, subject)
+		relative := path.Join(strings.Split(subject, PathSeparator)[index:]...)
+		p := path.Join(target, relative)
+
+		dirs := strings.Split(p, PathSeparator)
+		for index := 0; index < len(dirs); index++ {
+			pp := path.Join(dirs[0 : len(dirs)-index]...)
+			if _, exists := dir.Files()[pp]; exists {
+				return fb.ErrAlreadyExists
+			}
+		}
+
 		if _, exists := dir.Files()[p]; exists {
 			return fb.ErrAlreadyExists
 		}
