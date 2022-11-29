@@ -53,19 +53,11 @@ func NewFilterByNameFn(target string) (FilterFileFn, error) {
 }
 
 func NewFilterByDirFn(target string) (FilterFileFn, error) {
-	if !path.IsAbs(target) {
-		target = path.Join(PathSeparator, target)
-	}
+	target = fb.NormalizePath(target)
 
-	if target == PathSeparator {
-		target = ""
-	}
-
-	depth := len(strings.Split(target, PathSeparator))
+	depth := len(fb.PathComponents(target))
 	filterFn := func(p string, f *file.File) (string, *file.File) {
-		if !path.IsAbs(p) {
-			p = path.Join(PathSeparator, p)
-		}
+		p = fb.NormalizePath(p)
 
 		if strings.Compare(p, target) == 0 {
 			// 0 means p == target, so is not filtering by path, but by a filename
@@ -74,8 +66,9 @@ func NewFilterByDirFn(target string) (FilterFileFn, error) {
 			return "", nil
 		}
 
-		items := strings.Split(p, PathSeparator)
+		items := fb.PathComponents(p)
 		name := items[depth]
+
 		if len(items) > depth+1 {
 			f, _ = file.NewFile("", name)
 			f.SetFlag(file.Directory)
@@ -186,19 +179,6 @@ func (app *DirectoryApplication) Delete(ctx context.Context, uid int32) error {
 	return nil
 }
 
-func getPathsDivergenceIndex(p1 string, p2 string) (index int) {
-	p1Split := strings.Split(p1, PathSeparator)
-	p2Split := strings.Split(p2, PathSeparator)
-
-	for index = 0; index < len(p1Split) && index < len(p2Split); index++ {
-		if p1Split[index] != p2Split[index] {
-			break
-		}
-	}
-
-	return
-}
-
 func (app *DirectoryApplication) Relocate(ctx context.Context, uid int32, target string, filter string) error {
 	app.logger.Info("processing a \"move\" directory request",
 		zap.Int32("user_id", uid),
@@ -220,18 +200,20 @@ func (app *DirectoryApplication) Relocate(ctx context.Context, uid int32, target
 	}
 
 	matches := 0
-	target = path.Clean(target)
+	target = fb.NormalizePath(target)
+
 	for subject := range dir.Files() {
-		subject = path.Clean(subject)
-		if strings.HasSuffix(subject, target) || !regex.MatchString(subject) {
+		subject = fb.NormalizePath(subject)
+		hasPrefix := strings.HasPrefix(subject, target)
+		if hasPrefix || !regex.MatchString(subject) {
 			continue
 		}
 
-		index := getPathsDivergenceIndex(target, subject)
-		relative := path.Join(strings.Split(subject, PathSeparator)[index:]...)
+		index := fb.GetClosestRelative(target, subject)
+		relative := path.Join(fb.PathComponents(subject)[index:]...)
 		p := path.Join(target, relative)
 
-		dirs := strings.Split(p, PathSeparator)
+		dirs := fb.PathComponents(p)
 		for index := 0; index < len(dirs); index++ {
 			pp := path.Join(dirs[0 : len(dirs)-index]...)
 			if _, exists := dir.Files()[pp]; exists {

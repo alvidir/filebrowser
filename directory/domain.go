@@ -7,10 +7,6 @@ import (
 	"github.com/alvidir/filebrowser/file"
 )
 
-const (
-	PathSeparator = "/"
-)
-
 type FilterFileFn func(string, *file.File) (string, *file.File)
 
 type Directory struct {
