@@ -627,19 +627,19 @@ func TestRelocate(t *testing.T) {
 		filter string
 		want   []string
 	}{
-		// {
-		// 	name:   "move to a new directory",
-		// 	target: "new_directory",
-		// 	filter: "^/a_file$|^/another_file$",
-		// 	want: []string{
-		// 		"/new_directory/a_file",
-		// 		"/new_directory/another_file",
-		// 		"/a_directory/a_file",
-		// 		"/a_directory/another_file",
-		// 		"/another_dir/test.txt",
-		// 		"/unique_name",
-		// 	},
-		// },
+		{
+			name:   "move to a new directory",
+			target: "new_directory",
+			filter: "^/a_file$|^/another_file$",
+			want: []string{
+				"/new_directory/a_file",
+				"/new_directory/another_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+				"/another_dir/test.txt",
+				"/unique_name",
+			},
+		},
 		{
 			name:   "move to a existing directory",
 			target: "a_directory",
@@ -653,58 +653,71 @@ func TestRelocate(t *testing.T) {
 				"/another_dir/test.txt",
 			},
 		},
-		// {
-		// 	name:   "move directory to inner directory",
-		// 	target: "another_dir",
-		// 	filter: "^/a_directory",
-		// 	want: []string{
-		// 		"/a_file",
-		// 		"/another_file",
-		// 		"/another_dir/a_directory/a_file",
-		// 		"/another_dir/a_directory/another_file",
-		// 		"/another_dir/test.txt",
-		// 		"/unique_name",
-		// 	},
-		// },
-		// {
-		// 	name:   "move file to parent directory",
-		// 	target: "/",
-		// 	filter: "^/another_dir/(test.txt.*)",
-		// 	want: []string{
-		// 		"/a_file",
-		// 		"/another_file",
-		// 		"/a_directory/a_file",
-		// 		"/a_directory/another_file",
-		// 		"/test.txt",
-		// 		"/unique_name",
-		// 	},
-		// },
-		// {
-		// 	name:   "move to a directory with a file with the same name",
-		// 	target: "a_directory",
-		// 	filter: "^/a_file$",
-		// 	want: []string{
-		// 		"/another_file",
-		// 		"/a_directory/a_file",
-		// 		"/a_directory/a_file (1)",
-		// 		"/a_directory/another_file",
-		// 		"/another_dir/test.txt",
-		// 		"/unique_name",
-		// 	},
-		// },
-		// {
-		// 	name:   "move directory with already existing name",
-		// 	target: "another_dir/test.txt",
-		// 	filter: "^/a_directory",
-		// 	want: []string{
-		// 		"/a_file",
-		// 		"/another_file",
-		// 		"/another_dir/test.txt (1)/a_directory/a_file",
-		// 		"/another_dir/test.txt (1)/a_directory/another_file",
-		// 		"/another_dir/test.txt",
-		// 		"/unique_name",
-		// 	},
-		// },
+		{
+			name:   "move directory to inner directory",
+			target: "another_dir",
+			filter: "^/a_directory",
+			want: []string{
+				"/a_file",
+				"/another_file",
+				"/another_dir/a_directory/a_file",
+				"/another_dir/a_directory/another_file",
+				"/another_dir/test.txt",
+				"/unique_name",
+			},
+		},
+		{
+			name:   "move file to parent directory",
+			target: "/",
+			filter: "^/another_dir/(test.txt.*)",
+			want: []string{
+				"/a_file",
+				"/another_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+				"/test.txt",
+				"/unique_name",
+			},
+		},
+		{
+			name:   "move to a directory with a file with the same name",
+			target: "a_directory",
+			filter: "^/a_file$",
+			want: []string{
+				"/another_file",
+				"/a_directory/a_file",
+				"/a_directory/a_file (1)",
+				"/a_directory/another_file",
+				"/another_dir/test.txt",
+				"/unique_name",
+			},
+		},
+		{
+			name:   "move directory with already existing name",
+			target: "another_dir/test.txt",
+			filter: "^/a_directory",
+			want: []string{
+				"/a_file",
+				"/another_file",
+				"/another_dir/test.txt (1)/a_directory/a_file",
+				"/another_dir/test.txt (1)/a_directory/another_file",
+				"/another_dir/test.txt",
+				"/unique_name",
+			},
+		},
+		{
+			name:   "move from a directory to another",
+			target: "/a_directory",
+			filter: "^/another_dir/(test.txt.*)$",
+			want: []string{
+				"/a_file",
+				"/another_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+				"/a_directory/test.txt",
+				"/unique_name",
+			},
+		},
 	}
 
 	for _, test := range tests {
