@@ -42,7 +42,7 @@ func NewFilterByNameFn(target string) (FilterFileFn, error) {
 	}
 
 	filterFn := func(p string, f *file.File) (string, *file.File) {
-		if regex.MatchString(f.Name()) {
+		if regex.MatchString(p) || regex.MatchString(f.Name()) {
 			return p, f
 		}
 
@@ -185,10 +185,6 @@ func (app *DirectoryApplication) Relocate(ctx context.Context, uid int32, target
 		zap.String("path", target),
 		zap.String("filter", filter))
 
-	if len(target) == 0 {
-		return fb.ErrNotFound
-	}
-
 	regex, err := regexp.Compile(filter)
 	if err != nil {
 		return fb.ErrInvalidFormat
@@ -199,39 +195,27 @@ func (app *DirectoryApplication) Relocate(ctx context.Context, uid int32, target
 		return err
 	}
 
-	matches := 0
 	target = fb.NormalizePath(target)
+	for p0, f := range dir.Files() {
+		subject := fb.NormalizePath(p0)
 
-	for subject := range dir.Files() {
-		subject = fb.NormalizePath(subject)
-		hasPrefix := strings.HasPrefix(subject, target)
-		if hasPrefix || !regex.MatchString(subject) {
+		matchIndexPairs := regex.FindStringIndex(subject)
+		if matchIndexPairs == nil {
 			continue
 		}
 
-		index := fb.GetClosestRelative(target, subject)
-		relative := path.Join(fb.PathComponents(subject)[index:]...)
-		p := path.Join(target, relative)
-
-		dirs := fb.PathComponents(p)
-		for index := 0; index < len(dirs); index++ {
-			pp := path.Join(dirs[0 : len(dirs)-index]...)
-			if _, exists := dir.Files()[pp]; exists {
-				return fb.ErrAlreadyExists
-			}
+		matchStart := matchIndexPairs[0] + 1
+		if submatch := regex.NumSubexp(); submatch > 0 {
+			matchIndexPairs = regex.FindStringSubmatchIndex(subject)
+			matchStart = matchIndexPairs[submatch*2]
 		}
 
-		if _, exists := dir.Files()[p]; exists {
-			return fb.ErrAlreadyExists
-		}
+		index := len(fb.PathComponents(subject[:matchStart]))
+		p1 := path.Join(fb.PathComponents(subject)[index:]...)
+		p1 = fb.NormalizePath(path.Join(target, p1))
 
-		dir.Files()[p] = dir.Files()[subject]
-		delete(dir.Files(), subject)
-		matches++
-	}
-
-	if matches == 0 {
-		return fb.ErrNotFound
+		delete(dir.files, p0)
+		dir.AddFile(f, p1)
 	}
 
 	if err := app.dirRepo.Save(ctx, dir); err != nil {
@@ -251,7 +235,7 @@ func (app *DirectoryApplication) RegisterFile(ctx context.Context, file *file.Fi
 		return err
 	}
 
-	dir.AddFile(file, fpath)
+	dir.AddFile(file, fb.NormalizePath(fpath))
 	return app.dirRepo.Save(ctx, dir)
 }
 

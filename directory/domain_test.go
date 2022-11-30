@@ -28,7 +28,7 @@ func TestAddFile(t *testing.T) {
 		t.Errorf("got error = %v, want = %v", err, nil)
 	}
 
-	want := "path/to/filename"
+	want := "/path/to/filename"
 	if got := dir.AddFile(f, want); got != want {
 		t.Errorf("got final path = %s, want = %v", got, want)
 	}
@@ -74,16 +74,16 @@ func TestFiles(t *testing.T) {
 	}
 
 	want := []string{
-		"path/to/filename",
-		"path/to/filename",
-		"antoher/file",
+		"/path/to/filename",
+		"/path/to/filename",
+		"/antoher/file",
 	}
 
 	for _, path := range want {
 		dir.AddFile(f, path)
 	}
 
-	want[1] = "path/to/filename (1)"
+	want[1] = "/path/to/filename (1)"
 
 	got := dir.Files()
 	if len(got) != len(want) {

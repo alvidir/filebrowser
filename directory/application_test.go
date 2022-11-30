@@ -381,7 +381,7 @@ func TestRegisterFile(t *testing.T) {
 
 	if got := d.Files(); len(got) != 1 {
 		t.Errorf("got list len = %v, want = %v", len(got), 1)
-	} else if got, exists := got["path/to/file"]; !exists || got.Id() != "test" {
+	} else if got, exists := got["/path/to/file"]; !exists || got.Id() != "test" {
 		t.Errorf("got file = %v, want = %v", got, "test")
 	}
 }
@@ -613,6 +613,148 @@ func TestFilterByDir(t *testing.T) {
 					t.Errorf("path = %v not found", fwant.path)
 				}
 			}
+		})
+	}
+}
+
+func TestRelocate(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	tests := []struct {
+		name   string
+		target string
+		filter string
+		want   []string
+	}{
+		// {
+		// 	name:   "move to a new directory",
+		// 	target: "new_directory",
+		// 	filter: "^/a_file$|^/another_file$",
+		// 	want: []string{
+		// 		"/new_directory/a_file",
+		// 		"/new_directory/another_file",
+		// 		"/a_directory/a_file",
+		// 		"/a_directory/another_file",
+		// 		"/another_dir/test.txt",
+		// 		"/unique_name",
+		// 	},
+		// },
+		{
+			name:   "move to a existing directory",
+			target: "a_directory",
+			filter: "^/unique_name$",
+			want: []string{
+				"/a_file",
+				"/another_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+				"/a_directory/unique_name",
+				"/another_dir/test.txt",
+			},
+		},
+		// {
+		// 	name:   "move directory to inner directory",
+		// 	target: "another_dir",
+		// 	filter: "^/a_directory",
+		// 	want: []string{
+		// 		"/a_file",
+		// 		"/another_file",
+		// 		"/another_dir/a_directory/a_file",
+		// 		"/another_dir/a_directory/another_file",
+		// 		"/another_dir/test.txt",
+		// 		"/unique_name",
+		// 	},
+		// },
+		// {
+		// 	name:   "move file to parent directory",
+		// 	target: "/",
+		// 	filter: "^/another_dir/(test.txt.*)",
+		// 	want: []string{
+		// 		"/a_file",
+		// 		"/another_file",
+		// 		"/a_directory/a_file",
+		// 		"/a_directory/another_file",
+		// 		"/test.txt",
+		// 		"/unique_name",
+		// 	},
+		// },
+		// {
+		// 	name:   "move to a directory with a file with the same name",
+		// 	target: "a_directory",
+		// 	filter: "^/a_file$",
+		// 	want: []string{
+		// 		"/another_file",
+		// 		"/a_directory/a_file",
+		// 		"/a_directory/a_file (1)",
+		// 		"/a_directory/another_file",
+		// 		"/another_dir/test.txt",
+		// 		"/unique_name",
+		// 	},
+		// },
+		// {
+		// 	name:   "move directory with already existing name",
+		// 	target: "another_dir/test.txt",
+		// 	filter: "^/a_directory",
+		// 	want: []string{
+		// 		"/a_file",
+		// 		"/another_file",
+		// 		"/another_dir/test.txt (1)/a_directory/a_file",
+		// 		"/another_dir/test.txt (1)/a_directory/another_file",
+		// 		"/another_dir/test.txt",
+		// 		"/unique_name",
+		// 	},
+		// },
+	}
+
+	for _, test := range tests {
+		t := t
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			f, _ := file.NewFile("test", "filename")
+			dirRepo := &directoryRepositoryMock{}
+			files := map[string]*file.File{
+				"/a_file":                   f,
+				"/another_file":             f,
+				"/a_directory/a_file":       f,
+				"/a_directory/another_file": f,
+				"/another_dir/test.txt":     f,
+				"/unique_name":              f,
+			}
+
+			dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
+				return &Directory{
+					id:     "test",
+					userId: 999,
+					files:  files,
+				}, nil
+			}
+
+			fileRepo := &fileRepositoryMock{
+				find: func(repo *fileRepositoryMock, ctx context.Context, id string) (*file.File, error) {
+					return f, nil
+				},
+			}
+
+			app := NewDirectoryApplication(dirRepo, fileRepo, logger)
+
+			err := app.Relocate(context.TODO(), 999, test.target, test.filter)
+			if err != nil {
+				t.Errorf("got error = %v, want = nil", err)
+			}
+
+			if len(test.want) != len(files) {
+				t.Errorf("got files = %v, want = %v", files, test.want)
+			}
+
+			for _, expectedPath := range test.want {
+				if _, exists := files[expectedPath]; !exists {
+					t.Errorf("got files = %v, want = %v", files, test.want)
+				}
+			}
+
 		})
 	}
 }

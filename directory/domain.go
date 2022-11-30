@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path"
 
+	fb "github.com/alvidir/filebrowser"
 	"github.com/alvidir/filebrowser/file"
 )
 
@@ -24,16 +25,22 @@ func NewDirectory(userId int32) *Directory {
 }
 
 func (dir *Directory) getAvailablePath(dest string) string {
-	filename := path.Base(dest)
-	directory := path.Dir(dest)
+	components := fb.PathComponents(dest)
 
 	counter := 1
-	for _, exists := dir.files[dest]; exists; _, exists = dir.files[dest] {
-		dest = path.Join(directory, fmt.Sprintf("%s (%v)", filename, counter))
-		counter++
+	for index := 0; index < len(components); index++ {
+		subject := fb.NormalizePath(path.Join(components[0 : index+1]...))
+		if _, exists := dir.files[subject]; exists {
+			components[index] = fmt.Sprintf("%s (%v)", components[index], counter)
+			counter++
+
+			// is not sure the new name will not be duplicated, is required to keep
+			// iterating the same index till finding a non existing name.
+			index--
+		}
 	}
 
-	return dest
+	return fb.NormalizePath(path.Join(components...))
 }
 
 func (dir *Directory) AddFile(file *file.File, path string) string {
