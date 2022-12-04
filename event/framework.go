@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	EVENT_KIND_CREATED = "CREATED"
+	EVENT_KIND_CREATED = "created"
 	EXCHANGE_TYPE      = "fanout"
 )
 
