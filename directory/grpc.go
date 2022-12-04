@@ -41,10 +41,19 @@ func (server *DirectoryServer) Create(ctx context.Context, req *proto.DirectoryL
 	}
 
 	for _, fs := range dir.Files() {
-		descriptor.Files = append(descriptor.Files, &proto.FileDescriptor{
+		fileDescriptor := &proto.FileDescriptor{
 			Id:       fs.Id(),
-			Metadata: fs.Metadata(),
-		})
+			Metadata: make([]*proto.FileMetadata, 0, len(fs.Metadata())),
+		}
+
+		for key, value := range fs.Metadata() {
+			fileDescriptor.Metadata = append(fileDescriptor.Metadata, &proto.FileMetadata{
+				Key:   key,
+				Value: value,
+			})
+		}
+
+		descriptor.Files = append(descriptor.Files, fileDescriptor)
 	}
 
 	return descriptor, nil
@@ -56,7 +65,7 @@ func (server *DirectoryServer) Retrieve(ctx context.Context, req *proto.Director
 		return nil, err
 	}
 
-	dir, err := server.app.Retrieve(ctx, uid, req.GetPath())
+	dir, err := server.app.Retrieve(ctx, uid, req.GetPath(), req.GetFilter())
 	if err != nil {
 		return nil, err
 	}
@@ -71,4 +80,30 @@ func (server *DirectoryServer) Retrieve(ctx context.Context, req *proto.Director
 	}
 
 	return descriptor, nil
+}
+
+func (server *DirectoryServer) Delete(ctx context.Context, req *proto.DirectoryLocator) (*proto.Empty, error) {
+	uid, err := fb.GetUid(ctx, server.header, server.logger)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := server.app.Delete(ctx, uid); err != nil {
+		return nil, err
+	}
+
+	return &proto.Empty{}, nil
+}
+
+func (server *DirectoryServer) Relocate(ctx context.Context, req *proto.DirectoryLocator) (*proto.Empty, error) {
+	uid, err := fb.GetUid(ctx, server.header, server.logger)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := server.app.Relocate(ctx, uid, req.GetPath(), req.GetFilter()); err != nil {
+		return nil, err
+	}
+
+	return &proto.Empty{}, nil
 }

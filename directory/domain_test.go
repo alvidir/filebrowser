@@ -28,7 +28,7 @@ func TestAddFile(t *testing.T) {
 		t.Errorf("got error = %v, want = %v", err, nil)
 	}
 
-	want := "path/to/filename"
+	want := "/path/to/filename"
 	if got := dir.AddFile(f, want); got != want {
 		t.Errorf("got final path = %s, want = %v", got, want)
 	}
@@ -74,16 +74,16 @@ func TestFiles(t *testing.T) {
 	}
 
 	want := []string{
-		"path/to/filename",
-		"path/to/filename",
-		"antoher/file",
+		"/path/to/filename",
+		"/path/to/filename",
+		"/antoher/file",
 	}
 
 	for _, path := range want {
 		dir.AddFile(f, path)
 	}
 
-	want[1] = "path/to/filename (1)"
+	want[1] = "/path/to/filename (1)"
 
 	got := dir.Files()
 	if len(got) != len(want) {
@@ -94,34 +94,5 @@ func TestFiles(t *testing.T) {
 		if got, exists := got[path]; !exists || got.Id() != f.Id() {
 			t.Errorf("got file id = %v, want = %v", got, f.Id())
 		}
-	}
-}
-
-func TestFilterByPath(t *testing.T) {
-	subject := NewDirectory(1)
-	subject.files["hello/world.txt"], _ = file.NewFile("", "hello/world.txt")
-	subject.files[".profile"], _ = file.NewFile("", "profile")
-	subject.files["a_directory/a_file"], _ = file.NewFile("", "a_file")
-	subject.files["/a_directory/another_file"], _ = file.NewFile("", "another_file")
-	subject.files["/at_root"], _ = file.NewFile("", "at_root")
-
-	want := 1
-	if files, err := subject.FilesByPath("/hello"); err != nil {
-		t.Errorf("got error = %v", err)
-	} else if got := len(files); got != want {
-		t.Errorf("got files len = %v, want = %v", got, want)
-	}
-
-	want = 4
-	if files, err := subject.FilesByPath("/"); err != nil {
-		t.Errorf("got error = %v", err)
-	} else if got := len(files); got != want {
-		t.Errorf("got files len = %v, want = %v", got, want)
-	}
-
-	if files, err := subject.FilesByPath(""); err != nil {
-		t.Errorf("got error = %v", err)
-	} else if got := len(files); got != want {
-		t.Errorf("got files len = %v, want = %v", got, want)
 	}
 }

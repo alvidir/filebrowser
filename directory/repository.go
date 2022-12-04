@@ -181,7 +181,8 @@ func (repo *MongoDirectoryRepository) build(ctx context.Context, mdir *mongoDire
 	}
 
 	for _, f := range files {
-		dir.files[pathByFileId[f.Id()]] = f
+		p := fb.NormalizePath(pathByFileId[f.Id()])
+		dir.files[p] = f
 	}
 
 	return dir, nil

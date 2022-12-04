@@ -3,15 +3,12 @@ package directory
 import (
 	"fmt"
 	"path"
-	"strings"
 
 	fb "github.com/alvidir/filebrowser"
 	"github.com/alvidir/filebrowser/file"
 )
 
-const (
-	PathSeparator = "/"
-)
+type FilterFileFn func(string, *file.File) (string, *file.File)
 
 type Directory struct {
 	id     string
@@ -28,16 +25,22 @@ func NewDirectory(userId int32) *Directory {
 }
 
 func (dir *Directory) getAvailablePath(dest string) string {
-	filename := path.Base(dest)
-	directory := path.Dir(dest)
+	components := fb.PathComponents(dest)
 
 	counter := 1
-	for _, exists := dir.files[dest]; exists; _, exists = dir.files[dest] {
-		dest = path.Join(directory, fmt.Sprintf("%s (%v)", filename, counter))
-		counter++
+	for index := 0; index < len(components); index++ {
+		subject := fb.NormalizePath(path.Join(components[0 : index+1]...))
+		if _, exists := dir.files[subject]; exists {
+			components[index] = fmt.Sprintf("%s (%v)", components[index], counter)
+			counter++
+
+			// is not sure the new name will not be duplicated, is required to keep
+			// iterating the same index till finding a non existing name.
+			index--
+		}
 	}
 
-	return dest
+	return fb.NormalizePath(path.Join(components...))
 }
 
 func (dir *Directory) AddFile(file *file.File, path string) string {
@@ -58,35 +61,24 @@ func (dir *Directory) Files() map[string]*file.File {
 	return dir.files
 }
 
-func (dir *Directory) FilesByPath(target string) (map[string]*file.File, error) {
-	if !path.IsAbs(target) {
-		target = path.Join(PathSeparator, target)
-	}
-
-	if target == PathSeparator {
-		target = ""
-	}
-
+func (dir *Directory) FilterFiles(filters []FilterFileFn) (map[string]*file.File, error) {
 	filtered := make(map[string]*file.File)
-	depth := len(strings.Split(target, PathSeparator))
-	for p, f := range dir.files {
-		if !path.IsAbs(p) {
-			p = path.Join(PathSeparator, p)
+	for p, file := range dir.files {
+		selected := file
+		key := p
+
+		for _, filter := range filters {
+			if filter == nil {
+				continue
+			}
+
+			if key, selected = filter(p, file); selected == nil {
+				break
+			}
 		}
 
-		if strings.Compare(p, target) == 0 {
-			return nil, fb.ErrNotFound
-		} else if !strings.HasPrefix(p, target) {
-			continue
-		}
-
-		items := strings.Split(p, PathSeparator)
-		name := items[depth]
-		if _, exists := filtered[name]; !exists && len(items) > depth+1 {
-			filtered[name], _ = file.NewFile("", name)
-			filtered[name].SetFlag(file.Directory)
-		} else {
-			filtered[name] = f
+		if selected != nil {
+			filtered[key] = selected
 		}
 	}
 

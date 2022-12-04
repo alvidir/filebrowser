@@ -66,8 +66,8 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 	return file, err
 }
 
-func (app *FileApplication) Read(ctx context.Context, uid int32, fid string) (*File, error) {
-	app.logger.Info("processing a \"read\" file request",
+func (app *FileApplication) Retrieve(ctx context.Context, uid int32, fid string) (*File, error) {
+	app.logger.Info("processing a \"retrieve\" file request",
 		zap.String("file_id", fid),
 		zap.Int32("user_id", uid))
 
@@ -81,12 +81,12 @@ func (app *FileApplication) Read(ctx context.Context, uid int32, fid string) (*F
 		return nil, fb.ErrNotAvailable
 	}
 
-	file.HideProtectedFields(uid)
+	file.AuthorizedFieldsOnly(uid)
 	return file, nil
 }
 
-func (app *FileApplication) Write(ctx context.Context, uid int32, fid string, data []byte, meta Metadata) (*File, error) {
-	app.logger.Info("processing a \"write\" file request",
+func (app *FileApplication) Update(ctx context.Context, uid int32, fid string, name string, data []byte, meta Metadata) (*File, error) {
+	app.logger.Info("processing an \"update\" file request",
 		zap.String("file_id", fid),
 		zap.Int32("user_id", uid))
 
@@ -97,6 +97,10 @@ func (app *FileApplication) Write(ctx context.Context, uid int32, fid string, da
 
 	if file.Permission(uid)&(fb.Write|fb.Owner) == 0 {
 		return nil, fb.ErrNotAvailable
+	}
+
+	if len(name) > 0 {
+		file.name = name
 	}
 
 	if data != nil {

@@ -19,14 +19,24 @@ func NewFileDescriptor(file *File) *proto.FileDescriptor {
 	descriptor := &proto.FileDescriptor{
 		Id:          file.id,
 		Name:        file.name,
-		Metadata:    file.metadata,
-		Permissions: map[int32]*proto.Permissions{},
+		Metadata:    make([]*proto.FileMetadata, 0, len(file.metadata)),
+		Permissions: make([]*proto.FilePermissions, 0, len(file.permissions)),
 		Flags:       uint32(file.flags),
 		Data:        file.data,
 	}
 
+	for key, value := range file.metadata {
+		descriptor.Metadata = append(descriptor.Metadata, &proto.FileMetadata{
+			Key:   key,
+			Value: value,
+		})
+	}
+
 	for uid, perm := range file.permissions {
-		descriptor.Permissions[uid] = NewPermissions(perm)
+		descriptor.Permissions = append(descriptor.Permissions, &proto.FilePermissions{
+			Uid:         uid,
+			Permissions: NewPermissions(perm),
+		})
 	}
 
 	return descriptor
@@ -64,13 +74,13 @@ func (server *FileServer) Create(ctx context.Context, req *proto.FileConstructor
 	}, nil
 }
 
-func (server *FileServer) Read(ctx context.Context, req *proto.FileLocator) (*proto.FileDescriptor, error) {
+func (server *FileServer) Retrieve(ctx context.Context, req *proto.FileLocator) (*proto.FileDescriptor, error) {
 	uid, err := fb.GetUid(ctx, server.header, server.logger)
 	if err != nil {
 		return nil, err
 	}
 
-	file, err := server.app.Read(ctx, uid, req.GetId())
+	file, err := server.app.Retrieve(ctx, uid, req.GetTarget())
 	if err != nil {
 		return nil, err
 	}
@@ -78,13 +88,18 @@ func (server *FileServer) Read(ctx context.Context, req *proto.FileLocator) (*pr
 	return NewFileDescriptor(file), nil
 }
 
-func (server *FileServer) Write(ctx context.Context, req *proto.FileDescriptor) (*proto.FileDescriptor, error) {
+func (server *FileServer) Update(ctx context.Context, req *proto.FileDescriptor) (*proto.FileDescriptor, error) {
 	uid, err := fb.GetUid(ctx, server.header, server.logger)
 	if err != nil {
 		return nil, err
 	}
 
-	file, err := server.app.Write(ctx, uid, req.GetId(), req.GetData(), req.GetMetadata())
+	metadata := make(Metadata)
+	for _, meta := range req.GetMetadata() {
+		metadata[meta.Key] = meta.Value
+	}
+
+	file, err := server.app.Update(ctx, uid, req.GetId(), req.GetName(), req.GetData(), metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -98,6 +113,6 @@ func (server *FileServer) Delete(ctx context.Context, req *proto.FileLocator) (*
 		return nil, err
 	}
 
-	_, err = server.app.Delete(ctx, uid, req.GetId())
+	_, err = server.app.Delete(ctx, uid, req.GetTarget())
 	return nil, err
 }

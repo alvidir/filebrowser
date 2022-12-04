@@ -6,6 +6,7 @@ import "proto/file.proto";
 
 message DirectoryLocator {
     string path = 1;
+    string filter = 2;
 }
 
 message DirectoryDescriptor {
@@ -13,8 +14,11 @@ message DirectoryDescriptor {
     repeated FileDescriptor files = 2;
 }
 
+message Empty {}
+
 service Directory {
     rpc Create(DirectoryLocator) returns (DirectoryDescriptor);
     rpc Retrieve(DirectoryLocator) returns (DirectoryDescriptor);
-    rpc Delete(DirectoryLocator) returns (DirectoryDescriptor);
+    rpc Delete(DirectoryLocator) returns (Empty);
+    rpc Relocate(DirectoryLocator) returns (Empty);
 }

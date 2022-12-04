@@ -11,7 +11,7 @@ import (
 
 func TestMain(m *testing.M) {
 	if err := godotenv.Load(); err != nil {
-		log.Println("no dotenv file has been found")
+		log.Println("loading dotenv file")
 	}
 
 	code := m.Run()

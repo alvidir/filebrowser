@@ -14,7 +14,7 @@ proto:
 
 build:
 	podman build -t alvidir/filebrowser:latest -f ./container/filebrowser/containerfile .
-	podman build -t alvidir/filebrowser:latest-mq-worker -f ./container/mq-worker/containerfile .
+	podman build -t alvidir/filebrowser:latest-agent -f ./container/agent/containerfile .
 
 setup:
 	mkdir -p .ssh/
@@ -38,8 +38,8 @@ undeploy:
 run:
 	go run cmd/filebrowser/main.go
 
-mq-worker:
-	go run cmd/mq-worker/main.go
+agent:
+	go run cmd/agent/main.go
 
 test:
 	go test -v -race ./...
