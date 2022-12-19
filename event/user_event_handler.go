@@ -49,7 +49,7 @@ func (handler *UserEventHandler) OnEvent(ctx context.Context, body []byte) {
 	}
 
 	switch kind := event.Kind; kind {
-	case EVENT_KIND_CREATED:
+	case EventKindCreated:
 		handler.logger.Info("handling user event",
 			zap.String("kind", kind))
 

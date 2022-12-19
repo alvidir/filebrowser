@@ -52,7 +52,7 @@ func TestCertificateValidation(t *testing.T) {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			service := NewCertificateService(privateKey, &test.ttl, logger)
+			service := NewCertificateService(privateKey, "", &test.ttl, logger)
 			file := &FileMock{
 				permissions: fb.Owner,
 				id:          "123",

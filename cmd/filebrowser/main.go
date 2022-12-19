@@ -26,6 +26,7 @@ const (
 	ENV_REDIS_DSN      = "REDIS_DSN"
 	ENV_TOKEN_TIMEOUT  = "TOKEN_TIMEOUT"
 	ENV_JWT_SECRET     = "JWT_SECRET"
+	ENV_TOKEN_ISSUER   = "TOKEN_ISSUER"
 )
 
 var (
@@ -89,6 +90,16 @@ func getTokenTTL(logger *zap.Logger) *time.Duration {
 	return &ttl
 }
 
+func getTokenIssuer(logger *zap.Logger) string {
+	value, exists := os.LookupEnv(ENV_TOKEN_ISSUER)
+	if !exists {
+		logger.Fatal("must be set",
+			zap.String("varname", ENV_TOKEN_ISSUER))
+	}
+
+	return value
+}
+
 func getFilebrowserGrpcServer(mongoConn *mongo.Database, logger *zap.Logger) *grpc.Server {
 	if header, exists := os.LookupEnv(ENV_UID_HEADER); exists {
 		uidHeader = header
@@ -100,15 +111,16 @@ func getFilebrowserGrpcServer(mongoConn *mongo.Database, logger *zap.Logger) *gr
 	directoryApp := dir.NewDirectoryApplication(directoryRepo, fileRepo, logger)
 	directoryServer := dir.NewDirectoryServer(directoryApp, logger, uidHeader)
 
-	fileApp := file.NewFileApplication(fileRepo, directoryApp, logger)
-	fileServer := file.NewFileServer(fileApp, uidHeader, logger)
-
 	privateKey := getPrivateKey(logger)
 	tokenTTL := getTokenTTL(logger)
-	certSrv := cert.NewCertificateService(privateKey, tokenTTL, logger)
+	tokenIssuer := getTokenIssuer(logger)
+	certSrv := cert.NewCertificateService(privateKey, tokenIssuer, tokenTTL, logger)
 	certRepo := cert.NewMongoCertificateRepository(mongoConn, logger)
 	certApp := cert.NewCertificateApplication(certRepo, certSrv, logger)
 	certServer := cert.NewCertificateServer(certApp, logger, uidHeader)
+
+	fileApp := file.NewFileApplication(fileRepo, directoryApp, certApp, logger)
+	fileServer := file.NewFileServer(fileApp, uidHeader, logger)
 
 	grpcSrv := grpc.NewServer()
 	proto.RegisterDirectoryServer(grpcSrv, directoryServer)

@@ -18,8 +18,7 @@ const (
 	MetadataCreatedAtKey = "created_at"
 	MetadataUpdatedAtKey = "updated_at"
 	MetadataDeletedAtKey = "deleted_at"
-	MetadataUrlKey       = "url"
-	MetadataAppKey       = "app"
+	MetadataAppKey       = "app_id"
 
 	TimestampBase = 16
 )

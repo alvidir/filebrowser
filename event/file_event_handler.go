@@ -12,9 +12,9 @@ import (
 
 type FileEventPayload struct {
 	UserID   int32  `json:"user_id"`
-	App      string `json:"app"`
-	Url      string `json:"url"`
-	FileName string `json:"name"`
+	AppID    string `json:"app_id"`
+	FileName string `json:"file_name"`
+	FileID   string `json:"file_id"`
 	Kind     string `json:"kind"`
 }
 
@@ -45,7 +45,7 @@ func (handler *FileEventHandler) OnEvent(ctx context.Context, body []byte) {
 	}
 
 	switch kind := event.Kind; kind {
-	case EVENT_KIND_CREATED:
+	case EventKindCreated:
 		handler.logger.Info("handling file event",
 			zap.String("kind", kind))
 
@@ -59,16 +59,15 @@ func (handler *FileEventHandler) OnEvent(ctx context.Context, body []byte) {
 
 func (handler *FileEventHandler) onFileCreatedEvent(ctx context.Context, event *FileEventPayload) {
 	meta := file.Metadata{
-		file.MetadataAppKey: event.App,
-		file.MetadataUrlKey: event.Url,
+		file.MetadataAppKey: event.AppID,
 	}
 
 	file, err := handler.fileApp.Create(ctx, event.UserID, event.FileName, nil, meta)
 	if err != nil {
 		handler.logger.Error("creating file",
-			zap.String("url", event.Url),
-			zap.String("app", event.App),
+			zap.String("app", event.AppID),
 			zap.String("file_name", event.FileName),
+			zap.String("file_id", event.FileID),
 			zap.Int32("user_id", event.UserID),
 			zap.Error(err))
 
@@ -78,9 +77,9 @@ func (handler *FileEventHandler) onFileCreatedEvent(ctx context.Context, event *
 	_, err = handler.certApp.CreateFileAccessCertificate(ctx, event.UserID, file)
 	if err != nil {
 		handler.logger.Error("creating file access certificate",
-			zap.String("url", event.Url),
-			zap.String("app", event.App),
+			zap.String("app", event.AppID),
 			zap.String("file_name", event.FileName),
+			zap.String("file_id", event.FileID),
 			zap.Int32("user_id", event.UserID),
 			zap.Error(err))
 

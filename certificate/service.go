@@ -28,57 +28,6 @@ var (
 	}
 )
 
-type fileAccessClaims struct {
-	jwt.RegisteredClaims `json:",inline"`
-	FileId               string `json:"file_id"`
-	Read                 bool   `json:"can_read"`
-	Write                bool   `json:"can_write"`
-	Owner                bool   `json:"is_owner"`
-}
-
-func (claims *fileAccessClaims) permission() (perms fb.Permission) {
-	if claims.Read {
-		perms |= fb.Read
-	}
-
-	if claims.Write {
-		perms |= fb.Write
-	}
-
-	if claims.Owner {
-		perms |= fb.Owner
-	}
-
-	return
-}
-
-func newFileAccessClaims(cert *FileAccessCertificate, ttl *time.Duration, issuer string) (*fileAccessClaims, error) {
-	if len(cert.id) == 0 {
-		return nil, fb.ErrUnidentified
-	}
-
-	claims := &fileAccessClaims{
-		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    issuer,
-			Subject:   strconv.FormatInt(int64(cert.userId), userIdBase),
-			Audience:  []string{},
-			NotBefore: &jwt.NumericDate{},
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			ID:        cert.id,
-		},
-		FileId: cert.fileId,
-		Read:   cert.permission&fb.Read != 0,
-		Write:  cert.permission&fb.Write != 0,
-		Owner:  cert.permission&fb.Owner != 0,
-	}
-
-	if ttl != nil {
-		claims.ExpiresAt = jwt.NewNumericDate(time.Now().Add(*ttl))
-	}
-
-	return claims, nil
-}
-
 type JWTCertificateService struct {
 	signKey *ecdsa.PrivateKey
 	ttl     *time.Duration
@@ -86,16 +35,17 @@ type JWTCertificateService struct {
 	logger  *zap.Logger
 }
 
-func NewCertificateService(sign *ecdsa.PrivateKey, ttl *time.Duration, logger *zap.Logger) *JWTCertificateService {
+func NewCertificateService(sign *ecdsa.PrivateKey, issuer string, ttl *time.Duration, logger *zap.Logger) *JWTCertificateService {
 	return &JWTCertificateService{
 		signKey: sign,
 		ttl:     ttl,
+		issuer:  issuer,
 		logger:  logger,
 	}
 }
 
 func (service *JWTCertificateService) SignFileAccessCertificate(cert *FileAccessCertificate) error {
-	claims, err := newFileAccessClaims(cert, service.ttl, service.issuer)
+	claims, err := cert.Claims(service.ttl, service.issuer)
 	if err != nil {
 		return err
 	}
@@ -119,12 +69,12 @@ func (service *JWTCertificateService) SignFileAccessCertificate(cert *FileAccess
 		return fb.ErrUnknown
 	}
 
-	cert.token = []byte(signed)
+	cert.token = signed
 	return nil
 }
 
 func (service *JWTCertificateService) ParseFileAccessCertificate(tokenStr string) (*FileAccessCertificate, error) {
-	claims := new(fileAccessClaims)
+	claims := new(FileAccessClaims)
 	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
 		return &service.signKey.PublicKey, nil
 	})
@@ -150,8 +100,8 @@ func (service *JWTCertificateService) ParseFileAccessCertificate(tokenStr string
 		id:         claims.ID,
 		fileId:     claims.FileId,
 		userId:     int32(userId),
-		permission: claims.permission(),
-		token:      []byte(tokenStr),
+		permission: claims.Permission(),
+		token:      tokenStr,
 	}, nil
 }
 

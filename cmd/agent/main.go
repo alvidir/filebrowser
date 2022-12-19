@@ -28,6 +28,7 @@ const (
 	ENV_MONGO_DATABASE          = "MONGO_INITDB_DATABASE"
 	ENV_TOKEN_TIMEOUT           = "TOKEN_TIMEOUT"
 	ENV_JWT_SECRET              = "JWT_SECRET"
+	ENV_TOKEN_ISSUER            = "TOKEN_ISSUER"
 )
 
 func getMongoConnection(logger *zap.Logger) *mongo.Database {
@@ -112,6 +113,16 @@ func getTokenTTL(logger *zap.Logger) *time.Duration {
 	return &ttl
 }
 
+func getTokenIssuer(logger *zap.Logger) string {
+	value, exists := os.LookupEnv(ENV_TOKEN_ISSUER)
+	if !exists {
+		logger.Fatal("must be set",
+			zap.String("varname", ENV_TOKEN_ISSUER))
+	}
+
+	return value
+}
+
 func handleRabbitMqUserEvents(ctx context.Context, bus *event.RabbitMqEventBus, handler *event.UserEventHandler, logger *zap.Logger) error {
 	exchange, exists := os.LookupEnv(ENV_RABBITMQ_USERS_EXCHANGE)
 	if !exists {
@@ -183,14 +194,16 @@ func main() {
 	fileRepo := file.NewMongoFileRepository(mongoConn, logger)
 	directoryRepo := dir.NewMongoDirectoryRepository(mongoConn, fileRepo, logger)
 	directoryApp := dir.NewDirectoryApplication(directoryRepo, fileRepo, logger)
-	fileApp := file.NewFileApplication(fileRepo, directoryApp, logger)
-	userEventHandler := event.NewUserEventHandler(directoryApp, fileApp, logger)
 
 	privateKey := getPrivateKey(logger)
 	tokenTTL := getTokenTTL(logger)
-	certSrv := cert.NewCertificateService(privateKey, tokenTTL, logger)
+	tokenIssuer := getTokenIssuer(logger)
+	certSrv := cert.NewCertificateService(privateKey, tokenIssuer, tokenTTL, logger)
 	certRepo := cert.NewMongoCertificateRepository(mongoConn, logger)
 	certApp := cert.NewCertificateApplication(certRepo, certSrv, logger)
+
+	fileApp := file.NewFileApplication(fileRepo, directoryApp, certApp, logger)
+	userEventHandler := event.NewUserEventHandler(directoryApp, fileApp, logger)
 	fileEventHandler := event.NewFileEventHandler(directoryApp, fileApp, certApp, logger)
 
 	conn := getAmqpConnection(logger)

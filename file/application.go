@@ -7,6 +7,7 @@ import (
 	"time"
 
 	fb "github.com/alvidir/filebrowser"
+	cert "github.com/alvidir/filebrowser/certificate"
 	"go.uber.org/zap"
 )
 
@@ -26,15 +27,37 @@ type DirectoryApplication interface {
 type FileApplication struct {
 	fileRepo FileRepository
 	dirApp   DirectoryApplication
+	certApp  *cert.CertificateApplication
 	logger   *zap.Logger
 }
 
-func NewFileApplication(repo FileRepository, dirApp DirectoryApplication, logger *zap.Logger) *FileApplication {
+func NewFileApplication(repo FileRepository, dirApp DirectoryApplication, certApp *cert.CertificateApplication, logger *zap.Logger) *FileApplication {
 	return &FileApplication{
 		fileRepo: repo,
 		dirApp:   dirApp,
+		certApp:  certApp,
 		logger:   logger,
 	}
+}
+
+func (app *FileApplication) CreateCertificated(ctx context.Context, uid int32, fpath string, data []byte, meta Metadata) (*File, *cert.FileAccessCertificate, error) {
+	file, err := app.Create(ctx, uid, fpath, data, meta)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	certificate, err := app.certApp.CreateFileAccessCertificate(ctx, uid, file)
+	if err != nil {
+		app.logger.Error("creating file access certificate",
+			zap.String("file_name", file.Name()),
+			zap.String("file_id", file.Id()),
+			zap.Int32("user_id", uid),
+			zap.Error(err))
+
+		return nil, nil, err
+	}
+
+	return file, certificate, nil
 }
 
 func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string, data []byte, meta Metadata) (*File, error) {
