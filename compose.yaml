@@ -1,19 +1,22 @@
 services:
-  # mongo:
-  #   container_name: filebrowser-mongo
-  #   image: docker.io/mongo:latest
-  #   restart: always
-  #   volumes:
-  #     - dbdata:/data/db
-  #   security_opt:
-  #     label: disable
-  #   env_file:
-  #     - .env
+  mongo:
+    container_name: filebrowser-mongo
+    image: docker.io/mongo:latest
+    restart: always
+    volumes:
+      - dbdata:/data/db
+    security_opt:
+      label: disable
+    env_file:
+      - .env
 
   rabbitmq:
     container_name: filebrowser-rabbitmq
     image: docker.io/rabbitmq:3.11.3-alpine
+    # image: docker.io/rabbitmq:3-management
     restart: always
+    ports:
+      - 15672:15672
     security_opt:
       label: disable
 
@@ -21,10 +24,12 @@ services:
     container_name: filebrowser-server
     image: localhost/alvidir/filebrowser:latest
     restart: always
+    ports:
+      - 8000:8000
     security_opt:
       label: disable
     depends_on:
-      # - mongo
+      - mongo
     env_file:
       - .env
 

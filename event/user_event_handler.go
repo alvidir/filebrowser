@@ -13,17 +13,6 @@ const (
 	userSettingsPath = ".settings"
 )
 
-type UserProfile struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
-}
-
-type UserEventPayload struct {
-	UserID int32  `json:"id"`
-	Kind   string `json:"kind"`
-	UserProfile
-}
-
 type UserEventHandler struct {
 	dirApp  *dir.DirectoryApplication
 	fileApp *file.FileApplication

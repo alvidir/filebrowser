@@ -4,6 +4,7 @@ import (
 	"context"
 
 	fb "github.com/alvidir/filebrowser"
+	cert "github.com/alvidir/filebrowser/certificate"
 	"github.com/alvidir/filebrowser/proto"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -18,9 +19,10 @@ func NewPermissions(perm fb.Permission) *proto.Permissions {
 	}
 }
 
-func NewFileServer(app *FileApplication, authHeader string, logger *zap.Logger) *FileServer {
+func NewFileServer(fileApp *FileApplication, certApp *cert.CertificateApplication, authHeader string, logger *zap.Logger) *FileServer {
 	return &FileServer{
-		fileApp:   app,
+		fileApp:   fileApp,
+		certApp:   certApp,
 		logger:    logger,
 		uidHeader: authHeader,
 	}
@@ -56,6 +58,7 @@ func NewFileDescriptor(file *File) *proto.FileDescriptor {
 type FileServer struct {
 	proto.UnimplementedFileServer
 	fileApp   *FileApplication
+	certApp   *cert.CertificateApplication
 	logger    *zap.Logger
 	uidHeader string
 	jwtHeader string
@@ -67,7 +70,12 @@ func (server *FileServer) Create(ctx context.Context, req *proto.FileConstructor
 		return nil, err
 	}
 
-	file, certificate, err := server.fileApp.CreateCertificated(ctx, uid, req.GetPath(), req.GetData(), req.GetMetadata())
+	file, err := server.fileApp.Create(ctx, uid, req.GetPath(), req.GetData(), req.GetMetadata())
+	if err != nil {
+		return nil, err
+	}
+
+	certificate, err := server.certApp.GetFileAccessCertificate(ctx, uid, file.Id())
 	if err != nil {
 		return nil, err
 	}

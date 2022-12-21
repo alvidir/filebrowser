@@ -24,40 +24,26 @@ type DirectoryApplication interface {
 	UnregisterFile(ctx context.Context, file *File, uid int32) error
 }
 
+type EventBus interface {
+	EmitFileCreated(uid int32, f *File) error
+}
+
 type FileApplication struct {
 	fileRepo FileRepository
+	eventBus EventBus
 	dirApp   DirectoryApplication
 	certApp  *cert.CertificateApplication
 	logger   *zap.Logger
 }
 
-func NewFileApplication(repo FileRepository, dirApp DirectoryApplication, certApp *cert.CertificateApplication, logger *zap.Logger) *FileApplication {
+func NewFileApplication(repo FileRepository, dirApp DirectoryApplication, certApp *cert.CertificateApplication, bus EventBus, logger *zap.Logger) *FileApplication {
 	return &FileApplication{
 		fileRepo: repo,
+		eventBus: bus,
 		dirApp:   dirApp,
 		certApp:  certApp,
 		logger:   logger,
 	}
-}
-
-func (app *FileApplication) CreateCertificated(ctx context.Context, uid int32, fpath string, data []byte, meta Metadata) (*File, *cert.FileAccessCertificate, error) {
-	file, err := app.Create(ctx, uid, fpath, data, meta)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	certificate, err := app.certApp.CreateFileAccessCertificate(ctx, uid, file)
-	if err != nil {
-		app.logger.Error("creating file access certificate",
-			zap.String("file_name", file.Name()),
-			zap.String("file_id", file.Id()),
-			zap.Int32("user_id", uid),
-			zap.Error(err))
-
-		return nil, nil, err
-	}
-
-	return file, certificate, nil
 }
 
 func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string, data []byte, meta Metadata) (*File, error) {
@@ -85,8 +71,31 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 		return nil, err
 	}
 
-	err = app.dirApp.RegisterFile(ctx, file, uid, fpath)
-	return file, err
+	if err := app.dirApp.RegisterFile(ctx, file, uid, fpath); err != nil {
+		return nil, err
+	}
+
+	_, err = app.certApp.CreateFileAccessCertificate(ctx, uid, file)
+	if err != nil {
+		app.logger.Error("creating file access certificate",
+			zap.String("file_name", file.Name()),
+			zap.String("file_id", file.Id()),
+			zap.Int32("user_id", uid),
+			zap.Error(err))
+
+		return nil, err
+	}
+
+	if err := app.eventBus.EmitFileCreated(uid, file); err != nil {
+		app.logger.Error("emiting file created event",
+			zap.String("file_id", file.id),
+			zap.Int32("user_id", uid),
+			zap.Error(err))
+	} else {
+		app.logger.Info("file created event emited")
+	}
+
+	return file, nil
 }
 
 func (app *FileApplication) Retrieve(ctx context.Context, uid int32, fid string) (*File, error) {

@@ -12,6 +12,13 @@ import (
 	"go.uber.org/zap"
 )
 
+type eventBusMock struct {
+}
+
+func (bus *eventBusMock) EmitFileCreated(uid int32, f *File) error {
+	return nil
+}
+
 type directoryApplicationMock struct {
 	registerFile   func(ctx context.Context, file *File, uid int32, path string) error
 	unregisterFile func(ctx context.Context, file *File, uid int32) error
@@ -96,7 +103,7 @@ func TestCreateWhenFileAlreadyExists(t *testing.T) {
 	}
 
 	fileRepo := &fileRepositoryMock{}
-	app := NewFileApplication(fileRepo, dirApp, nil, logger)
+	app := NewFileApplication(fileRepo, dirApp, nil, &eventBusMock{}, logger)
 
 	userId := int32(999)
 	fpath := "path/to/example.test"
@@ -117,7 +124,7 @@ func TestReadWhenFileDoesNotExists(t *testing.T) {
 	}
 
 	fileRepo := &fileRepositoryMock{}
-	app := NewFileApplication(fileRepo, dirApp, nil, logger)
+	app := NewFileApplication(fileRepo, dirApp, nil, &eventBusMock{}, logger)
 
 	userId := int32(999)
 	fid := "testing"
@@ -146,7 +153,7 @@ func TestCreate(t *testing.T) {
 			return nil
 		},
 	}
-	app := NewFileApplication(fileRepo, dirApp, nil, logger)
+	app := NewFileApplication(fileRepo, dirApp, nil, &eventBusMock{}, logger)
 
 	userId := int32(999)
 	fpath := "path/to/example.test"
@@ -203,7 +210,7 @@ func TestCreateWithCustomMetadata(t *testing.T) {
 			return nil
 		},
 	}
-	app := NewFileApplication(fileRepo, dirApp, nil, logger)
+	app := NewFileApplication(fileRepo, dirApp, nil, &eventBusMock{}, logger)
 
 	userId := int32(999)
 	fpath := "path/to/example.test"
@@ -247,7 +254,7 @@ func TestReadWhenHasNoPermissions(t *testing.T) {
 	}
 
 	fileRepo := &fileRepositoryMock{}
-	app := NewFileApplication(fileRepo, dirApp, nil, logger)
+	app := NewFileApplication(fileRepo, dirApp, nil, &eventBusMock{}, logger)
 
 	userId := int32(999)
 	fid := "testing"
@@ -275,7 +282,7 @@ func TestRead(t *testing.T) {
 	}
 
 	dirApp := &directoryApplicationMock{}
-	app := NewFileApplication(repo, dirApp, nil, logger)
+	app := NewFileApplication(repo, dirApp, nil, &eventBusMock{}, logger)
 	file, err := app.Retrieve(context.Background(), 111, "")
 	if err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
@@ -327,7 +334,7 @@ func TestWriteWhenFileDoesNotExists(t *testing.T) {
 	}
 
 	fileRepo := &fileRepositoryMock{}
-	app := NewFileApplication(fileRepo, dirApp, nil, logger)
+	app := NewFileApplication(fileRepo, dirApp, nil, &eventBusMock{}, logger)
 
 	userId := int32(999)
 	fid := "testing"
@@ -359,7 +366,7 @@ func TestWriteWhenHasNoPermissions(t *testing.T) {
 			}, nil
 		},
 	}
-	app := NewFileApplication(repo, dirApp, nil, logger)
+	app := NewFileApplication(repo, dirApp, nil, &eventBusMock{}, logger)
 
 	fid := "testing"
 	if _, err := app.Update(context.Background(), 222, fid, "", nil, nil); !errors.Is(err, fb.ErrNotAvailable) {
@@ -389,7 +396,7 @@ func TestWriteWhenCannotSave(t *testing.T) {
 	}
 
 	dirApp := &directoryApplicationMock{}
-	app := NewFileApplication(repo, dirApp, nil, logger)
+	app := NewFileApplication(repo, dirApp, nil, &eventBusMock{}, logger)
 
 	fid := "testing"
 	if _, err := app.Update(context.Background(), 111, fid, "", nil, nil); !errors.Is(err, fb.ErrUnknown) {
@@ -423,7 +430,7 @@ func TestWrite(t *testing.T) {
 	}
 
 	dirApp := &directoryApplicationMock{}
-	app := NewFileApplication(repo, dirApp, nil, logger)
+	app := NewFileApplication(repo, dirApp, nil, &eventBusMock{}, logger)
 
 	fid := "testing"
 	data := []byte{1, 2, 3}
@@ -475,7 +482,7 @@ func TestWriteWithCustomMetadata(t *testing.T) {
 	}
 
 	dirApp := &directoryApplicationMock{}
-	app := NewFileApplication(repo, dirApp, nil, logger)
+	app := NewFileApplication(repo, dirApp, nil, &eventBusMock{}, logger)
 
 	fid := "testing"
 	data := []byte{1, 2, 3}
@@ -512,7 +519,7 @@ func TestDeleteWhenFileDoesNotExists(t *testing.T) {
 	}
 
 	fileRepo := &fileRepositoryMock{}
-	app := NewFileApplication(fileRepo, dirApp, nil, logger)
+	app := NewFileApplication(fileRepo, dirApp, nil, &eventBusMock{}, logger)
 
 	userId := int32(999)
 	fid := "testing"
@@ -544,7 +551,7 @@ func TestDeleteWhenHasNoPermissions(t *testing.T) {
 			}, nil
 		},
 	}
-	app := NewFileApplication(repo, dirApp, nil, logger)
+	app := NewFileApplication(repo, dirApp, nil, &eventBusMock{}, logger)
 
 	fid := "testing"
 	if _, err := app.Delete(context.Background(), 999, fid); !errors.Is(err, fb.ErrNotAvailable) {
@@ -575,7 +582,7 @@ func TestDeleteWhenCannotSave(t *testing.T) {
 		},
 	}
 
-	app := NewFileApplication(repo, dirApp, nil, logger)
+	app := NewFileApplication(repo, dirApp, nil, &eventBusMock{}, logger)
 
 	fid := "testing"
 	if _, err := app.Delete(context.Background(), 222, fid); !errors.Is(err, fb.ErrUnknown) {
@@ -612,7 +619,7 @@ func TestDeleteWhenIsNotOwner(t *testing.T) {
 		},
 	}
 
-	app := NewFileApplication(repo, dirApp, nil, logger)
+	app := NewFileApplication(repo, dirApp, nil, &eventBusMock{}, logger)
 
 	fid := "testing"
 	file, err := app.Delete(context.Background(), 111, fid)
@@ -662,7 +669,7 @@ func TestDeleteWhenMoreThanOneOwner(t *testing.T) {
 		},
 	}
 
-	app := NewFileApplication(repo, dirApp, nil, logger)
+	app := NewFileApplication(repo, dirApp, nil, &eventBusMock{}, logger)
 
 	fid := "testing"
 	file, err := app.Delete(context.Background(), 111, fid)
@@ -716,7 +723,7 @@ func TestDeleteWhenSingleOwner(t *testing.T) {
 		},
 	}
 
-	app := NewFileApplication(repo, dirApp, nil, logger)
+	app := NewFileApplication(repo, dirApp, nil, &eventBusMock{}, logger)
 
 	fid := "testing"
 	before := time.Now().Unix()
