@@ -24,6 +24,10 @@ type DirectoryApplication interface {
 	UnregisterFile(ctx context.Context, file *File, uid int32) error
 }
 
+type CertificateApplication interface {
+	CreateFileAccessCertificate(ctx context.Context, uid int32, file cert.File) (*cert.FileAccessCertificate, error)
+}
+
 type EventBus interface {
 	EmitFileCreated(uid int32, f *File) error
 }
@@ -32,11 +36,11 @@ type FileApplication struct {
 	fileRepo FileRepository
 	eventBus EventBus
 	dirApp   DirectoryApplication
-	certApp  *cert.CertificateApplication
+	certApp  CertificateApplication
 	logger   *zap.Logger
 }
 
-func NewFileApplication(repo FileRepository, dirApp DirectoryApplication, certApp *cert.CertificateApplication, bus EventBus, logger *zap.Logger) *FileApplication {
+func NewFileApplication(repo FileRepository, dirApp DirectoryApplication, certApp CertificateApplication, bus EventBus, logger *zap.Logger) *FileApplication {
 	return &FileApplication{
 		fileRepo: repo,
 		eventBus: bus,
