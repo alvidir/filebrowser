@@ -95,8 +95,6 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 			zap.String("file_id", file.id),
 			zap.Int32("user_id", uid),
 			zap.Error(err))
-	} else {
-		app.logger.Info("file created event emited")
 	}
 
 	return file, nil
