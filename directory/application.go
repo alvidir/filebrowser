@@ -237,7 +237,7 @@ func (app *DirectoryApplication) RegisterFile(ctx context.Context, file *file.Fi
 	}
 
 	name := dir.AddFile(file, fb.NormalizePath(fpath))
-	return name, app.dirRepo.Save(ctx, dir)
+	return path.Base(name), app.dirRepo.Save(ctx, dir)
 }
 
 // UnregisterFile is executed when a file has been deleted
