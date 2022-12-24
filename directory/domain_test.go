@@ -28,23 +28,23 @@ func TestAddFile(t *testing.T) {
 		t.Errorf("got error = %v, want = %v", err, nil)
 	}
 
-	want := "/path/to/filename"
-	if got := dir.AddFile(f, want); got != want {
-		t.Errorf("got final path = %s, want = %v", got, want)
+	path := "/path/to/filename"
+	if got := dir.AddFile(f, path); got != path {
+		t.Errorf("got final path = %s, want = %v", got, path)
 	}
 
-	if got := dir.files[want]; got.Id() != f.Id() {
+	if got := dir.files[path]; got.Id() != f.Id() {
 		t.Errorf("got file id = %v, want = %v", got, f.Id())
 	}
 
-	want = fmt.Sprintf("%s (1)", want)
-	if got := dir.AddFile(f, want); got != want {
-		t.Errorf("got final path = %s, want = %v", got, want)
+	want1 := fmt.Sprintf("%s (1)", path)
+	if got := dir.AddFile(f, path); got != want1 {
+		t.Errorf("got final path = %s, want = %v", got, want1)
 	}
 
-	want = fmt.Sprintf("%s (2)", want)
-	if got := dir.AddFile(f, want); got != want {
-		t.Errorf("got final path = %s, want = %v", got, want)
+	want2 := fmt.Sprintf("%s (2)", path)
+	if got := dir.AddFile(f, path); got != want2 {
+		t.Errorf("got final path = %s, want = %v", got, want2)
 	}
 }
 

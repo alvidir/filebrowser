@@ -26,17 +26,17 @@ func NewDirectory(userId int32) *Directory {
 
 func (dir *Directory) getAvailablePath(dest string) string {
 	components := fb.PathComponents(dest)
-
-	counter := 1
 	for index := 0; index < len(components); index++ {
-		subject := fb.NormalizePath(path.Join(components[0 : index+1]...))
-		if _, exists := dir.files[subject]; exists {
-			components[index] = fmt.Sprintf("%s (%v)", components[index], counter)
-			counter++
+		candidate := components[index]
+		counter := 1
+		for {
+			subject := fb.NormalizePath(path.Join(components[0 : index+1]...))
+			if _, exists := dir.files[subject]; !exists {
+				break
+			}
 
-			// is not sure the new name will not be duplicated, is required to keep
-			// iterating the same index till finding a non existing name.
-			index--
+			components[index] = fmt.Sprintf("%s (%v)", candidate, counter)
+			counter++
 		}
 	}
 
