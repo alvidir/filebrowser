@@ -7,8 +7,6 @@ import (
 	cert "github.com/alvidir/filebrowser/certificate"
 	"github.com/alvidir/filebrowser/proto"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
-	headers "google.golang.org/grpc/metadata"
 )
 
 func NewPermissions(perm fb.Permission) *proto.Permissions {
@@ -61,7 +59,6 @@ type FileServer struct {
 	certApp   *cert.CertificateApplication
 	logger    *zap.Logger
 	uidHeader string
-	jwtHeader string
 }
 
 func (server *FileServer) Create(ctx context.Context, req *proto.FileConstructor) (*proto.FileDescriptor, error) {
@@ -80,24 +77,7 @@ func (server *FileServer) Create(ctx context.Context, req *proto.FileConstructor
 		return nil, err
 	}
 
-	certificate, err := server.certApp.GetFileAccessCertificate(ctx, uid, file.Id())
-	if err != nil {
-		return nil, err
-	}
-
-	header := headers.New(map[string]string{server.jwtHeader: certificate.Token()})
-	if err := grpc.SendHeader(ctx, header); err != nil {
-		server.logger.Error("sending grpc headers",
-			zap.String("file_id", file.Id()),
-			zap.Int32("user_id", uid),
-			zap.Error(err))
-
-		return nil, err
-	}
-
-	return &proto.FileDescriptor{
-		Id: file.id,
-	}, nil
+	return NewFileDescriptor(file), nil
 }
 
 func (server *FileServer) Retrieve(ctx context.Context, req *proto.FileLocator) (*proto.FileDescriptor, error) {

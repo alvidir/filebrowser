@@ -20,7 +20,7 @@ type FileRepository interface {
 }
 
 type DirectoryApplication interface {
-	RegisterFile(ctx context.Context, file *File, uid int32, path string) error
+	RegisterFile(ctx context.Context, file *File, uid int32, path string) (string, error)
 	UnregisterFile(ctx context.Context, file *File, uid int32) error
 }
 
@@ -75,9 +75,12 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 		return nil, err
 	}
 
-	if err := app.dirApp.RegisterFile(ctx, file, uid, fpath); err != nil {
+	name, err := app.dirApp.RegisterFile(ctx, file, uid, fpath)
+	if err != nil {
 		return nil, err
 	}
+
+	file.SetName(name)
 
 	_, err = app.certApp.CreateFileAccessCertificate(ctx, uid, file)
 	if err != nil {

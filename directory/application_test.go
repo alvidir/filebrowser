@@ -355,7 +355,7 @@ func TestRegisterFileWhenDirectoryDoesNotExists(t *testing.T) {
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
 	f, _ := file.NewFile("test", "filename")
-	if err := app.RegisterFile(context.TODO(), f, 999, "path/to/file"); !errors.Is(err, fb.ErrNotFound) {
+	if _, err := app.RegisterFile(context.TODO(), f, 999, "path/to/file"); !errors.Is(err, fb.ErrNotFound) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 }
@@ -375,7 +375,7 @@ func TestRegisterFile(t *testing.T) {
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
 	f, _ := file.NewFile("test", "filename")
-	if err := app.RegisterFile(context.TODO(), f, 999, "path/to/file"); err != nil {
+	if _, err := app.RegisterFile(context.TODO(), f, 999, "path/to/file"); err != nil {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 

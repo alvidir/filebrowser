@@ -27,16 +27,16 @@ func (app *certificateApplicationMock) CreateFileAccessCertificate(ctx context.C
 }
 
 type directoryApplicationMock struct {
-	registerFile   func(ctx context.Context, file *File, uid int32, path string) error
+	registerFile   func(ctx context.Context, file *File, uid int32, path string) (string, error)
 	unregisterFile func(ctx context.Context, file *File, uid int32) error
 }
 
-func (app *directoryApplicationMock) RegisterFile(ctx context.Context, file *File, uid int32, path string) error {
+func (app *directoryApplicationMock) RegisterFile(ctx context.Context, file *File, uid int32, path string) (string, error) {
 	if app.registerFile != nil {
 		return app.registerFile(ctx, file, uid, path)
 	}
 
-	return fb.ErrUnknown
+	return "", fb.ErrUnknown
 }
 
 func (app *directoryApplicationMock) UnregisterFile(ctx context.Context, file *File, uid int32) error {
@@ -104,8 +104,8 @@ func TestCreateWhenFileAlreadyExists(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		registerFile: func(ctx context.Context, file *File, uid int32, path string) error {
-			return nil
+		registerFile: func(ctx context.Context, file *File, uid int32, path string) (string, error) {
+			return "", nil
 		},
 	}
 
@@ -125,8 +125,8 @@ func TestReadWhenFileDoesNotExists(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		registerFile: func(ctx context.Context, file *File, uid int32, path string) error {
-			return nil
+		registerFile: func(ctx context.Context, file *File, uid int32, path string) (string, error) {
+			return "", nil
 		},
 	}
 
@@ -147,9 +147,9 @@ func TestCreate(t *testing.T) {
 
 	directoryAddFileMethodExecuted := false
 	dirApp := &directoryApplicationMock{
-		registerFile: func(ctx context.Context, file *File, uid int32, path string) error {
+		registerFile: func(ctx context.Context, file *File, uid int32, path string) (string, error) {
 			directoryAddFileMethodExecuted = true
-			return nil
+			return file.name, nil
 		},
 	}
 
@@ -205,8 +205,8 @@ func TestCreateWithCustomMetadata(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		registerFile: func(ctx context.Context, file *File, uid int32, path string) error {
-			return nil
+		registerFile: func(ctx context.Context, file *File, uid int32, path string) (string, error) {
+			return "", nil
 		},
 	}
 
@@ -255,8 +255,8 @@ func TestReadWhenHasNoPermissions(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		registerFile: func(ctx context.Context, file *File, uid int32, path string) error {
-			return nil
+		registerFile: func(ctx context.Context, file *File, uid int32, path string) (string, error) {
+			return "", nil
 		},
 	}
 
@@ -335,8 +335,8 @@ func TestWriteWhenFileDoesNotExists(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		registerFile: func(ctx context.Context, file *File, uid int32, path string) error {
-			return nil
+		registerFile: func(ctx context.Context, file *File, uid int32, path string) (string, error) {
+			return "", nil
 		},
 	}
 
@@ -356,8 +356,8 @@ func TestWriteWhenHasNoPermissions(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		registerFile: func(ctx context.Context, file *File, uid int32, path string) error {
-			return nil
+		registerFile: func(ctx context.Context, file *File, uid int32, path string) (string, error) {
+			return "", nil
 		},
 	}
 
@@ -520,8 +520,8 @@ func TestDeleteWhenFileDoesNotExists(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		registerFile: func(ctx context.Context, file *File, uid int32, path string) error {
-			return nil
+		registerFile: func(ctx context.Context, file *File, uid int32, path string) (string, error) {
+			return "", nil
 		},
 	}
 

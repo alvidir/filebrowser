@@ -226,17 +226,18 @@ func (app *DirectoryApplication) Relocate(ctx context.Context, uid int32, target
 }
 
 // RegisterFile is executed when a file has been created
-func (app *DirectoryApplication) RegisterFile(ctx context.Context, file *file.File, uid int32, fpath string) error {
+func (app *DirectoryApplication) RegisterFile(ctx context.Context, file *file.File, uid int32, fpath string) (string, error) {
 	app.logger.Info("processing an \"add file\" request",
-		zap.Int32("user_id", uid))
+		zap.Int32("user_id", uid),
+		zap.String("file_id", file.Id()))
 
 	dir, err := app.dirRepo.FindByUserId(ctx, uid)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	dir.AddFile(file, fb.NormalizePath(fpath))
-	return app.dirRepo.Save(ctx, dir)
+	name := dir.AddFile(file, fb.NormalizePath(fpath))
+	return name, app.dirRepo.Save(ctx, dir)
 }
 
 // UnregisterFile is executed when a file has been deleted
