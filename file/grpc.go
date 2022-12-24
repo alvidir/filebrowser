@@ -8,7 +8,7 @@ import (
 	"github.com/alvidir/filebrowser/proto"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
+	headers "google.golang.org/grpc/metadata"
 )
 
 func NewPermissions(perm fb.Permission) *proto.Permissions {
@@ -70,7 +70,12 @@ func (server *FileServer) Create(ctx context.Context, req *proto.FileConstructor
 		return nil, err
 	}
 
-	file, err := server.fileApp.Create(ctx, uid, req.GetPath(), req.GetData(), req.GetMetadata())
+	metadata := make(Metadata)
+	for _, meta := range req.GetMetadata() {
+		metadata[meta.GetKey()] = meta.GetValue()
+	}
+
+	file, err := server.fileApp.Create(ctx, uid, req.GetPath(), req.GetData(), metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +85,7 @@ func (server *FileServer) Create(ctx context.Context, req *proto.FileConstructor
 		return nil, err
 	}
 
-	header := metadata.New(map[string]string{server.jwtHeader: certificate.Token()})
+	header := headers.New(map[string]string{server.jwtHeader: certificate.Token()})
 	if err := grpc.SendHeader(ctx, header); err != nil {
 		server.logger.Error("sending grpc headers",
 			zap.String("file_id", file.Id()),

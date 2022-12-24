@@ -13,7 +13,6 @@ services:
   rabbitmq:
     container_name: filebrowser-rabbitmq
     image: docker.io/rabbitmq:3.11.3-alpine
-    # image: docker.io/rabbitmq:3-management
     restart: always
     ports:
       - 15672:15672
