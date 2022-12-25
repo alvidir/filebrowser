@@ -176,6 +176,69 @@ func (repo *MongoCertificateRepository) Delete(ctx context.Context, cert *FileAc
 	return nil
 }
 
+func (repo *MongoCertificateRepository) DeleteAllByFileId(ctx context.Context, fileId string) error {
+	objID, err := primitive.ObjectIDFromHex(fileId)
+	if err != nil {
+		repo.logger.Error("parsing file id to ObjectID",
+			zap.String("file_id", fileId),
+			zap.Error(err))
+
+		return fb.ErrUnknown
+	}
+
+	result, err := repo.conn.DeleteMany(ctx, bson.M{"file_id": objID})
+	if err != nil {
+		repo.logger.Error("performing delete many on mongo",
+			zap.String("file_id", fileId),
+			zap.Error(err))
+
+		return fb.ErrUnknown
+	}
+
+	if result.DeletedCount == 0 {
+		repo.logger.Error("performing delete many on mongo",
+			zap.String("file_id", fileId),
+			zap.Int64("deleted_count", result.DeletedCount))
+
+		return fb.ErrUnknown
+	}
+
+	return nil
+}
+
+func (repo *MongoCertificateRepository) DeleteByFileIdAndUserId(ctx context.Context, userId int32, fileId string) error {
+	objID, err := primitive.ObjectIDFromHex(fileId)
+	if err != nil {
+		repo.logger.Error("parsing file id to ObjectID",
+			zap.String("file_id", fileId),
+			zap.Int32("user_id", userId),
+			zap.Error(err))
+
+		return fb.ErrUnknown
+	}
+
+	result, err := repo.conn.DeleteMany(ctx, bson.M{"user_id": userId, "file_id": objID})
+	if err != nil {
+		repo.logger.Error("performing delete one on mongo",
+			zap.String("file_id", fileId),
+			zap.Int32("user_id", userId),
+			zap.Error(err))
+
+		return fb.ErrUnknown
+	}
+
+	if result.DeletedCount == 0 {
+		repo.logger.Error("performing delete one on mongo",
+			zap.String("file_id", fileId),
+			zap.Int32("user_id", userId),
+			zap.Int64("deleted_count", result.DeletedCount))
+
+		return fb.ErrUnknown
+	}
+
+	return nil
+}
+
 func (repo *MongoCertificateRepository) build(ctx context.Context, mdir *mongoFileAccessAuthorization) *FileAccessCertificate {
 	return &FileAccessCertificate{
 		id:         mdir.ID.Hex(),

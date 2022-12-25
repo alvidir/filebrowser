@@ -625,97 +625,113 @@ func TestRelocate(t *testing.T) {
 		name   string
 		target string
 		filter string
+		files  []string
 		want   []string
 	}{
 		{
 			name:   "move to a new directory",
 			target: "new_directory",
 			filter: "^/a_file$|^/another_file$",
+			files: []string{
+				"/a_file",
+				"/another_file",
+			},
 			want: []string{
 				"/new_directory/a_file",
 				"/new_directory/another_file",
-				"/a_directory/a_file",
-				"/a_directory/another_file",
-				"/another_dir/test.txt",
-				"/unique_name",
 			},
 		},
 		{
 			name:   "move to a existing directory",
 			target: "a_directory",
-			filter: "^/unique_name$",
-			want: []string{
+			filter: "^/a_file$",
+			files: []string{
 				"/a_file",
-				"/another_file",
+				"/a_directory/another_file",
+			},
+			want: []string{
 				"/a_directory/a_file",
 				"/a_directory/another_file",
-				"/a_directory/unique_name",
-				"/another_dir/test.txt",
 			},
 		},
 		{
-			name:   "move directory to inner directory",
+			name:   "move directory to another directory",
 			target: "another_dir",
 			filter: "^/a_directory",
+			files: []string{
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+				"/another_dir/a_file",
+			},
 			want: []string{
-				"/a_file",
-				"/another_file",
 				"/another_dir/a_directory/a_file",
 				"/another_dir/a_directory/another_file",
-				"/another_dir/test.txt",
-				"/unique_name",
+				"/another_dir/a_file",
 			},
 		},
 		{
 			name:   "move file to parent directory",
 			target: "/",
-			filter: "^/another_dir/(test.txt.*)",
-			want: []string{
-				"/a_file",
-				"/another_file",
+			filter: "^/a_directory/(a_file.*)",
+			files: []string{
 				"/a_directory/a_file",
 				"/a_directory/another_file",
-				"/test.txt",
-				"/unique_name",
+			},
+			want: []string{
+				"/a_file",
+				"/a_directory/another_file",
 			},
 		},
 		{
 			name:   "move to a directory with a file with the same name",
 			target: "a_directory",
 			filter: "^/a_file$",
-			want: []string{
-				"/another_file",
+			files: []string{
+				"/a_file",
 				"/a_directory/a_file",
+			},
+			want: []string{
 				"/a_directory/a_file (1)",
-				"/a_directory/another_file",
-				"/another_dir/test.txt",
-				"/unique_name",
+				"/a_directory/a_file",
 			},
 		},
 		{
-			name:   "move directory with already existing name",
-			target: "another_dir/test.txt",
+			name:   "move to new directory with same name as file",
+			target: "another_dir/an_item",
 			filter: "^/a_directory",
+			files: []string{
+				"/a_directory/a_file",
+				"/another_dir/an_item",
+			},
 			want: []string{
-				"/a_file",
-				"/another_file",
-				"/another_dir/test.txt (1)/a_directory/a_file",
-				"/another_dir/test.txt (1)/a_directory/another_file",
-				"/another_dir/test.txt",
-				"/unique_name",
+				"/another_dir/an_item (1)/a_directory/a_file",
+				"/another_dir/an_item",
 			},
 		},
 		{
 			name:   "move from a directory to another",
 			target: "/a_directory",
-			filter: "^/another_dir/(test.txt.*)$",
-			want: []string{
-				"/a_file",
-				"/another_file",
+			filter: "^/another_dir/(a_file.*)$",
+			files: []string{
 				"/a_directory/a_file",
-				"/a_directory/another_file",
-				"/a_directory/test.txt",
-				"/unique_name",
+				"/another_dir/a_file",
+			},
+			want: []string{
+				"/a_directory/a_file (1)",
+				"/a_directory/a_file",
+			},
+		},
+		{
+			name:   "move file with similar name to directory",
+			target: "/a_directory",
+			filter: "^/(a_file(/.*)?)$",
+			files: []string{
+				"/a_file",
+				"/a_file (1)",
+			},
+			want: []string{
+				"/a_directory/a_file",
+				"/a_file (1)",
 			},
 		},
 	}
@@ -728,13 +744,9 @@ func TestRelocate(t *testing.T) {
 
 			f, _ := file.NewFile("test", "filename")
 			dirRepo := &directoryRepositoryMock{}
-			files := map[string]*file.File{
-				"/a_file":                   f,
-				"/another_file":             f,
-				"/a_directory/a_file":       f,
-				"/a_directory/another_file": f,
-				"/another_dir/test.txt":     f,
-				"/unique_name":              f,
+			files := make(map[string]*file.File)
+			for _, fileName := range test.files {
+				files[fileName] = f
 			}
 
 			dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
