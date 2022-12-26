@@ -199,13 +199,12 @@ func (app *DirectoryApplication) Relocate(ctx context.Context, uid int32, target
 	for p0, f := range dir.Files() {
 		subject := fb.NormalizePath(p0)
 
-		matches := regex.FindStringIndex(subject)
+		matches := regex.FindStringSubmatchIndex(subject)
 		if matches == nil {
 			continue
 		}
 
 		matchStart := matches[0] + 1
-		matches = regex.FindStringSubmatchIndex(subject)
 		if regex.NumSubexp() > 0 && matches[2] > -1 {
 			matchStart = matches[2]
 		}
