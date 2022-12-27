@@ -734,6 +734,19 @@ func TestRelocate(t *testing.T) {
 				"/a_file (1)",
 			},
 		},
+		{
+			name:   "move file with similar name to directory - 2",
+			target: "/a_directory",
+			filter: "^/(a_file \\(1\\)(/.*)?)$",
+			files: []string{
+				"/a_file",
+				"/a_file (1)",
+			},
+			want: []string{
+				"/a_directory/a_file (1)",
+				"/a_file",
+			},
+		},
 	}
 
 	for _, test := range tests {
