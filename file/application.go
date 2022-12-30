@@ -28,22 +28,16 @@ type CertificateApplication interface {
 	CreateFileAccessCertificate(ctx context.Context, uid int32, file cert.File) (*cert.FileAccessCertificate, error)
 }
 
-type EventBus interface {
-	EmitFileCreated(uid int32, f *File) error
-}
-
 type FileApplication struct {
 	fileRepo FileRepository
-	eventBus EventBus
 	dirApp   DirectoryApplication
 	certApp  CertificateApplication
 	logger   *zap.Logger
 }
 
-func NewFileApplication(repo FileRepository, dirApp DirectoryApplication, certApp CertificateApplication, bus EventBus, logger *zap.Logger) *FileApplication {
+func NewFileApplication(repo FileRepository, dirApp DirectoryApplication, certApp CertificateApplication, logger *zap.Logger) *FileApplication {
 	return &FileApplication{
 		fileRepo: repo,
-		eventBus: bus,
 		dirApp:   dirApp,
 		certApp:  certApp,
 		logger:   logger,
@@ -91,13 +85,6 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 			zap.Error(err))
 
 		return nil, err
-	}
-
-	if err := app.eventBus.EmitFileCreated(uid, file); err != nil {
-		app.logger.Error("emiting file created event",
-			zap.String("file_id", file.id),
-			zap.Int32("user_id", uid),
-			zap.Error(err))
 	}
 
 	return file, nil

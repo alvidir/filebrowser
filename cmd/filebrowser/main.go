@@ -71,8 +71,8 @@ func main() {
 	fileExchange := cmd.GetFileExchange(logger)
 	fileBus := event.NewFileEventBus(eventIssuer, fileExchange, ch, logger)
 
-	fileApp := file.NewFileApplication(fileRepo, directoryApp, certApp, fileBus, logger)
-	fileServer := file.NewFileServer(fileApp, certApp, cmd.UidHeader, logger)
+	fileApp := file.NewFileApplication(fileRepo, directoryApp, certApp, logger)
+	fileServer := file.NewFileServer(fileApp, certApp, fileBus, cmd.UidHeader, logger)
 
 	grpcServer := grpc.NewServer()
 	proto.RegisterDirectoryServer(grpcServer, directoryServer)

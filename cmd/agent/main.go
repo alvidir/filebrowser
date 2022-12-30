@@ -100,13 +100,11 @@ func main() {
 	ch := cmd.GetAmqpChannel(conn, logger)
 	defer ch.Close()
 
-	eventIssuer := cmd.GetEventIssuer(logger)
-	fileExchange := cmd.GetFileExchange(logger)
-	fileBus := event.NewFileEventBus(eventIssuer, fileExchange, ch, logger)
-
-	fileApp := file.NewFileApplication(fileRepo, directoryApp, certApp, fileBus, logger)
+	fileApp := file.NewFileApplication(fileRepo, directoryApp, certApp, logger)
 	userEventHandler := event.NewUserEventHandler(directoryApp, fileApp, logger)
 	fileEventHandler := event.NewFileEventHandler(directoryApp, fileApp, certApp, logger)
+
+	eventIssuer := cmd.GetEventIssuer(logger)
 	fileEventHandler.DiscardIssuer(eventIssuer)
 
 	ctx, cancel := context.WithCancel(context.Background())

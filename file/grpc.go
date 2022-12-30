@@ -9,6 +9,10 @@ import (
 	"go.uber.org/zap"
 )
 
+type FileEventBus interface {
+	EmitFileCreated(uid int32, f *File) error
+}
+
 func NewPermissions(perm fb.Permission) *proto.Permissions {
 	return &proto.Permissions{
 		Read:  perm&fb.Read != 0,
@@ -17,10 +21,11 @@ func NewPermissions(perm fb.Permission) *proto.Permissions {
 	}
 }
 
-func NewFileServer(fileApp *FileApplication, certApp *cert.CertificateApplication, authHeader string, logger *zap.Logger) *FileServer {
+func NewFileServer(fileApp *FileApplication, certApp *cert.CertificateApplication, bus FileEventBus, authHeader string, logger *zap.Logger) *FileServer {
 	return &FileServer{
 		fileApp:   fileApp,
 		certApp:   certApp,
+		fileBus:   bus,
 		logger:    logger,
 		uidHeader: authHeader,
 	}
@@ -57,6 +62,7 @@ type FileServer struct {
 	proto.UnimplementedFileServer
 	fileApp   *FileApplication
 	certApp   *cert.CertificateApplication
+	fileBus   FileEventBus
 	logger    *zap.Logger
 	uidHeader string
 }
@@ -75,6 +81,13 @@ func (server *FileServer) Create(ctx context.Context, req *proto.FileConstructor
 	file, err := server.fileApp.Create(ctx, uid, req.GetPath(), req.GetData(), metadata)
 	if err != nil {
 		return nil, err
+	}
+
+	if err := server.fileBus.EmitFileCreated(uid, file); err != nil {
+		server.logger.Error("emiting file created event",
+			zap.String("file_id", file.id),
+			zap.Int32("user_id", uid),
+			zap.Error(err))
 	}
 
 	return NewFileDescriptor(file), nil
