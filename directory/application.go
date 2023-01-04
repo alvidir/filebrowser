@@ -35,51 +35,6 @@ func NewDirectoryApplication(dirRepo DirectoryRepository, fileRepo file.FileRepo
 	}
 }
 
-func NewFilterByNameFn(target string) (FilterFileFn, error) {
-	regex, err := regexp.Compile(target)
-	if err != nil {
-		return nil, fb.ErrInvalidFormat
-	}
-
-	filterFn := func(p string, f *file.File) (string, *file.File) {
-		if regex.MatchString(p) || regex.MatchString(f.Name()) {
-			return p, f
-		}
-
-		return "", nil
-	}
-
-	return filterFn, nil
-}
-
-func NewFilterByDirFn(target string) (FilterFileFn, error) {
-	target = fb.NormalizePath(target)
-
-	depth := len(fb.PathComponents(target))
-	filterFn := func(p string, f *file.File) (string, *file.File) {
-		p = fb.NormalizePath(p)
-
-		if strings.Compare(p, target) == 0 {
-			// 0 means p == target, so is not filtering by path, but by a filename
-			return "", nil
-		} else if !strings.HasPrefix(p, target) {
-			return "", nil
-		}
-
-		items := fb.PathComponents(p)
-		name := items[depth]
-
-		if len(items) > depth+1 {
-			f, _ = file.NewFile("", name)
-			f.SetFlag(file.Directory)
-		}
-
-		return name, f
-	}
-
-	return filterFn, nil
-}
-
 func (app *DirectoryApplication) Create(ctx context.Context, uid int32) (*Directory, error) {
 	app.logger.Info("processing a \"create\" directory request",
 		zap.Int32("user_id", uid))
@@ -126,7 +81,7 @@ func (app *DirectoryApplication) Retrieve(ctx context.Context, uid int32, path s
 		filters = append(filters, filterFn)
 	}
 
-	dir.files, err = dir.FilterFiles(filters)
+	dir.files, err = FilterFiles(dir.Files(), filters)
 	if err != nil {
 		return nil, err
 	}
@@ -277,4 +232,121 @@ func (app *DirectoryApplication) UnregisterFile(ctx context.Context, f *file.Fil
 
 	wg.Wait()
 	return nil
+}
+
+func NewFilterByNameFn(target string) (FilterFileFn, error) {
+	regex, err := regexp.Compile(target)
+	if err != nil {
+		return nil, fb.ErrInvalidFormat
+	}
+
+	filterFn := func(p string, f *file.File) (string, *file.File) {
+		if regex.MatchString(p) || regex.MatchString(f.Name()) {
+			return p, f
+		}
+
+		return "", nil
+	}
+
+	return filterFn, nil
+}
+
+func NewFilterByDirFn(target string) (FilterFileFn, error) {
+	target = fb.NormalizePath(target)
+
+	depth := len(fb.PathComponents(target))
+	filterFn := func(p string, f *file.File) (string, *file.File) {
+		p = fb.NormalizePath(p)
+
+		if strings.Compare(p, target) == 0 {
+			// 0 means p == target, so is not filtering by path, but by a filename
+			return "", nil
+		} else if !strings.HasPrefix(p, target) {
+			return "", nil
+		}
+
+		items := fb.PathComponents(p)
+		name := items[depth]
+
+		if len(items) > depth+1 {
+			createdAt := f.Metadata()[file.MetadataCreatedAtKey]
+			updatedAt := f.Metadata()[file.MetadataUpdatedAtKey]
+
+			f, _ = file.NewFile("", name)
+			f.AddMetadata(file.MetadataCreatedAtKey, createdAt)
+			f.AddMetadata(file.MetadataUpdatedAtKey, updatedAt)
+			f.SetFlag(file.Directory)
+		}
+
+		return name, f
+	}
+
+	return filterFn, nil
+}
+
+func FilterFiles(files map[string]*file.File, filters []FilterFileFn) (map[string]*file.File, error) {
+	filtered := make(map[string]*file.File)
+
+	type agregation struct {
+		createdAt int64
+		updatedAt int64
+		size      int64
+	}
+
+	agregations := make(map[string]*agregation)
+
+	for p, f := range files {
+		selected := f
+		key := p
+
+		for _, filter := range filters {
+			if filter == nil {
+				continue
+			}
+
+			if key, selected = filter(p, f); selected == nil {
+				break
+			}
+		}
+
+		if selected == nil {
+			continue
+		}
+
+		filtered[key] = selected
+		if selected.Flags()&file.Directory != 0 {
+			if _, exists := agregations[key]; !exists {
+				agregations[key] = &agregation{createdAt: -1, updatedAt: -1, size: 0}
+			}
+
+			agregation := agregations[key]
+			createdAt, err := strconv.ParseInt(f.Metadata()[file.MetadataCreatedAtKey], file.TimestampBase, 64)
+			if err != nil {
+				return nil, err
+			}
+
+			if agregation.createdAt < 0 || agregation.createdAt > createdAt {
+				agregation.createdAt = createdAt
+			}
+
+			updatedAt, err := strconv.ParseInt(f.Metadata()[file.MetadataUpdatedAtKey], file.TimestampBase, 64)
+			if err != nil {
+				return nil, err
+			}
+
+			if agregation.updatedAt < 0 || agregation.updatedAt < updatedAt {
+				agregation.updatedAt = updatedAt
+			}
+
+			agregation.size++
+		}
+	}
+
+	for key, agregation := range agregations {
+		filtered[key].AddMetadata(file.MetadataCreatedAtKey, strconv.FormatInt(agregation.createdAt, file.TimestampBase))
+		filtered[key].AddMetadata(file.MetadataUpdatedAtKey, strconv.FormatInt(agregation.updatedAt, file.TimestampBase))
+		filtered[key].AddMetadata(file.MetadataSizeKey, strconv.FormatInt(agregation.size, file.TimestampBase))
+	}
+
+	return filtered, nil
 }

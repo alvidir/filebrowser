@@ -60,27 +60,3 @@ func (dir *Directory) RemoveFile(file *file.File) {
 func (dir *Directory) Files() map[string]*file.File {
 	return dir.files
 }
-
-func (dir *Directory) FilterFiles(filters []FilterFileFn) (map[string]*file.File, error) {
-	filtered := make(map[string]*file.File)
-	for p, file := range dir.files {
-		selected := file
-		key := p
-
-		for _, filter := range filters {
-			if filter == nil {
-				continue
-			}
-
-			if key, selected = filter(p, file); selected == nil {
-				break
-			}
-		}
-
-		if selected != nil {
-			filtered[key] = selected
-		}
-	}
-
-	return filtered, nil
-}

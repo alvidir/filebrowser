@@ -504,6 +504,35 @@ func TestUnregisterFileWhenFileIsShared(t *testing.T) {
 
 }
 
+func TestFilterFilesAgregation(t *testing.T) {
+	subject := NewDirectory(1)
+	subject.files["a_file"], _ = file.NewFile("", "filename")
+	subject.files["/another_file"], _ = file.NewFile("", "filename")
+	subject.files["a_directory/a_file"], _ = file.NewFile("", "filename")
+	subject.files["/a_directory/another_file"], _ = file.NewFile("", "filename")
+	subject.files["/a_directory/another_dir/a_file"], _ = file.NewFile("", "filename")
+
+	filterFn, err := NewFilterByDirFn("/")
+	if err != nil {
+		t.Errorf("got error = %v, want = nil", err)
+	}
+
+	files, err := FilterFiles(subject.Files(), []FilterFileFn{filterFn})
+	if err != nil {
+		t.Errorf("got error = %v, want = nil", err)
+	}
+
+	f, exists := files["a_directory"]
+	if !exists {
+		t.Errorf("got exists = %v, want = %v", exists, true)
+	}
+
+	want := "3"
+	if size, exists := f.Metadata()[file.MetadataSizeKey]; !exists || size != want {
+		t.Errorf("got size = %v, want = %v", size, want)
+	}
+}
+
 func TestFilterByDir(t *testing.T) {
 	subject := NewDirectory(1)
 	subject.files["a_file"], _ = file.NewFile("", "filename")
@@ -584,7 +613,7 @@ func TestFilterByDir(t *testing.T) {
 				t.Errorf("got error = %v, want = nil", err)
 			}
 
-			files, err := subject.FilterFiles([]FilterFileFn{filterFn})
+			files, err := FilterFiles(subject.Files(), []FilterFileFn{filterFn})
 			if test.err == nil && err != nil {
 				t.Errorf("got error = %v, want = nil", err)
 			} else if test.err != nil && !errors.Is(test.err, err) {
