@@ -11,6 +11,7 @@ import (
 
 const (
 	EventKindCreated = "created"
+	EventKindDeleted = "deleted"
 	ExchangeType     = "fanout"
 )
 

@@ -11,6 +11,7 @@ import (
 
 type FileEventBus interface {
 	EmitFileCreated(uid int32, f *File) error
+	EmitFileDeleted(uid int32, f *File) error
 }
 
 func NewPermissions(perm fb.Permission) *proto.Permissions {
@@ -135,6 +136,15 @@ func (server *FileServer) Delete(ctx context.Context, req *proto.FileLocator) (*
 	file, err := server.fileApp.Delete(ctx, uid, req.GetTarget())
 	if err != nil {
 		return nil, err
+	}
+
+	if _, exists := file.metadata[MetadataDeletedAtKey]; exists {
+		if err := server.fileBus.EmitFileDeleted(uid, file); err != nil {
+			server.logger.Error("emiting file deleted event",
+				zap.String("file_id", file.id),
+				zap.Int32("user_id", uid),
+				zap.Error(err))
+		}
 	}
 
 	return NewFileDescriptor(file), nil
