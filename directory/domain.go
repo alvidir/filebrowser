@@ -8,8 +8,6 @@ import (
 	"github.com/alvidir/filebrowser/file"
 )
 
-type FilterFileFn func(string, *file.File) (string, *file.File)
-
 type Directory struct {
 	id     string
 	userId int32

@@ -5,7 +5,6 @@ import (
 	"path"
 	"regexp"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -25,6 +24,37 @@ type DirectoryApplication struct {
 	dirRepo  DirectoryRepository
 	fileRepo file.FileRepository
 	logger   *zap.Logger
+}
+
+func (app *DirectoryApplication) removeFile(ctx context.Context, dir *Directory, f *file.File) error {
+	if f.Permission(dir.userId)&fb.Owner == 0 {
+		dir.RemoveFile(f)
+		return app.dirRepo.Save(ctx, dir)
+	}
+
+	if _, exists := f.Value(file.MetadataDeletedAtKey); !exists {
+		dir.RemoveFile(f)
+		return app.dirRepo.Save(ctx, dir)
+	}
+
+	var wg sync.WaitGroup
+	for _, uid := range f.SharedWith() {
+		wg.Add(1)
+		go func(ctx context.Context, wg *sync.WaitGroup, uid int32) {
+			defer wg.Done()
+
+			dir, err := app.dirRepo.FindByUserId(ctx, uid)
+			if err != nil {
+				return
+			}
+
+			dir.RemoveFile(f)
+			app.dirRepo.Save(ctx, dir)
+		}(ctx, &wg, uid)
+	}
+
+	wg.Wait()
+	return nil
 }
 
 func NewDirectoryApplication(dirRepo DirectoryRepository, fileRepo file.FileRepository, logger *zap.Logger) *DirectoryApplication {
@@ -62,9 +92,9 @@ func (app *DirectoryApplication) Retrieve(ctx context.Context, uid int32, path s
 		return nil, err
 	}
 
-	filters := make([]FilterFileFn, 0, 2)
+	filters := make([]filterFileFn, 0, 2)
 	if len(path) > 0 {
-		filterFn, err := NewFilterByDirFn(path)
+		filterFn, err := newFilterByDirFn(path)
 		if err != nil {
 			return nil, err
 		}
@@ -73,7 +103,7 @@ func (app *DirectoryApplication) Retrieve(ctx context.Context, uid int32, path s
 	}
 
 	if len(filter) > 0 {
-		filterFn, err := NewFilterByNameFn(filter)
+		filterFn, err := newFilterByRegexFn(filter)
 		if err != nil {
 			return nil, err
 		}
@@ -81,7 +111,12 @@ func (app *DirectoryApplication) Retrieve(ctx context.Context, uid int32, path s
 		filters = append(filters, filterFn)
 	}
 
-	dir.files, err = FilterFiles(dir.Files(), filters)
+	files, err := filterFiles(dir.Files(), filters)
+	if err != nil {
+		return nil, err
+	}
+
+	dir.files, err = files.Agregate()
 	if err != nil {
 		return nil, err
 	}
@@ -94,6 +129,7 @@ func (app *DirectoryApplication) Retrieve(ctx context.Context, uid int32, path s
 	return dir, nil
 }
 
+// Delete hard deletes the user uid directory
 func (app *DirectoryApplication) Delete(ctx context.Context, uid int32) error {
 	app.logger.Info("processing a \"delete\" directory request",
 		zap.Int32("user_id", uid))
@@ -134,8 +170,11 @@ func (app *DirectoryApplication) Delete(ctx context.Context, uid int32) error {
 	return nil
 }
 
+// Relocate appends the target path at the beginning of all these file paths in the directory that matches the
+// filter's regex. If the regex contains more than one submatches, then the starting indexes of the first and
+// second submatches determines the substring to be removed before appending.
 func (app *DirectoryApplication) Relocate(ctx context.Context, uid int32, target string, filter string) error {
-	app.logger.Info("processing a \"move\" directory request",
+	app.logger.Info("processing a \"relocate\" directory request",
 		zap.Int32("user_id", uid),
 		zap.String("path", target),
 		zap.String("filter", filter))
@@ -179,9 +218,61 @@ func (app *DirectoryApplication) Relocate(ctx context.Context, uid int32, target
 	return nil
 }
 
-// RegisterFile is executed when a file has been created
+// RemoveFiles removes, for given user, all these files whose path in the user's directory matches the path as
+// a prefix and the filter as a regex. If any of both is not defined (aka. empty string) then the corresponding
+// filter will be skipt.
+func (app *DirectoryApplication) RemoveFiles(ctx context.Context, uid int32, path string, filter string) error {
+	app.logger.Info("processing a \"remove files\" request",
+		zap.Int32("user_id", uid))
+
+	dir, err := app.dirRepo.FindByUserId(ctx, uid)
+	if err != nil {
+		return err
+	}
+
+	filters := make([]filterFileFn, 0, 2)
+	if len(path) > 0 {
+		filterFn, err := newFilterByPrefixFn(path)
+		if err != nil {
+			return err
+		}
+
+		filters = append(filters, filterFn)
+	}
+
+	if len(filter) > 0 {
+		filterFn, err := newFilterByRegexFn(filter)
+		if err != nil {
+			return err
+		}
+
+		filters = append(filters, filterFn)
+	}
+
+	files, err := filterFiles(dir.Files(), filters)
+	if err != nil {
+		return err
+	}
+
+	var wg sync.WaitGroup
+	files.Range(func(p string, f *file.File) bool {
+		wg.Add(1)
+		go func(ctx context.Context, dir *Directory, f *file.File) {
+			defer wg.Done()
+			app.removeFile(ctx, dir, f)
+		}(ctx, dir, f)
+
+		return true
+	})
+
+	wg.Wait()
+	return nil
+}
+
+// RegisterFile registers the given file into the user uid directory. The given path may change if,
+// and only if, another file with the same name exists in the same path.
 func (app *DirectoryApplication) RegisterFile(ctx context.Context, file *file.File, uid int32, fpath string) (string, error) {
-	app.logger.Info("processing an \"add file\" request",
+	app.logger.Info("processing an \"register file\" request",
 		zap.Int32("user_id", uid),
 		zap.String("file_id", file.Id()))
 
@@ -194,9 +285,10 @@ func (app *DirectoryApplication) RegisterFile(ctx context.Context, file *file.Fi
 	return path.Base(name), app.dirRepo.Save(ctx, dir)
 }
 
-// UnregisterFile is executed when a file has been deleted
+// UnregisterFile unregisters the given file from the directory. This action may trigger the file's
+// deletion if it becomes with no owner once unregistered.
 func (app *DirectoryApplication) UnregisterFile(ctx context.Context, f *file.File, uid int32) error {
-	app.logger.Info("processing a \"remove file\" request",
+	app.logger.Info("processing a \"unregister file\" request",
 		zap.Int32("user_id", uid))
 
 	dir, err := app.dirRepo.FindByUserId(ctx, uid)
@@ -204,149 +296,5 @@ func (app *DirectoryApplication) UnregisterFile(ctx context.Context, f *file.Fil
 		return err
 	}
 
-	if f.Permission(uid)&fb.Owner == 0 {
-		dir.RemoveFile(f)
-		return app.dirRepo.Save(ctx, dir)
-	}
-
-	if _, exists := f.Value(file.MetadataDeletedAtKey); !exists {
-		dir.RemoveFile(f)
-		return app.dirRepo.Save(ctx, dir)
-	}
-
-	var wg sync.WaitGroup
-	for _, uid := range f.SharedWith() {
-		wg.Add(1)
-		go func(ctx context.Context, wg *sync.WaitGroup, uid int32) {
-			defer wg.Done()
-
-			dir, err := app.dirRepo.FindByUserId(ctx, uid)
-			if err != nil {
-				return
-			}
-
-			dir.RemoveFile(f)
-			app.dirRepo.Save(ctx, dir)
-		}(ctx, &wg, uid)
-	}
-
-	wg.Wait()
-	return nil
-}
-
-func NewFilterByNameFn(target string) (FilterFileFn, error) {
-	regex, err := regexp.Compile(target)
-	if err != nil {
-		return nil, fb.ErrInvalidFormat
-	}
-
-	filterFn := func(p string, f *file.File) (string, *file.File) {
-		if regex.MatchString(p) || regex.MatchString(f.Name()) {
-			return p, f
-		}
-
-		return "", nil
-	}
-
-	return filterFn, nil
-}
-
-func NewFilterByDirFn(target string) (FilterFileFn, error) {
-	target = fb.NormalizePath(target)
-
-	depth := len(fb.PathComponents(target))
-	filterFn := func(p string, f *file.File) (string, *file.File) {
-		p = fb.NormalizePath(p)
-
-		if strings.Compare(p, target) == 0 {
-			// 0 means p == target, so is not filtering by path, but by a filename
-			return "", nil
-		} else if !strings.HasPrefix(p, target) {
-			return "", nil
-		}
-
-		items := fb.PathComponents(p)
-		name := items[depth]
-
-		if len(items) > depth+1 {
-			createdAt := f.Metadata()[file.MetadataCreatedAtKey]
-			updatedAt := f.Metadata()[file.MetadataUpdatedAtKey]
-
-			f, _ = file.NewFile("", name)
-			f.AddMetadata(file.MetadataCreatedAtKey, createdAt)
-			f.AddMetadata(file.MetadataUpdatedAtKey, updatedAt)
-			f.SetFlag(file.Directory)
-		}
-
-		return name, f
-	}
-
-	return filterFn, nil
-}
-
-func FilterFiles(files map[string]*file.File, filters []FilterFileFn) (map[string]*file.File, error) {
-	filtered := make(map[string]*file.File)
-
-	type agregation struct {
-		createdAt int64
-		updatedAt int64
-		size      int64
-	}
-
-	agregations := make(map[string]*agregation)
-
-	for p, f := range files {
-		selected := f
-		key := p
-
-		for _, filter := range filters {
-			if filter == nil {
-				continue
-			}
-
-			if key, selected = filter(p, f); selected == nil {
-				break
-			}
-		}
-
-		if selected == nil {
-			continue
-		}
-
-		filtered[key] = selected
-		if selected.Flags()&file.Directory != 0 {
-			if _, exists := agregations[key]; !exists {
-				agregations[key] = &agregation{createdAt: -1, updatedAt: -1, size: 0}
-			}
-
-			agregation := agregations[key]
-			createdAt, err := strconv.ParseInt(f.Metadata()[file.MetadataCreatedAtKey], file.TimestampBase, 64)
-			if err != nil {
-				return nil, err
-			}
-
-			if agregation.createdAt < 0 || agregation.createdAt > createdAt {
-				agregation.createdAt = createdAt
-			}
-
-			updatedAt, err := strconv.ParseInt(f.Metadata()[file.MetadataUpdatedAtKey], file.TimestampBase, 64)
-			if err != nil {
-				return nil, err
-			}
-
-			if agregation.updatedAt < 0 || agregation.updatedAt < updatedAt {
-				agregation.updatedAt = updatedAt
-			}
-
-			agregation.size++
-		}
-	}
-
-	for key, agregation := range agregations {
-		filtered[key].AddMetadata(file.MetadataCreatedAtKey, strconv.FormatInt(agregation.createdAt, file.TimestampBase))
-		filtered[key].AddMetadata(file.MetadataUpdatedAtKey, strconv.FormatInt(agregation.updatedAt, file.TimestampBase))
-		filtered[key].AddMetadata(file.MetadataSizeKey, strconv.FormatInt(agregation.size, file.TimestampBase))
-	}
-
-	return filtered, nil
+	return app.removeFile(ctx, dir, f)
 }

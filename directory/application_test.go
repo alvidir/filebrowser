@@ -504,148 +504,6 @@ func TestUnregisterFileWhenFileIsShared(t *testing.T) {
 
 }
 
-func TestFilterFilesAgregation(t *testing.T) {
-	subject := NewDirectory(1)
-	subject.files["a_file"], _ = file.NewFile("", "filename")
-	subject.files["/another_file"], _ = file.NewFile("", "filename")
-	subject.files["a_directory/a_file"], _ = file.NewFile("", "filename")
-	subject.files["/a_directory/another_file"], _ = file.NewFile("", "filename")
-	subject.files["/a_directory/another_dir/a_file"], _ = file.NewFile("", "filename")
-
-	filterFn, err := NewFilterByDirFn("/")
-	if err != nil {
-		t.Errorf("got error = %v, want = nil", err)
-	}
-
-	files, err := FilterFiles(subject.Files(), []FilterFileFn{filterFn})
-	if err != nil {
-		t.Errorf("got error = %v, want = nil", err)
-	}
-
-	f, exists := files["a_directory"]
-	if !exists {
-		t.Errorf("got exists = %v, want = %v", exists, true)
-	}
-
-	want := "3"
-	if size, exists := f.Metadata()[file.MetadataSizeKey]; !exists || size != want {
-		t.Errorf("got size = %v, want = %v", size, want)
-	}
-}
-
-func TestFilterByDir(t *testing.T) {
-	subject := NewDirectory(1)
-	subject.files["a_file"], _ = file.NewFile("", "filename")
-	subject.files["/another_file"], _ = file.NewFile("", "filename")
-	subject.files["a_directory/a_file"], _ = file.NewFile("", "filename")
-	subject.files["/a_directory/another_file"], _ = file.NewFile("", "filename")
-
-	tests := []struct {
-		name string
-		path string
-		want []struct {
-			path  string
-			isDir bool
-		}
-		err error
-	}{
-		{
-			name: "filter by root",
-			path: "/",
-			want: []struct {
-				path  string
-				isDir bool
-			}{
-				{path: "a_file", isDir: false},
-				{path: "another_file", isDir: false},
-				{path: "a_directory", isDir: true},
-			},
-			err: nil,
-		},
-		{
-			name: "filter by directory",
-			path: "a_directory",
-			want: []struct {
-				path  string
-				isDir bool
-			}{
-				{path: "a_file", isDir: false},
-				{path: "another_file", isDir: false},
-			},
-			err: nil,
-		},
-		{
-			name: "filter by filename",
-			path: "a_file",
-			want: []struct {
-				path  string
-				isDir bool
-			}{},
-			err: nil,
-		},
-		{
-			name: "filter by another filename",
-			path: "a_directory/a_file",
-			want: []struct {
-				path  string
-				isDir bool
-			}{},
-			err: nil,
-		},
-		{
-			name: "filter by non existing directory",
-			path: "another_directory",
-			want: []struct {
-				path  string
-				isDir bool
-			}{},
-			err: nil,
-		},
-	}
-
-	for _, test := range tests {
-		t := t
-		test := test
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			filterFn, err := NewFilterByDirFn(test.path)
-			if err != nil {
-				t.Errorf("got error = %v, want = nil", err)
-			}
-
-			files, err := FilterFiles(subject.Files(), []FilterFileFn{filterFn})
-			if test.err == nil && err != nil {
-				t.Errorf("got error = %v, want = nil", err)
-			} else if test.err != nil && !errors.Is(test.err, err) {
-				t.Errorf("got error = %v, want = %v", err, test.err)
-			}
-
-			if len(test.want) != len(files) {
-				t.Errorf("got files length = %v, want = %v", len(files), len(test.want))
-			}
-
-			for _, fwant := range test.want {
-				var exists bool
-				for p, f := range files {
-					if exists = p == fwant.path; !exists {
-						continue
-					}
-
-					if isDir := f.Flags()&file.Directory != 0; isDir != fwant.isDir {
-						t.Errorf("got file path = %v as directory = %v, want = %v", p, isDir, fwant.isDir)
-					}
-
-					break
-				}
-
-				if !exists {
-					t.Errorf("path = %v not found", fwant.path)
-				}
-			}
-		})
-	}
-}
-
 func TestRelocate(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
@@ -808,6 +666,105 @@ func TestRelocate(t *testing.T) {
 			app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
 			err := app.Relocate(context.TODO(), 999, test.target, test.filter)
+			if err != nil {
+				t.Errorf("got error = %v, want = nil", err)
+			}
+
+			if len(test.want) != len(files) {
+				t.Errorf("got files = %v, want = %v", files, test.want)
+			}
+
+			for _, expectedPath := range test.want {
+				if _, exists := files[expectedPath]; !exists {
+					t.Errorf("got files = %v, want = %v", files, test.want)
+				}
+			}
+
+		})
+	}
+}
+
+func TestRemoveFiles(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	tests := []struct {
+		name   string
+		target string
+		filter string
+		files  []string
+		want   []string
+	}{
+		{
+			name:   "filter single file by regex",
+			target: "",
+			filter: "^/a_file$",
+			files: []string{
+				"/a_file",
+				"/a_directory/a_file",
+			},
+			want: []string{
+				"/a_directory/a_file",
+			},
+		},
+		{
+			name:   "filter multiple files by regex",
+			target: "",
+			filter: "^/a_file$|^/another_file$",
+			files: []string{
+				"/a_file",
+				"/another_file",
+				"/a_directory/a_file",
+			},
+			want: []string{
+				"/a_directory/a_file",
+			},
+		},
+		{
+			name:   "filter directory by prefix",
+			target: "/a_directory",
+			filter: "",
+			files: []string{
+				"/a_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+			},
+			want: []string{
+				"/a_file",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t := t
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			dirRepo := &directoryRepositoryMock{}
+			files := make(map[string]*file.File)
+			for index, filename := range test.files {
+				files[filename], _ = file.NewFile(strconv.Itoa(index), "filename")
+				t.Logf("got f as %v", files[filename])
+			}
+
+			dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
+				return &Directory{
+					id:     "test",
+					userId: 999,
+					files:  files,
+				}, nil
+			}
+
+			fileRepo := &fileRepositoryMock{
+				find: func(repo *fileRepositoryMock, ctx context.Context, id string) (*file.File, error) {
+					return files[id], nil
+				},
+			}
+
+			app := NewDirectoryApplication(dirRepo, fileRepo, logger)
+
+			err := app.RemoveFiles(context.TODO(), 999, test.target, test.filter)
 			if err != nil {
 				t.Errorf("got error = %v, want = nil", err)
 			}
