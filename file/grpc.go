@@ -132,6 +132,10 @@ func (server *FileServer) Delete(ctx context.Context, req *proto.FileLocator) (*
 		return nil, err
 	}
 
-	_, err = server.fileApp.Delete(ctx, uid, req.GetTarget())
-	return nil, err
+	file, err := server.fileApp.Delete(ctx, uid, req.GetTarget())
+	if err != nil {
+		return nil, err
+	}
+
+	return NewFileDescriptor(file), nil
 }

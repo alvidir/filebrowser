@@ -156,6 +156,10 @@ func (app *FileApplication) Delete(ctx context.Context, uid int32, fid string) (
 		return nil, err
 	}
 
+	if err = app.dirApp.UnregisterFile(ctx, f, uid); err != nil {
+		return nil, err
+	}
+
 	if f.Permission(uid)&fb.Owner != 0 && len(f.Owners()) == 1 {
 		// uid is the only owner of file f
 		f.metadata[MetadataDeletedAtKey] = strconv.FormatInt(time.Now().Unix(), TimestampBase)
@@ -169,10 +173,5 @@ func (app *FileApplication) Delete(ctx context.Context, uid int32, fid string) (
 		return nil, fb.ErrNotAvailable
 	}
 
-	if err != nil {
-		return nil, err
-	}
-
-	err = app.dirApp.UnregisterFile(ctx, f, uid)
 	return f, err
 }

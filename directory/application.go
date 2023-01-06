@@ -26,37 +26,6 @@ type DirectoryApplication struct {
 	logger   *zap.Logger
 }
 
-func (app *DirectoryApplication) removeFile(ctx context.Context, dir *Directory, f *file.File) error {
-	if f.Permission(dir.userId)&fb.Owner == 0 {
-		dir.RemoveFile(f)
-		return app.dirRepo.Save(ctx, dir)
-	}
-
-	if _, exists := f.Value(file.MetadataDeletedAtKey); !exists {
-		dir.RemoveFile(f)
-		return app.dirRepo.Save(ctx, dir)
-	}
-
-	var wg sync.WaitGroup
-	for _, uid := range f.SharedWith() {
-		wg.Add(1)
-		go func(ctx context.Context, wg *sync.WaitGroup, uid int32) {
-			defer wg.Done()
-
-			dir, err := app.dirRepo.FindByUserId(ctx, uid)
-			if err != nil {
-				return
-			}
-
-			dir.RemoveFile(f)
-			app.dirRepo.Save(ctx, dir)
-		}(ctx, &wg, uid)
-	}
-
-	wg.Wait()
-	return nil
-}
-
 func NewDirectoryApplication(dirRepo DirectoryRepository, fileRepo file.FileRepository, logger *zap.Logger) *DirectoryApplication {
 	return &DirectoryApplication{
 		dirRepo:  dirRepo,
@@ -254,19 +223,13 @@ func (app *DirectoryApplication) RemoveFiles(ctx context.Context, uid int32, pat
 		return err
 	}
 
-	var wg sync.WaitGroup
 	files.Range(func(p string, f *file.File) bool {
-		wg.Add(1)
-		go func(ctx context.Context, dir *Directory, f *file.File) {
-			defer wg.Done()
-			app.removeFile(ctx, dir, f)
-		}(ctx, dir, f)
-
-		return true
+		dir.RemoveFile(f)
+		err = app.dirRepo.Save(ctx, dir)
+		return err == nil
 	})
 
-	wg.Wait()
-	return nil
+	return err
 }
 
 // RegisterFile registers the given file into the user uid directory. The given path may change if,
@@ -296,5 +259,6 @@ func (app *DirectoryApplication) UnregisterFile(ctx context.Context, f *file.Fil
 		return err
 	}
 
-	return app.removeFile(ctx, dir, f)
+	dir.RemoveFile(f)
+	return app.dirRepo.Save(ctx, dir)
 }
