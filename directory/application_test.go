@@ -733,6 +733,22 @@ func TestRemoveFiles(t *testing.T) {
 				"/a_file",
 			},
 		},
+		{
+			name:   "filter by prefix and regex",
+			target: "/a_directory",
+			filter: "/a_file$",
+			files: []string{
+				"/a_file",
+				"/another_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+			},
+			want: []string{
+				"/a_file",
+				"/another_file",
+				"/a_directory/another_file",
+			},
+		},
 	}
 
 	for _, test := range tests {
