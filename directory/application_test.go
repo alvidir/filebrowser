@@ -578,7 +578,7 @@ func TestRelocate(t *testing.T) {
 				"/a_directory/a_file",
 			},
 			want: []string{
-				"/a_directory/a_file (1)",
+				"/a_directory/a_file_1",
 				"/a_directory/a_file",
 			},
 		},
@@ -591,7 +591,7 @@ func TestRelocate(t *testing.T) {
 				"/another_dir/an_item",
 			},
 			want: []string{
-				"/another_dir/an_item (1)/a_directory/a_file",
+				"/another_dir/an_item_1/a_directory/a_file",
 				"/another_dir/an_item",
 			},
 		},
@@ -604,7 +604,7 @@ func TestRelocate(t *testing.T) {
 				"/another_dir/a_file",
 			},
 			want: []string{
-				"/a_directory/a_file (1)",
+				"/a_directory/a_file_1",
 				"/a_directory/a_file",
 			},
 		},
@@ -614,23 +614,23 @@ func TestRelocate(t *testing.T) {
 			filter: "^/(a_file(/.*)?)$",
 			files: []string{
 				"/a_file",
-				"/a_file (1)",
+				"/a_file_1",
 			},
 			want: []string{
 				"/a_directory/a_file",
-				"/a_file (1)",
+				"/a_file_1",
 			},
 		},
 		{
 			name:   "move file with similar name to directory - 2",
 			target: "/a_directory",
-			filter: "^/(a_file \\(1\\)(/.*)?)$",
+			filter: "^/(a_file_1(/.*)?)$",
 			files: []string{
 				"/a_file",
-				"/a_file (1)",
+				"/a_file_1",
 			},
 			want: []string{
-				"/a_directory/a_file (1)",
+				"/a_directory/a_file_1",
 				"/a_file",
 			},
 		},
@@ -640,11 +640,26 @@ func TestRelocate(t *testing.T) {
 			filter: "^(/a_file(/.*)?)$",
 			files: []string{
 				"/a_file",
-				"/a_file (1)",
+				"/a_file_1",
 			},
 			want: []string{
 				"/renamed_file",
-				"/a_file (1)",
+				"/a_file_1",
+			},
+		},
+		{
+			name:   "rename deeper file",
+			target: "/a_directory/renamed_file",
+			filter: "^(/a_directory/a_file(/.*)?)$",
+			files: []string{
+				"/a_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+			},
+			want: []string{
+				"/a_file",
+				"/a_directory/renamed_file",
+				"/a_directory/another_file",
 			},
 		},
 		{
@@ -660,6 +675,25 @@ func TestRelocate(t *testing.T) {
 				"/a_file",
 				"/renamed_dir/a_file",
 				"/renamed_dir/another_file",
+			},
+		},
+		{
+			name:   "rename deeper directory",
+			target: "/a_directory/renamed_dir",
+			filter: "^/a_directory/another_dir(/.*)?$",
+			files: []string{
+				"/a_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+				"/a_directory/another_dir/a_file",
+				"/a_directory/another_dir/another_file",
+			},
+			want: []string{
+				"/a_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+				"/a_directory/renamed_dir/a_file",
+				"/a_directory/renamed_dir/another_file",
 			},
 		},
 	}

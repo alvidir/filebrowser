@@ -27,13 +27,14 @@ func (dir *Directory) getAvailablePath(dest string) string {
 	for index := 0; index < len(components); index++ {
 		candidate := components[index]
 		counter := 1
+
 		for {
 			subject := fb.NormalizePath(path.Join(components[0 : index+1]...))
 			if _, exists := dir.files[subject]; !exists {
 				break
 			}
 
-			components[index] = fmt.Sprintf("%s (%v)", candidate, counter)
+			components[index] = fmt.Sprintf("%s_%d", candidate, counter)
 			counter++
 		}
 	}

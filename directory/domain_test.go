@@ -37,12 +37,12 @@ func TestAddFile(t *testing.T) {
 		t.Errorf("got file id = %v, want = %v", got, f.Id())
 	}
 
-	want1 := fmt.Sprintf("%s (1)", path)
+	want1 := fmt.Sprintf("%s_1", path)
 	if got := dir.AddFile(f, path); got != want1 {
 		t.Errorf("got final path = %s, want = %v", got, want1)
 	}
 
-	want2 := fmt.Sprintf("%s (2)", path)
+	want2 := fmt.Sprintf("%s_2", path)
 	if got := dir.AddFile(f, path); got != want2 {
 		t.Errorf("got final path = %s, want = %v", got, want2)
 	}
@@ -83,7 +83,7 @@ func TestFiles(t *testing.T) {
 		dir.AddFile(f, path)
 	}
 
-	want[1] = "/path/to/filename (1)"
+	want[1] = "/path/to/filename_1"
 
 	got := dir.Files()
 	if len(got) != len(want) {
