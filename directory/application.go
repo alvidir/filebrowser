@@ -172,7 +172,11 @@ func (app *DirectoryApplication) Relocate(ctx context.Context, uid int32, target
 			matchStart = matches[2]
 		}
 
-		index := len(fb.PathComponents(subject[:matchStart]))
+		index := len(fb.PathComponents(subject))
+		if matchStart > 0 {
+			index = len(fb.PathComponents(subject[:matchStart]))
+		}
+
 		p1 := path.Join(fb.PathComponents(subject)[index:]...)
 		p1 = fb.NormalizePath(path.Join(target, p1))
 

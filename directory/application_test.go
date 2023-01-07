@@ -634,6 +634,34 @@ func TestRelocate(t *testing.T) {
 				"/a_file",
 			},
 		},
+		{
+			name:   "rename file",
+			target: "/renamed_file",
+			filter: "^(/a_file(/.*)?)$",
+			files: []string{
+				"/a_file",
+				"/a_file (1)",
+			},
+			want: []string{
+				"/renamed_file",
+				"/a_file (1)",
+			},
+		},
+		{
+			name:   "rename directory",
+			target: "/renamed_dir",
+			filter: "^/a_directory(/.*)?$",
+			files: []string{
+				"/a_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+			},
+			want: []string{
+				"/a_file",
+				"/renamed_dir/a_file",
+				"/renamed_dir/another_file",
+			},
+		},
 	}
 
 	for _, test := range tests {
