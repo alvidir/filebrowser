@@ -5,7 +5,6 @@ import (
 	"path"
 	"regexp"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -35,51 +34,6 @@ func NewDirectoryApplication(dirRepo DirectoryRepository, fileRepo file.FileRepo
 	}
 }
 
-func NewFilterByNameFn(target string) (FilterFileFn, error) {
-	regex, err := regexp.Compile(target)
-	if err != nil {
-		return nil, fb.ErrInvalidFormat
-	}
-
-	filterFn := func(p string, f *file.File) (string, *file.File) {
-		if regex.MatchString(p) || regex.MatchString(f.Name()) {
-			return p, f
-		}
-
-		return "", nil
-	}
-
-	return filterFn, nil
-}
-
-func NewFilterByDirFn(target string) (FilterFileFn, error) {
-	target = fb.NormalizePath(target)
-
-	depth := len(fb.PathComponents(target))
-	filterFn := func(p string, f *file.File) (string, *file.File) {
-		p = fb.NormalizePath(p)
-
-		if strings.Compare(p, target) == 0 {
-			// 0 means p == target, so is not filtering by path, but by a filename
-			return "", nil
-		} else if !strings.HasPrefix(p, target) {
-			return "", nil
-		}
-
-		items := fb.PathComponents(p)
-		name := items[depth]
-
-		if len(items) > depth+1 {
-			f, _ = file.NewFile("", name)
-			f.SetFlag(file.Directory)
-		}
-
-		return name, f
-	}
-
-	return filterFn, nil
-}
-
 func (app *DirectoryApplication) Create(ctx context.Context, uid int32) (*Directory, error) {
 	app.logger.Info("processing a \"create\" directory request",
 		zap.Int32("user_id", uid))
@@ -107,9 +61,9 @@ func (app *DirectoryApplication) Retrieve(ctx context.Context, uid int32, path s
 		return nil, err
 	}
 
-	filters := make([]FilterFileFn, 0, 2)
+	filters := make([]filterFileFn, 0, 2)
 	if len(path) > 0 {
-		filterFn, err := NewFilterByDirFn(path)
+		filterFn, err := newFilterByDirFn(path)
 		if err != nil {
 			return nil, err
 		}
@@ -118,7 +72,7 @@ func (app *DirectoryApplication) Retrieve(ctx context.Context, uid int32, path s
 	}
 
 	if len(filter) > 0 {
-		filterFn, err := NewFilterByNameFn(filter)
+		filterFn, err := newFilterByRegexFn(filter)
 		if err != nil {
 			return nil, err
 		}
@@ -126,7 +80,12 @@ func (app *DirectoryApplication) Retrieve(ctx context.Context, uid int32, path s
 		filters = append(filters, filterFn)
 	}
 
-	dir.files, err = dir.FilterFiles(filters)
+	files, err := filterFiles(dir.Files(), filters)
+	if err != nil {
+		return nil, err
+	}
+
+	dir.files, err = files.Agregate()
 	if err != nil {
 		return nil, err
 	}
@@ -139,6 +98,7 @@ func (app *DirectoryApplication) Retrieve(ctx context.Context, uid int32, path s
 	return dir, nil
 }
 
+// Delete hard deletes the user uid directory
 func (app *DirectoryApplication) Delete(ctx context.Context, uid int32) error {
 	app.logger.Info("processing a \"delete\" directory request",
 		zap.Int32("user_id", uid))
@@ -179,8 +139,11 @@ func (app *DirectoryApplication) Delete(ctx context.Context, uid int32) error {
 	return nil
 }
 
+// Relocate appends the target path at the beginning of all these file paths in the directory that matches the
+// filter's regex. If the regex contains more than one submatches, then the starting indexes of the first and
+// second submatches determines the substring to be removed before appending.
 func (app *DirectoryApplication) Relocate(ctx context.Context, uid int32, target string, filter string) error {
-	app.logger.Info("processing a \"move\" directory request",
+	app.logger.Info("processing a \"relocate\" directory request",
 		zap.Int32("user_id", uid),
 		zap.String("path", target),
 		zap.String("filter", filter))
@@ -199,18 +162,21 @@ func (app *DirectoryApplication) Relocate(ctx context.Context, uid int32, target
 	for p0, f := range dir.Files() {
 		subject := fb.NormalizePath(p0)
 
-		matchIndexPairs := regex.FindStringIndex(subject)
-		if matchIndexPairs == nil {
+		matches := regex.FindStringSubmatchIndex(subject)
+		if matches == nil {
 			continue
 		}
 
-		matchStart := matchIndexPairs[0] + 1
-		if submatch := regex.NumSubexp(); submatch > 0 {
-			matchIndexPairs = regex.FindStringSubmatchIndex(subject)
-			matchStart = matchIndexPairs[submatch*2]
+		matchStart := matches[0] + 1
+		if regex.NumSubexp() > 0 && matches[2] > -1 {
+			matchStart = matches[2]
 		}
 
-		index := len(fb.PathComponents(subject[:matchStart]))
+		index := len(fb.PathComponents(subject))
+		if matchStart > 0 {
+			index = len(fb.PathComponents(subject[:matchStart]))
+		}
+
 		p1 := path.Join(fb.PathComponents(subject)[index:]...)
 		p1 = fb.NormalizePath(path.Join(target, p1))
 
@@ -225,9 +191,11 @@ func (app *DirectoryApplication) Relocate(ctx context.Context, uid int32, target
 	return nil
 }
 
-// RegisterFile is executed when a file has been created
-func (app *DirectoryApplication) RegisterFile(ctx context.Context, file *file.File, uid int32, fpath string) error {
-	app.logger.Info("processing an \"add file\" request",
+// RemoveFiles removes, for given user, all these files whose path in the user's directory matches the path as
+// a prefix and the filter as a regex. If any of both is not defined (aka. empty string) then the corresponding
+// filter will be skipt.
+func (app *DirectoryApplication) RemoveFiles(ctx context.Context, uid int32, path string, filter string) error {
+	app.logger.Info("processing a \"remove files\" request",
 		zap.Int32("user_id", uid))
 
 	dir, err := app.dirRepo.FindByUserId(ctx, uid)
@@ -235,13 +203,59 @@ func (app *DirectoryApplication) RegisterFile(ctx context.Context, file *file.Fi
 		return err
 	}
 
-	dir.AddFile(file, fb.NormalizePath(fpath))
-	return app.dirRepo.Save(ctx, dir)
+	filters := make([]filterFileFn, 0, 2)
+	if len(path) > 0 {
+		filterFn, err := newFilterByPrefixFn(path)
+		if err != nil {
+			return err
+		}
+
+		filters = append(filters, filterFn)
+	}
+
+	if len(filter) > 0 {
+		filterFn, err := newFilterByRegexFn(filter)
+		if err != nil {
+			return err
+		}
+
+		filters = append(filters, filterFn)
+	}
+
+	files, err := filterFiles(dir.Files(), filters)
+	if err != nil {
+		return err
+	}
+
+	files.Range(func(p string, f *file.File) bool {
+		dir.RemoveFile(f)
+		err = app.dirRepo.Save(ctx, dir)
+		return err == nil
+	})
+
+	return err
 }
 
-// UnregisterFile is executed when a file has been deleted
+// RegisterFile registers the given file into the user uid directory. The given path may change if,
+// and only if, another file with the same name exists in the same path.
+func (app *DirectoryApplication) RegisterFile(ctx context.Context, file *file.File, uid int32, fpath string) (string, error) {
+	app.logger.Info("processing an \"register file\" request",
+		zap.Int32("user_id", uid),
+		zap.String("file_id", file.Id()))
+
+	dir, err := app.dirRepo.FindByUserId(ctx, uid)
+	if err != nil {
+		return "", err
+	}
+
+	name := dir.AddFile(file, fb.NormalizePath(fpath))
+	return path.Base(name), app.dirRepo.Save(ctx, dir)
+}
+
+// UnregisterFile unregisters the given file from the directory. This action may trigger the file's
+// deletion if it becomes with no owner once unregistered.
 func (app *DirectoryApplication) UnregisterFile(ctx context.Context, f *file.File, uid int32) error {
-	app.logger.Info("processing a \"remove file\" request",
+	app.logger.Info("processing a \"unregister file\" request",
 		zap.Int32("user_id", uid))
 
 	dir, err := app.dirRepo.FindByUserId(ctx, uid)
@@ -249,32 +263,6 @@ func (app *DirectoryApplication) UnregisterFile(ctx context.Context, f *file.Fil
 		return err
 	}
 
-	if f.Permission(uid)&fb.Owner == 0 {
-		dir.RemoveFile(f)
-		return app.dirRepo.Save(ctx, dir)
-	}
-
-	if _, exists := f.Value(file.MetadataDeletedAtKey); !exists {
-		dir.RemoveFile(f)
-		return app.dirRepo.Save(ctx, dir)
-	}
-
-	var wg sync.WaitGroup
-	for _, uid := range f.SharedWith() {
-		wg.Add(1)
-		go func(ctx context.Context, wg *sync.WaitGroup, uid int32) {
-			defer wg.Done()
-
-			dir, err := app.dirRepo.FindByUserId(ctx, uid)
-			if err != nil {
-				return
-			}
-
-			dir.RemoveFile(f)
-			app.dirRepo.Save(ctx, dir)
-		}(ctx, &wg, uid)
-	}
-
-	wg.Wait()
-	return nil
+	dir.RemoveFile(f)
+	return app.dirRepo.Save(ctx, dir)
 }

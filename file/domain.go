@@ -18,8 +18,8 @@ const (
 	MetadataCreatedAtKey = "created_at"
 	MetadataUpdatedAtKey = "updated_at"
 	MetadataDeletedAtKey = "deleted_at"
-	MetadataUrlKey       = "url"
-	MetadataAppKey       = "app"
+	MetadataSizeKey      = "size"
+	MetadataAppKey       = "app_id"
 
 	TimestampBase = 16
 )
@@ -111,6 +111,10 @@ func (file *File) SharedWith() []int32 {
 	}
 
 	return shared
+}
+
+func (file *File) SetID(id string) {
+	file.id = id
 }
 
 func (file *File) SetName(name string) {

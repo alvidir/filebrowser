@@ -10,18 +10,11 @@ import (
 	"go.uber.org/zap"
 )
 
-type FileEventPayload struct {
-	UserID   int32  `json:"user_id"`
-	App      string `json:"app"`
-	Url      string `json:"url"`
-	FileName string `json:"name"`
-	Kind     string `json:"kind"`
-}
-
 type FileEventHandler struct {
 	dirApp  *dir.DirectoryApplication
 	fileApp *file.FileApplication
 	certApp *cert.CertificateApplication
+	issuers map[string]bool
 	logger  *zap.Logger
 }
 
@@ -30,8 +23,18 @@ func NewFileEventHandler(dirApp *dir.DirectoryApplication, fileApp *file.FileApp
 		dirApp:  dirApp,
 		fileApp: fileApp,
 		certApp: certApp,
+		issuers: make(map[string]bool),
 		logger:  logger,
 	}
+}
+
+func (handler *FileEventHandler) DiscardIssuer(issuer string) {
+	handler.issuers[issuer] = false
+}
+
+func (handler *FileEventHandler) isDiscarted(issuer string) bool {
+	accepted, exists := handler.issuers[issuer]
+	return !accepted && exists
 }
 
 func (handler *FileEventHandler) OnEvent(ctx context.Context, body []byte) {
@@ -45,7 +48,7 @@ func (handler *FileEventHandler) OnEvent(ctx context.Context, body []byte) {
 	}
 
 	switch kind := event.Kind; kind {
-	case EVENT_KIND_CREATED:
+	case EventKindCreated:
 		handler.logger.Info("handling file event",
 			zap.String("kind", kind))
 
@@ -58,17 +61,28 @@ func (handler *FileEventHandler) OnEvent(ctx context.Context, body []byte) {
 }
 
 func (handler *FileEventHandler) onFileCreatedEvent(ctx context.Context, event *FileEventPayload) {
+	if handler.isDiscarted(event.Issuer) {
+		handler.logger.Info("discarting event",
+			zap.String("issuer", event.Issuer),
+			zap.String("app", event.AppID),
+			zap.String("file_name", event.FileName),
+			zap.String("file_id", event.FileID),
+			zap.Int32("user_id", event.UserID))
+
+		return
+	}
+
 	meta := file.Metadata{
-		file.MetadataAppKey: event.App,
-		file.MetadataUrlKey: event.Url,
+		file.MetadataAppKey: event.AppID,
 	}
 
 	file, err := handler.fileApp.Create(ctx, event.UserID, event.FileName, nil, meta)
 	if err != nil {
 		handler.logger.Error("creating file",
-			zap.String("url", event.Url),
-			zap.String("app", event.App),
+			zap.String("issuer", event.Issuer),
+			zap.String("app", event.AppID),
 			zap.String("file_name", event.FileName),
+			zap.String("file_id", event.FileID),
 			zap.Int32("user_id", event.UserID),
 			zap.Error(err))
 
@@ -78,9 +92,10 @@ func (handler *FileEventHandler) onFileCreatedEvent(ctx context.Context, event *
 	_, err = handler.certApp.CreateFileAccessCertificate(ctx, event.UserID, file)
 	if err != nil {
 		handler.logger.Error("creating file access certificate",
-			zap.String("url", event.Url),
-			zap.String("app", event.App),
+			zap.String("issuer", event.Issuer),
+			zap.String("app", event.AppID),
 			zap.String("file_name", event.FileName),
+			zap.String("file_id", event.FileID),
 			zap.Int32("user_id", event.UserID),
 			zap.Error(err))
 

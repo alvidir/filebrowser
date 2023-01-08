@@ -7,6 +7,7 @@ import (
 	"time"
 
 	fb "github.com/alvidir/filebrowser"
+	cert "github.com/alvidir/filebrowser/certificate"
 	"go.uber.org/zap"
 )
 
@@ -19,20 +20,26 @@ type FileRepository interface {
 }
 
 type DirectoryApplication interface {
-	RegisterFile(ctx context.Context, file *File, uid int32, path string) error
+	RegisterFile(ctx context.Context, file *File, uid int32, path string) (string, error)
 	UnregisterFile(ctx context.Context, file *File, uid int32) error
+}
+
+type CertificateApplication interface {
+	CreateFileAccessCertificate(ctx context.Context, uid int32, file cert.File) (*cert.FileAccessCertificate, error)
 }
 
 type FileApplication struct {
 	fileRepo FileRepository
 	dirApp   DirectoryApplication
+	certApp  CertificateApplication
 	logger   *zap.Logger
 }
 
-func NewFileApplication(repo FileRepository, dirApp DirectoryApplication, logger *zap.Logger) *FileApplication {
+func NewFileApplication(repo FileRepository, dirApp DirectoryApplication, certApp CertificateApplication, logger *zap.Logger) *FileApplication {
 	return &FileApplication{
 		fileRepo: repo,
 		dirApp:   dirApp,
+		certApp:  certApp,
 		logger:   logger,
 	}
 }
@@ -62,8 +69,25 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 		return nil, err
 	}
 
-	err = app.dirApp.RegisterFile(ctx, file, uid, fpath)
-	return file, err
+	name, err := app.dirApp.RegisterFile(ctx, file, uid, fpath)
+	if err != nil {
+		return nil, err
+	}
+
+	file.SetName(name)
+
+	_, err = app.certApp.CreateFileAccessCertificate(ctx, uid, file)
+	if err != nil {
+		app.logger.Error("creating file access certificate",
+			zap.String("file_name", file.Name()),
+			zap.String("file_id", file.Id()),
+			zap.Int32("user_id", uid),
+			zap.Error(err))
+
+		return nil, err
+	}
+
+	return file, nil
 }
 
 func (app *FileApplication) Retrieve(ctx context.Context, uid int32, fid string) (*File, error) {
@@ -132,6 +156,10 @@ func (app *FileApplication) Delete(ctx context.Context, uid int32, fid string) (
 		return nil, err
 	}
 
+	if err = app.dirApp.UnregisterFile(ctx, f, uid); err != nil {
+		return nil, err
+	}
+
 	if f.Permission(uid)&fb.Owner != 0 && len(f.Owners()) == 1 {
 		// uid is the only owner of file f
 		f.metadata[MetadataDeletedAtKey] = strconv.FormatInt(time.Now().Unix(), TimestampBase)
@@ -145,10 +173,5 @@ func (app *FileApplication) Delete(ctx context.Context, uid int32, fid string) (
 		return nil, fb.ErrNotAvailable
 	}
 
-	if err != nil {
-		return nil, err
-	}
-
-	err = app.dirApp.UnregisterFile(ctx, f, uid)
 	return f, err
 }
