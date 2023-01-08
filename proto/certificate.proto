@@ -11,7 +11,7 @@ message CertificateLocator {
 message CertificateDescriptor {
     string id = 1;
     Permissions permissions = 2;
-    bytes token = 3;
+    string token = 3;
 }
 
 service Certificate {

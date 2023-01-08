@@ -1,133 +1,30 @@
 package main
 
 import (
-	"crypto/ecdsa"
 	"net"
 	"os"
-	"time"
 
-	fb "github.com/alvidir/filebrowser"
 	cert "github.com/alvidir/filebrowser/certificate"
+	"github.com/alvidir/filebrowser/cmd"
 	dir "github.com/alvidir/filebrowser/directory"
-	file "github.com/alvidir/filebrowser/file"
-	proto "github.com/alvidir/filebrowser/proto"
+	"github.com/alvidir/filebrowser/event"
+	"github.com/alvidir/filebrowser/file"
+	"github.com/alvidir/filebrowser/proto"
 	"github.com/joho/godotenv"
-	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
 
-const (
-	ENV_SERVICE_ADDR   = "SERVICE_ADDR"
-	ENV_SERVICE_NETW   = "SERVICE_NETW"
-	ENV_UID_HEADER     = "UID_HEADER"
-	ENV_MONGO_DSN      = "MONGO_DSN"
-	ENV_MONGO_DATABASE = "MONGO_DATABASE"
-	ENV_REDIS_DSN      = "REDIS_DSN"
-	ENV_TOKEN_TIMEOUT  = "TOKEN_TIMEOUT"
-	ENV_JWT_SECRET     = "JWT_SECRET"
-)
-
-var (
-	serviceAddr = "0.0.0.0:8000"
-	serviceNetw = "tcp"
-	uidHeader   = "X-Uid"
-)
-
-func getMongoConnection(logger *zap.Logger) *mongo.Database {
-	mongoUri, exists := os.LookupEnv(ENV_MONGO_DSN)
-	if !exists {
-		logger.Fatal("mongo dsn must be set")
-	}
-
-	database, exists := os.LookupEnv(ENV_MONGO_DATABASE)
-	if !exists {
-		logger.Fatal("mongo database name must be set")
-	}
-
-	mongoConn, err := fb.NewMongoDBConn(mongoUri, database)
-	if err != nil {
-		logger.Fatal("failed establishing connection",
-			zap.String("uri", mongoUri),
-			zap.Error(err))
-	} else {
-		logger.Info("connection with mongodb cluster established")
-	}
-
-	return mongoConn
-}
-
-func getPrivateKey(logger *zap.Logger) *ecdsa.PrivateKey {
-	secret, exists := os.LookupEnv(ENV_JWT_SECRET)
-	if !exists {
-		logger.Fatal("must be set",
-			zap.String("varname", ENV_JWT_SECRET))
-	}
-
-	privateKey, err := cert.ParsePKCS8PrivateKey(secret)
-	if err != nil {
-		logger.Fatal("parsing PKCS8 private key",
-			zap.Error(err))
-	}
-
-	return privateKey
-}
-
-func getTokenTTL(logger *zap.Logger) *time.Duration {
-	value, exists := os.LookupEnv(ENV_TOKEN_TIMEOUT)
-	if !exists {
-		return nil
-	}
-
-	ttl, err := time.ParseDuration(value)
-	if err != nil {
-		logger.Fatal("invalid token ttl",
-			zap.String("value", value),
-			zap.Error(err))
-	}
-
-	return &ttl
-}
-
-func getFilebrowserGrpcServer(mongoConn *mongo.Database, logger *zap.Logger) *grpc.Server {
-	if header, exists := os.LookupEnv(ENV_UID_HEADER); exists {
-		uidHeader = header
-	}
-
-	fileRepo := file.NewMongoFileRepository(mongoConn, logger)
-
-	directoryRepo := dir.NewMongoDirectoryRepository(mongoConn, fileRepo, logger)
-	directoryApp := dir.NewDirectoryApplication(directoryRepo, fileRepo, logger)
-	directoryServer := dir.NewDirectoryServer(directoryApp, logger, uidHeader)
-
-	fileApp := file.NewFileApplication(fileRepo, directoryApp, logger)
-	fileServer := file.NewFileServer(fileApp, uidHeader, logger)
-
-	privateKey := getPrivateKey(logger)
-	tokenTTL := getTokenTTL(logger)
-	certSrv := cert.NewCertificateService(privateKey, tokenTTL, logger)
-	certRepo := cert.NewMongoCertificateRepository(mongoConn, logger)
-	certApp := cert.NewCertificateApplication(certRepo, certSrv, logger)
-	certServer := cert.NewCertificateServer(certApp, logger, uidHeader)
-
-	grpcSrv := grpc.NewServer()
-	proto.RegisterDirectoryServer(grpcSrv, directoryServer)
-	proto.RegisterFileServer(grpcSrv, fileServer)
-	proto.RegisterCertificateServer(grpcSrv, certServer)
-
-	return grpcSrv
-}
-
 func getNetworkListener(logger *zap.Logger) net.Listener {
-	if addr, exists := os.LookupEnv(ENV_SERVICE_ADDR); exists {
-		serviceAddr = addr
+	if addr, exists := os.LookupEnv(cmd.ENV_SERVICE_ADDR); exists {
+		cmd.ServiceAddr = addr
 	}
 
-	if netw, exists := os.LookupEnv(ENV_SERVICE_NETW); exists {
-		serviceNetw = netw
+	if netw, exists := os.LookupEnv(cmd.ENV_SERVICE_NETW); exists {
+		cmd.ServiceNetw = netw
 	}
 
-	lis, err := net.Listen(serviceNetw, serviceAddr)
+	lis, err := net.Listen(cmd.ServiceNetw, cmd.ServiceAddr)
 	if err != nil {
 		logger.Panic("failed to listen: %v",
 			zap.Error(err))
@@ -145,12 +42,46 @@ func main() {
 			zap.Error(err))
 	}
 
-	mongoConn := getMongoConnection(logger)
-	grpcServer := getFilebrowserGrpcServer(mongoConn, logger)
+	mongoConn := cmd.GetMongoConnection(logger)
+	if header, exists := os.LookupEnv(cmd.ENV_UID_HEADER); exists {
+		cmd.UidHeader = header
+	}
+
+	fileRepo := file.NewMongoFileRepository(mongoConn, logger)
+
+	directoryRepo := dir.NewMongoDirectoryRepository(mongoConn, fileRepo, logger)
+	directoryApp := dir.NewDirectoryApplication(directoryRepo, fileRepo, logger)
+	directoryServer := dir.NewDirectoryServer(directoryApp, logger, cmd.UidHeader)
+
+	privateKey := cmd.GetPrivateKey(logger)
+	tokenTTL := cmd.GetTokenTTL(logger)
+	tokenIssuer := cmd.GetTokenIssuer(logger)
+	certSrv := cert.NewCertificateService(privateKey, tokenIssuer, tokenTTL, logger)
+	certRepo := cert.NewMongoCertificateRepository(mongoConn, logger)
+	certApp := cert.NewCertificateApplication(certRepo, certSrv, logger)
+	certServer := cert.NewCertificateServer(certApp, logger, cmd.UidHeader)
+
+	conn := cmd.GetAmqpConnection(logger)
+	defer conn.Close()
+
+	ch := cmd.GetAmqpChannel(conn, logger)
+	defer ch.Close()
+
+	eventIssuer := cmd.GetEventIssuer(logger)
+	fileExchange := cmd.GetFileExchange(logger)
+	fileBus := event.NewFileEventBus(eventIssuer, fileExchange, ch, logger)
+
+	fileApp := file.NewFileApplication(fileRepo, directoryApp, certApp, logger)
+	fileServer := file.NewFileServer(fileApp, certApp, fileBus, cmd.UidHeader, logger)
+
+	grpcServer := grpc.NewServer()
+	proto.RegisterDirectoryServer(grpcServer, directoryServer)
+	proto.RegisterFileServer(grpcServer, fileServer)
+	proto.RegisterCertificateServer(grpcServer, certServer)
 	lis := getNetworkListener(logger)
 
 	logger.Info("server ready to accept connections",
-		zap.String("address", serviceAddr))
+		zap.String("address", cmd.ServiceAddr))
 
 	if err := grpcServer.Serve(lis); err != nil {
 		logger.Fatal("server terminated with errors",

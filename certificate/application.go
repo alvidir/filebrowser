@@ -3,7 +3,6 @@ package certificate
 import (
 	"context"
 
-	"github.com/alvidir/filebrowser/file"
 	"go.uber.org/zap"
 )
 
@@ -32,7 +31,7 @@ func NewCertificateApplication(repo CertificateRepository, srv CertificateServic
 	}
 }
 
-func (app *CertificateApplication) CreateFileAccessCertificate(ctx context.Context, uid int32, file *file.File) (*FileAccessCertificate, error) {
+func (app *CertificateApplication) CreateFileAccessCertificate(ctx context.Context, uid int32, file File) (*FileAccessCertificate, error) {
 	cert := NewFileAccessCertificate(uid, file)
 	if err := app.certRepo.Create(ctx, cert); err != nil {
 		return nil, err
