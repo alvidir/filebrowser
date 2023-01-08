@@ -107,3 +107,16 @@ func (server *DirectoryServer) Relocate(ctx context.Context, req *proto.Director
 
 	return &proto.Empty{}, nil
 }
+
+func (server *DirectoryServer) RemoveFiles(ctx context.Context, req *proto.DirectoryLocator) (*proto.Empty, error) {
+	uid, err := fb.GetUid(ctx, server.header, server.logger)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := server.app.RemoveFiles(ctx, uid, req.GetPath(), req.GetFilter()); err != nil {
+		return nil, err
+	}
+
+	return &proto.Empty{}, nil
+}

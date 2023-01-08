@@ -13,17 +13,6 @@ const (
 	userSettingsPath = ".settings"
 )
 
-type UserProfile struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
-}
-
-type UserEventPayload struct {
-	UserID int32  `json:"id"`
-	Kind   string `json:"kind"`
-	UserProfile
-}
-
 type UserEventHandler struct {
 	dirApp  *dir.DirectoryApplication
 	fileApp *file.FileApplication
@@ -49,7 +38,7 @@ func (handler *UserEventHandler) OnEvent(ctx context.Context, body []byte) {
 	}
 
 	switch kind := event.Kind; kind {
-	case EVENT_KIND_CREATED:
+	case EventKindCreated:
 		handler.logger.Info("handling user event",
 			zap.String("kind", kind))
 

@@ -355,7 +355,7 @@ func TestRegisterFileWhenDirectoryDoesNotExists(t *testing.T) {
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
 	f, _ := file.NewFile("test", "filename")
-	if err := app.RegisterFile(context.TODO(), f, 999, "path/to/file"); !errors.Is(err, fb.ErrNotFound) {
+	if _, err := app.RegisterFile(context.TODO(), f, 999, "path/to/file"); !errors.Is(err, fb.ErrNotFound) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 }
@@ -375,7 +375,7 @@ func TestRegisterFile(t *testing.T) {
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
 	f, _ := file.NewFile("test", "filename")
-	if err := app.RegisterFile(context.TODO(), f, 999, "path/to/file"); err != nil {
+	if _, err := app.RegisterFile(context.TODO(), f, 999, "path/to/file"); err != nil {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 
@@ -504,119 +504,6 @@ func TestUnregisterFileWhenFileIsShared(t *testing.T) {
 
 }
 
-func TestFilterByDir(t *testing.T) {
-	subject := NewDirectory(1)
-	subject.files["a_file"], _ = file.NewFile("", "filename")
-	subject.files["/another_file"], _ = file.NewFile("", "filename")
-	subject.files["a_directory/a_file"], _ = file.NewFile("", "filename")
-	subject.files["/a_directory/another_file"], _ = file.NewFile("", "filename")
-
-	tests := []struct {
-		name string
-		path string
-		want []struct {
-			path  string
-			isDir bool
-		}
-		err error
-	}{
-		{
-			name: "filter by root",
-			path: "/",
-			want: []struct {
-				path  string
-				isDir bool
-			}{
-				{path: "a_file", isDir: false},
-				{path: "another_file", isDir: false},
-				{path: "a_directory", isDir: true},
-			},
-			err: nil,
-		},
-		{
-			name: "filter by directory",
-			path: "a_directory",
-			want: []struct {
-				path  string
-				isDir bool
-			}{
-				{path: "a_file", isDir: false},
-				{path: "another_file", isDir: false},
-			},
-			err: nil,
-		},
-		{
-			name: "filter by filename",
-			path: "a_file",
-			want: []struct {
-				path  string
-				isDir bool
-			}{},
-			err: nil,
-		},
-		{
-			name: "filter by another filename",
-			path: "a_directory/a_file",
-			want: []struct {
-				path  string
-				isDir bool
-			}{},
-			err: nil,
-		},
-		{
-			name: "filter by non existing directory",
-			path: "another_directory",
-			want: []struct {
-				path  string
-				isDir bool
-			}{},
-			err: nil,
-		},
-	}
-
-	for _, test := range tests {
-		t := t
-		test := test
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			filterFn, err := NewFilterByDirFn(test.path)
-			if err != nil {
-				t.Errorf("got error = %v, want = nil", err)
-			}
-
-			files, err := subject.FilterFiles([]FilterFileFn{filterFn})
-			if test.err == nil && err != nil {
-				t.Errorf("got error = %v, want = nil", err)
-			} else if test.err != nil && !errors.Is(test.err, err) {
-				t.Errorf("got error = %v, want = %v", err, test.err)
-			}
-
-			if len(test.want) != len(files) {
-				t.Errorf("got files length = %v, want = %v", len(files), len(test.want))
-			}
-
-			for _, fwant := range test.want {
-				var exists bool
-				for p, f := range files {
-					if exists = p == fwant.path; !exists {
-						continue
-					}
-
-					if isDir := f.Flags()&file.Directory != 0; isDir != fwant.isDir {
-						t.Errorf("got file path = %v as directory = %v, want = %v", p, isDir, fwant.isDir)
-					}
-
-					break
-				}
-
-				if !exists {
-					t.Errorf("path = %v not found", fwant.path)
-				}
-			}
-		})
-	}
-}
-
 func TestRelocate(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
@@ -625,97 +512,188 @@ func TestRelocate(t *testing.T) {
 		name   string
 		target string
 		filter string
+		files  []string
 		want   []string
 	}{
 		{
 			name:   "move to a new directory",
 			target: "new_directory",
 			filter: "^/a_file$|^/another_file$",
+			files: []string{
+				"/a_file",
+				"/another_file",
+			},
 			want: []string{
 				"/new_directory/a_file",
 				"/new_directory/another_file",
-				"/a_directory/a_file",
-				"/a_directory/another_file",
-				"/another_dir/test.txt",
-				"/unique_name",
 			},
 		},
 		{
 			name:   "move to a existing directory",
 			target: "a_directory",
-			filter: "^/unique_name$",
-			want: []string{
+			filter: "^/a_file$",
+			files: []string{
 				"/a_file",
-				"/another_file",
+				"/a_directory/another_file",
+			},
+			want: []string{
 				"/a_directory/a_file",
 				"/a_directory/another_file",
-				"/a_directory/unique_name",
-				"/another_dir/test.txt",
 			},
 		},
 		{
-			name:   "move directory to inner directory",
+			name:   "move directory to another directory",
 			target: "another_dir",
 			filter: "^/a_directory",
+			files: []string{
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+				"/another_dir/a_file",
+			},
 			want: []string{
-				"/a_file",
-				"/another_file",
 				"/another_dir/a_directory/a_file",
 				"/another_dir/a_directory/another_file",
-				"/another_dir/test.txt",
-				"/unique_name",
+				"/another_dir/a_file",
 			},
 		},
 		{
 			name:   "move file to parent directory",
 			target: "/",
-			filter: "^/another_dir/(test.txt.*)",
-			want: []string{
-				"/a_file",
-				"/another_file",
+			filter: "^/a_directory/(a_file.*)",
+			files: []string{
 				"/a_directory/a_file",
 				"/a_directory/another_file",
-				"/test.txt",
-				"/unique_name",
+			},
+			want: []string{
+				"/a_file",
+				"/a_directory/another_file",
 			},
 		},
 		{
 			name:   "move to a directory with a file with the same name",
 			target: "a_directory",
 			filter: "^/a_file$",
-			want: []string{
-				"/another_file",
+			files: []string{
+				"/a_file",
 				"/a_directory/a_file",
-				"/a_directory/a_file (1)",
-				"/a_directory/another_file",
-				"/another_dir/test.txt",
-				"/unique_name",
+			},
+			want: []string{
+				"/a_directory/a_file_1",
+				"/a_directory/a_file",
 			},
 		},
 		{
-			name:   "move directory with already existing name",
-			target: "another_dir/test.txt",
+			name:   "move to new directory with same name as file",
+			target: "another_dir/an_item",
 			filter: "^/a_directory",
+			files: []string{
+				"/a_directory/a_file",
+				"/another_dir/an_item",
+			},
 			want: []string{
-				"/a_file",
-				"/another_file",
-				"/another_dir/test.txt (1)/a_directory/a_file",
-				"/another_dir/test.txt (1)/a_directory/another_file",
-				"/another_dir/test.txt",
-				"/unique_name",
+				"/another_dir/an_item_1/a_directory/a_file",
+				"/another_dir/an_item",
 			},
 		},
 		{
 			name:   "move from a directory to another",
 			target: "/a_directory",
-			filter: "^/another_dir/(test.txt.*)$",
+			filter: "^/another_dir/(a_file.*)$",
+			files: []string{
+				"/a_directory/a_file",
+				"/another_dir/a_file",
+			},
 			want: []string{
+				"/a_directory/a_file_1",
+				"/a_directory/a_file",
+			},
+		},
+		{
+			name:   "move file with similar name to directory",
+			target: "/a_directory",
+			filter: "^/(a_file(/.*)?)$",
+			files: []string{
 				"/a_file",
-				"/another_file",
+				"/a_file_1",
+			},
+			want: []string{
+				"/a_directory/a_file",
+				"/a_file_1",
+			},
+		},
+		{
+			name:   "move file with similar name to directory - 2",
+			target: "/a_directory",
+			filter: "^/(a_file_1(/.*)?)$",
+			files: []string{
+				"/a_file",
+				"/a_file_1",
+			},
+			want: []string{
+				"/a_directory/a_file_1",
+				"/a_file",
+			},
+		},
+		{
+			name:   "rename file",
+			target: "/renamed_file",
+			filter: "^(/a_file(/.*)?)$",
+			files: []string{
+				"/a_file",
+				"/a_file_1",
+			},
+			want: []string{
+				"/renamed_file",
+				"/a_file_1",
+			},
+		},
+		{
+			name:   "rename deeper file",
+			target: "/a_directory/renamed_file",
+			filter: "^(/a_directory/a_file(/.*)?)$",
+			files: []string{
+				"/a_file",
 				"/a_directory/a_file",
 				"/a_directory/another_file",
-				"/a_directory/test.txt",
-				"/unique_name",
+			},
+			want: []string{
+				"/a_file",
+				"/a_directory/renamed_file",
+				"/a_directory/another_file",
+			},
+		},
+		{
+			name:   "rename directory",
+			target: "/renamed_dir",
+			filter: "^/a_directory(/.*)?$",
+			files: []string{
+				"/a_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+			},
+			want: []string{
+				"/a_file",
+				"/renamed_dir/a_file",
+				"/renamed_dir/another_file",
+			},
+		},
+		{
+			name:   "rename deeper directory",
+			target: "/a_directory/renamed_dir",
+			filter: "^/a_directory/another_dir(/.*)?$",
+			files: []string{
+				"/a_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+				"/a_directory/another_dir/a_file",
+				"/a_directory/another_dir/another_file",
+			},
+			want: []string{
+				"/a_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+				"/a_directory/renamed_dir/a_file",
+				"/a_directory/renamed_dir/another_file",
 			},
 		},
 	}
@@ -728,13 +706,9 @@ func TestRelocate(t *testing.T) {
 
 			f, _ := file.NewFile("test", "filename")
 			dirRepo := &directoryRepositoryMock{}
-			files := map[string]*file.File{
-				"/a_file":                   f,
-				"/another_file":             f,
-				"/a_directory/a_file":       f,
-				"/a_directory/another_file": f,
-				"/another_dir/test.txt":     f,
-				"/unique_name":              f,
+			files := make(map[string]*file.File)
+			for _, fileName := range test.files {
+				files[fileName] = f
 			}
 
 			dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
@@ -754,6 +728,121 @@ func TestRelocate(t *testing.T) {
 			app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
 			err := app.Relocate(context.TODO(), 999, test.target, test.filter)
+			if err != nil {
+				t.Errorf("got error = %v, want = nil", err)
+			}
+
+			if len(test.want) != len(files) {
+				t.Errorf("got files = %v, want = %v", files, test.want)
+			}
+
+			for _, expectedPath := range test.want {
+				if _, exists := files[expectedPath]; !exists {
+					t.Errorf("got files = %v, want = %v", files, test.want)
+				}
+			}
+
+		})
+	}
+}
+
+func TestRemoveFiles(t *testing.T) {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+
+	tests := []struct {
+		name   string
+		target string
+		filter string
+		files  []string
+		want   []string
+	}{
+		{
+			name:   "filter single file by regex",
+			target: "",
+			filter: "^/a_file$",
+			files: []string{
+				"/a_file",
+				"/a_directory/a_file",
+			},
+			want: []string{
+				"/a_directory/a_file",
+			},
+		},
+		{
+			name:   "filter multiple files by regex",
+			target: "",
+			filter: "^/a_file$|^/another_file$",
+			files: []string{
+				"/a_file",
+				"/another_file",
+				"/a_directory/a_file",
+			},
+			want: []string{
+				"/a_directory/a_file",
+			},
+		},
+		{
+			name:   "filter directory by prefix",
+			target: "/a_directory",
+			filter: "",
+			files: []string{
+				"/a_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+			},
+			want: []string{
+				"/a_file",
+			},
+		},
+		{
+			name:   "filter by prefix and regex",
+			target: "/a_directory",
+			filter: "/a_file$",
+			files: []string{
+				"/a_file",
+				"/another_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+			},
+			want: []string{
+				"/a_file",
+				"/another_file",
+				"/a_directory/another_file",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t := t
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			dirRepo := &directoryRepositoryMock{}
+			files := make(map[string]*file.File)
+			for index, filename := range test.files {
+				files[filename], _ = file.NewFile(strconv.Itoa(index), "filename")
+				t.Logf("got f as %v", files[filename])
+			}
+
+			dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
+				return &Directory{
+					id:     "test",
+					userId: 999,
+					files:  files,
+				}, nil
+			}
+
+			fileRepo := &fileRepositoryMock{
+				find: func(repo *fileRepositoryMock, ctx context.Context, id string) (*file.File, error) {
+					return files[id], nil
+				},
+			}
+
+			app := NewDirectoryApplication(dirRepo, fileRepo, logger)
+
+			err := app.RemoveFiles(context.TODO(), 999, test.target, test.filter)
 			if err != nil {
 				t.Errorf("got error = %v, want = nil", err)
 			}

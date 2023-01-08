@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	EVENT_KIND_CREATED = "created"
-	EXCHANGE_TYPE      = "fanout"
+	EventKindCreated = "created"
+	EventKindDeleted = "deleted"
+	ExchangeType     = "fanout"
 )
 
 type EventHandler func(ctx context.Context, body []byte)
@@ -30,13 +31,13 @@ func NewRabbitMqEventBus(chann *amqp.Channel, logger *zap.Logger) *RabbitMqEvent
 
 func (bus *RabbitMqEventBus) QueueBind(exchange, queue string) error {
 	if err := bus.chann.ExchangeDeclare(
-		exchange,      // name
-		EXCHANGE_TYPE, // type
-		true,          // durable
-		false,         // auto-deleted
-		false,         // internal
-		false,         // no-wait
-		nil,           // arguments
+		exchange,     // name
+		ExchangeType, // type
+		true,         // durable
+		false,        // auto-deleted
+		false,        // internal
+		false,        // no-wait
+		nil,          // arguments
 	); err != nil {
 		bus.logger.Fatal("declaring exchange",
 			zap.String("name", exchange),
