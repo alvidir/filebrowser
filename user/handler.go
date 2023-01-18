@@ -1,9 +1,10 @@
-package event
+package user
 
 import (
 	"context"
 	"encoding/json"
 
+	fb "github.com/alvidir/filebrowser"
 	dir "github.com/alvidir/filebrowser/directory"
 	"github.com/alvidir/filebrowser/file"
 	"go.uber.org/zap"
@@ -12,6 +13,17 @@ import (
 const (
 	userSettingsPath = ".settings"
 )
+
+type UserProfile struct {
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
+
+type UserEventPayload struct {
+	UserID int32  `json:"id"`
+	Kind   string `json:"kind"`
+	UserProfile
+}
 
 type UserEventHandler struct {
 	dirApp  *dir.DirectoryApplication
@@ -38,7 +50,7 @@ func (handler *UserEventHandler) OnEvent(ctx context.Context, body []byte) {
 	}
 
 	switch kind := event.Kind; kind {
-	case EventKindCreated:
+	case fb.EventKindCreated:
 		handler.logger.Info("handling user event",
 			zap.String("kind", kind))
 

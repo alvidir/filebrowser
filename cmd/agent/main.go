@@ -9,13 +9,13 @@ import (
 	cert "github.com/alvidir/filebrowser/certificate"
 	"github.com/alvidir/filebrowser/cmd"
 	dir "github.com/alvidir/filebrowser/directory"
-	"github.com/alvidir/filebrowser/event"
 	"github.com/alvidir/filebrowser/file"
+	"github.com/alvidir/filebrowser/user"
 	"github.com/joho/godotenv"
 	"go.uber.org/zap"
 )
 
-func handleRabbitMqUserEvents(ctx context.Context, bus *event.RabbitMqEventBus, handler *event.UserEventHandler, logger *zap.Logger) error {
+func handleRabbitMqUserEvents(ctx context.Context, bus *fb.RabbitMqEventBus, handler *user.UserEventHandler, logger *zap.Logger) error {
 	exchange, exists := os.LookupEnv(cmd.ENV_RABBITMQ_USERS_EXCHANGE)
 	if !exists {
 		logger.Error("must be set",
@@ -44,7 +44,7 @@ func handleRabbitMqUserEvents(ctx context.Context, bus *event.RabbitMqEventBus, 
 	return bus.Consume(ctx, queue, handler.OnEvent)
 }
 
-func handleRabbitMqFileEvents(ctx context.Context, bus *event.RabbitMqEventBus, handler *event.FileEventHandler, logger *zap.Logger) error {
+func handleRabbitMqFileEvents(ctx context.Context, bus *fb.RabbitMqEventBus, handler *file.FileEventHandler, logger *zap.Logger) error {
 	exchange, exists := os.LookupEnv(cmd.ENV_RABBITMQ_FILES_EXCHANGE)
 	if !exists {
 		logger.Error("must be set",
@@ -101,14 +101,17 @@ func main() {
 	defer ch.Close()
 
 	fileApp := file.NewFileApplication(fileRepo, directoryApp, certApp, logger)
-	userEventHandler := event.NewUserEventHandler(directoryApp, fileApp, logger)
-	fileEventHandler := event.NewFileEventHandler(directoryApp, fileApp, certApp, logger)
+	userEventHandler := user.NewUserEventHandler(directoryApp, fileApp, logger)
+	fileEventHandler := file.NewFileEventHandler(fileApp, certApp, logger)
 
 	eventIssuer := cmd.GetEventIssuer(logger)
 	fileEventHandler.DiscardIssuer(eventIssuer)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	bus := event.NewRabbitMqEventBus(ch, logger)
+	bus := &fb.RabbitMqEventBus{
+		Chann:  ch,
+		Logger: logger,
+	}
 
 	var wg sync.WaitGroup
 	wg.Add(2)

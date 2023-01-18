@@ -4,10 +4,10 @@ import (
 	"net"
 	"os"
 
+	fb "github.com/alvidir/filebrowser"
 	cert "github.com/alvidir/filebrowser/certificate"
 	"github.com/alvidir/filebrowser/cmd"
 	dir "github.com/alvidir/filebrowser/directory"
-	"github.com/alvidir/filebrowser/event"
 	"github.com/alvidir/filebrowser/file"
 	"github.com/alvidir/filebrowser/proto"
 	"github.com/joho/godotenv"
@@ -69,7 +69,12 @@ func main() {
 
 	eventIssuer := cmd.GetEventIssuer(logger)
 	fileExchange := cmd.GetFileExchange(logger)
-	fileBus := event.NewFileEventBus(eventIssuer, fileExchange, ch, logger)
+	bus := fb.RabbitMqEventBus{
+		Chann:  ch,
+		Logger: logger,
+	}
+
+	fileBus := file.NewFileEventBus(bus, fileExchange, eventIssuer)
 
 	fileApp := file.NewFileApplication(fileRepo, directoryApp, certApp, logger)
 	fileServer := file.NewFileServer(fileApp, certApp, fileBus, cmd.UidHeader, logger)

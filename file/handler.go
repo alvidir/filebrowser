@@ -1,26 +1,23 @@
-package event
+package file
 
 import (
 	"context"
 	"encoding/json"
 
+	fb "github.com/alvidir/filebrowser"
 	cert "github.com/alvidir/filebrowser/certificate"
-	dir "github.com/alvidir/filebrowser/directory"
-	"github.com/alvidir/filebrowser/file"
 	"go.uber.org/zap"
 )
 
 type FileEventHandler struct {
-	dirApp  *dir.DirectoryApplication
-	fileApp *file.FileApplication
+	fileApp *FileApplication
 	certApp *cert.CertificateApplication
 	issuers map[string]bool
 	logger  *zap.Logger
 }
 
-func NewFileEventHandler(dirApp *dir.DirectoryApplication, fileApp *file.FileApplication, certApp *cert.CertificateApplication, logger *zap.Logger) *FileEventHandler {
+func NewFileEventHandler(fileApp *FileApplication, certApp *cert.CertificateApplication, logger *zap.Logger) *FileEventHandler {
 	return &FileEventHandler{
-		dirApp:  dirApp,
 		fileApp: fileApp,
 		certApp: certApp,
 		issuers: make(map[string]bool),
@@ -48,7 +45,7 @@ func (handler *FileEventHandler) OnEvent(ctx context.Context, body []byte) {
 	}
 
 	switch kind := event.Kind; kind {
-	case EventKindCreated:
+	case fb.EventKindCreated:
 		handler.logger.Info("handling file event",
 			zap.String("kind", kind))
 
@@ -72,8 +69,8 @@ func (handler *FileEventHandler) onFileCreatedEvent(ctx context.Context, event *
 		return
 	}
 
-	meta := file.Metadata{
-		file.MetadataAppKey: event.AppID,
+	meta := Metadata{
+		MetadataAppKey: event.AppID,
 	}
 
 	file, err := handler.fileApp.Create(ctx, event.UserID, event.FileName, nil, meta)

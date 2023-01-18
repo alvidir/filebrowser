@@ -1,10 +1,9 @@
-package event
+package filebrowser
 
 import (
 	"context"
 	"sync"
 
-	fb "github.com/alvidir/filebrowser"
 	"github.com/streadway/amqp"
 	"go.uber.org/zap"
 )
@@ -18,19 +17,12 @@ const (
 type EventHandler func(ctx context.Context, body []byte)
 
 type RabbitMqEventBus struct {
-	chann  *amqp.Channel
-	logger *zap.Logger
-}
-
-func NewRabbitMqEventBus(chann *amqp.Channel, logger *zap.Logger) *RabbitMqEventBus {
-	return &RabbitMqEventBus{
-		chann:  chann,
-		logger: logger,
-	}
+	Chann  *amqp.Channel
+	Logger *zap.Logger
 }
 
 func (bus *RabbitMqEventBus) QueueBind(exchange, queue string) error {
-	if err := bus.chann.ExchangeDeclare(
+	if err := bus.Chann.ExchangeDeclare(
 		exchange,     // name
 		ExchangeType, // type
 		true,         // durable
@@ -39,14 +31,14 @@ func (bus *RabbitMqEventBus) QueueBind(exchange, queue string) error {
 		false,        // no-wait
 		nil,          // arguments
 	); err != nil {
-		bus.logger.Fatal("declaring exchange",
+		bus.Logger.Fatal("declaring exchange",
 			zap.String("name", exchange),
 			zap.Error(err))
 
 		return err
 	}
 
-	if _, err := bus.chann.QueueDeclare(
+	if _, err := bus.Chann.QueueDeclare(
 		queue, // name
 		false, // durable
 		false, // delete when unused
@@ -54,21 +46,21 @@ func (bus *RabbitMqEventBus) QueueBind(exchange, queue string) error {
 		false, // no-wait
 		nil,   // arguments
 	); err != nil {
-		bus.logger.Fatal("declaring a queue",
+		bus.Logger.Fatal("declaring a queue",
 			zap.String("name", queue),
 			zap.Error(err))
 
 		return err
 	}
 
-	if err := bus.chann.QueueBind(
+	if err := bus.Chann.QueueBind(
 		queue,    // queue name
 		"",       // routing key
 		exchange, // exchange name
 		false,
 		nil,
 	); err != nil {
-		bus.logger.Fatal("binding a queue",
+		bus.Logger.Fatal("binding a queue",
 			zap.String("exchange", exchange),
 			zap.String("queue", queue),
 			zap.Error(err))
@@ -80,7 +72,7 @@ func (bus *RabbitMqEventBus) QueueBind(exchange, queue string) error {
 }
 
 func (bus *RabbitMqEventBus) Consume(ctx context.Context, queue string, handler EventHandler) error {
-	events, err := bus.chann.Consume(
+	events, err := bus.Chann.Consume(
 		queue, // queue
 		"",    // consumer
 		true,  // auto-ack
@@ -91,13 +83,13 @@ func (bus *RabbitMqEventBus) Consume(ctx context.Context, queue string, handler 
 	)
 
 	if err != nil {
-		bus.logger.Error("registering a consumer",
+		bus.Logger.Error("registering a consumer",
 			zap.Error(err))
 
 		return err
 	}
 
-	bus.logger.Info("waiting for events",
+	bus.Logger.Info("waiting for events",
 		zap.String("queue", queue))
 
 	var wg sync.WaitGroup
@@ -107,10 +99,10 @@ func (bus *RabbitMqEventBus) Consume(ctx context.Context, queue string, handler 
 		select {
 		case event, ok := <-events:
 			if !ok {
-				bus.logger.Error("channel closed",
+				bus.Logger.Error("channel closed",
 					zap.String("queue", queue))
 
-				return fb.ErrChannelClosed
+				return ErrChannelClosed
 			}
 
 			wg.Add(1)
@@ -120,7 +112,7 @@ func (bus *RabbitMqEventBus) Consume(ctx context.Context, queue string, handler 
 			}(ctx, &wg)
 
 		case <-ctx.Done():
-			bus.logger.Warn("context cancelled",
+			bus.Logger.Warn("context cancelled",
 				zap.Error(ctx.Err()))
 
 			return ctx.Err()
