@@ -17,12 +17,23 @@ const (
 type EventHandler func(ctx context.Context, body []byte)
 
 type RabbitMqEventBus struct {
-	Chann  *amqp.Channel
-	Logger *zap.Logger
+	chann  *amqp.Channel
+	logger *zap.Logger
+}
+
+func NewRabbitMqEventBus(chann *amqp.Channel, logger *zap.Logger) *RabbitMqEventBus {
+	return &RabbitMqEventBus{
+		chann:  chann,
+		logger: logger,
+	}
+}
+
+func (bus *RabbitMqEventBus) Chann() *amqp.Channel {
+	return bus.chann
 }
 
 func (bus *RabbitMqEventBus) QueueBind(exchange, queue string) error {
-	if err := bus.Chann.ExchangeDeclare(
+	if err := bus.chann.ExchangeDeclare(
 		exchange,     // name
 		ExchangeType, // type
 		true,         // durable
@@ -31,14 +42,14 @@ func (bus *RabbitMqEventBus) QueueBind(exchange, queue string) error {
 		false,        // no-wait
 		nil,          // arguments
 	); err != nil {
-		bus.Logger.Fatal("declaring exchange",
+		bus.logger.Fatal("declaring exchange",
 			zap.String("name", exchange),
 			zap.Error(err))
 
 		return err
 	}
 
-	if _, err := bus.Chann.QueueDeclare(
+	if _, err := bus.chann.QueueDeclare(
 		queue, // name
 		false, // durable
 		false, // delete when unused
@@ -46,21 +57,21 @@ func (bus *RabbitMqEventBus) QueueBind(exchange, queue string) error {
 		false, // no-wait
 		nil,   // arguments
 	); err != nil {
-		bus.Logger.Fatal("declaring a queue",
+		bus.logger.Fatal("declaring a queue",
 			zap.String("name", queue),
 			zap.Error(err))
 
 		return err
 	}
 
-	if err := bus.Chann.QueueBind(
+	if err := bus.chann.QueueBind(
 		queue,    // queue name
 		"",       // routing key
 		exchange, // exchange name
 		false,
 		nil,
 	); err != nil {
-		bus.Logger.Fatal("binding a queue",
+		bus.logger.Fatal("binding a queue",
 			zap.String("exchange", exchange),
 			zap.String("queue", queue),
 			zap.Error(err))
@@ -72,7 +83,7 @@ func (bus *RabbitMqEventBus) QueueBind(exchange, queue string) error {
 }
 
 func (bus *RabbitMqEventBus) Consume(ctx context.Context, queue string, handler EventHandler) error {
-	events, err := bus.Chann.Consume(
+	events, err := bus.chann.Consume(
 		queue, // queue
 		"",    // consumer
 		true,  // auto-ack
@@ -83,13 +94,13 @@ func (bus *RabbitMqEventBus) Consume(ctx context.Context, queue string, handler 
 	)
 
 	if err != nil {
-		bus.Logger.Error("registering a consumer",
+		bus.logger.Error("registering a consumer",
 			zap.Error(err))
 
 		return err
 	}
 
-	bus.Logger.Info("waiting for events",
+	bus.logger.Info("waiting for events",
 		zap.String("queue", queue))
 
 	var wg sync.WaitGroup
@@ -99,7 +110,7 @@ func (bus *RabbitMqEventBus) Consume(ctx context.Context, queue string, handler 
 		select {
 		case event, ok := <-events:
 			if !ok {
-				bus.Logger.Error("channel closed",
+				bus.logger.Error("channel closed",
 					zap.String("queue", queue))
 
 				return ErrChannelClosed
@@ -112,7 +123,7 @@ func (bus *RabbitMqEventBus) Consume(ctx context.Context, queue string, handler 
 			}(ctx, &wg)
 
 		case <-ctx.Done():
-			bus.Logger.Warn("context cancelled",
+			bus.logger.Warn("context cancelled",
 				zap.Error(ctx.Err()))
 
 			return ctx.Err()

@@ -17,7 +17,7 @@ type FileEventPayload struct {
 }
 
 type FileEventBus struct {
-	fb.RabbitMqEventBus
+	*fb.RabbitMqEventBus
 	issuer   string
 	exchange string
 }
@@ -28,7 +28,7 @@ func (bus *FileEventBus) emit(body FileEventPayload) error {
 		return err
 	}
 
-	err = bus.Chann.Publish(bus.exchange, "", true, false, amqp.Publishing{
+	err = bus.Chann().Publish(bus.exchange, "", true, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        []byte(payload),
 	})
@@ -40,7 +40,7 @@ func (bus *FileEventBus) emit(body FileEventPayload) error {
 	return nil
 }
 
-func NewFileEventBus(bus fb.RabbitMqEventBus, exchange string, issuer string) *FileEventBus {
+func NewFileEventBus(bus *fb.RabbitMqEventBus, exchange string, issuer string) *FileEventBus {
 	return &FileEventBus{
 		bus,
 		issuer,

@@ -108,10 +108,7 @@ func main() {
 	fileEventHandler.DiscardIssuer(eventIssuer)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	bus := &fb.RabbitMqEventBus{
-		Chann:  ch,
-		Logger: logger,
-	}
+	bus := fb.NewRabbitMqEventBus(ch, logger)
 
 	var wg sync.WaitGroup
 	wg.Add(2)
