@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type FileEventBus interface {
+type EventBus interface {
 	EmitFileCreated(uid int32, f *File) error
 	EmitFileDeleted(uid int32, f *File) error
 }
@@ -22,7 +22,7 @@ func NewPermissions(perm fb.Permission) *proto.Permissions {
 	}
 }
 
-func NewFileServer(fileApp *FileApplication, certApp *cert.CertificateApplication, bus FileEventBus, authHeader string, logger *zap.Logger) *FileServer {
+func NewFileServer(fileApp *FileApplication, certApp *cert.CertificateApplication, bus EventBus, authHeader string, logger *zap.Logger) *FileServer {
 	return &FileServer{
 		fileApp:   fileApp,
 		certApp:   certApp,
@@ -63,7 +63,7 @@ type FileServer struct {
 	proto.UnimplementedFileServer
 	fileApp   *FileApplication
 	certApp   *cert.CertificateApplication
-	fileBus   FileEventBus
+	fileBus   EventBus
 	logger    *zap.Logger
 	uidHeader string
 }
