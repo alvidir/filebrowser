@@ -69,10 +69,7 @@ func main() {
 
 	eventIssuer := cmd.GetEventIssuer(logger)
 	fileExchange := cmd.GetFileExchange(logger)
-	bus := fb.RabbitMqEventBus{
-		Chann:  ch,
-		Logger: logger,
-	}
+	bus := fb.NewRabbitMqEventBus(ch, logger)
 
 	fileBus := file.NewFileEventBus(bus, fileExchange, eventIssuer)
 
