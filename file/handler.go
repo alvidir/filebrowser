@@ -44,51 +44,33 @@ func (handler *FileEventHandler) OnEvent(ctx context.Context, body []byte) {
 		return
 	}
 
+	if handler.isDiscarted(event.Issuer) {
+		handler.logger.Info("discarting event",
+			zap.String("issuer", event.Issuer))
+
+		return
+	}
+
 	switch kind := event.Kind; kind {
 	case fb.EventKindCreated:
-		handler.logger.Info("handling file event",
-			zap.String("kind", kind))
-
 		handler.onFileCreatedEvent(ctx, event)
 
 	default:
 		handler.logger.Warn("unhandled file event",
-			zap.String("kind", kind))
+			zap.String("kind", event.Kind))
 	}
 }
 
 func (handler *FileEventHandler) onFileCreatedEvent(ctx context.Context, event *FileEventPayload) {
-	if handler.isDiscarted(event.Issuer) {
-		handler.logger.Info("discarting event",
-			zap.String("issuer", event.Issuer),
-			zap.String("app", event.AppID),
-			zap.String("file_name", event.FileName),
-			zap.String("file_id", event.FileID),
-			zap.Int32("user_id", event.UserID))
-
-		return
-	}
+	handler.logger.Info("handling a file \"create\" event")
 
 	meta := Metadata{
 		MetadataAppKey: event.AppID,
 	}
 
-	file, err := handler.fileApp.Create(ctx, event.UserID, event.FileName, nil, meta)
+	_, err := handler.fileApp.Create(ctx, event.UserID, event.FileName, nil, meta)
 	if err != nil {
 		handler.logger.Error("creating file",
-			zap.String("issuer", event.Issuer),
-			zap.String("app", event.AppID),
-			zap.String("file_name", event.FileName),
-			zap.String("file_id", event.FileID),
-			zap.Int32("user_id", event.UserID),
-			zap.Error(err))
-
-		return
-	}
-
-	_, err = handler.certApp.CreateFileAccessCertificate(ctx, event.UserID, file)
-	if err != nil {
-		handler.logger.Error("creating file access certificate",
 			zap.String("issuer", event.Issuer),
 			zap.String("app", event.AppID),
 			zap.String("file_name", event.FileName),
