@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net"
 	"os"
 
@@ -16,6 +17,10 @@ import (
 )
 
 func getNetworkListener(logger *zap.Logger) net.Listener {
+	if port, exists := os.LookupEnv(cmd.ENV_SERVICE_PORT); exists {
+		cmd.ServicePort = port
+	}
+
 	if addr, exists := os.LookupEnv(cmd.ENV_SERVICE_ADDR); exists {
 		cmd.ServiceAddr = addr
 	}
@@ -24,7 +29,8 @@ func getNetworkListener(logger *zap.Logger) net.Listener {
 		cmd.ServiceNetw = netw
 	}
 
-	lis, err := net.Listen(cmd.ServiceNetw, cmd.ServiceAddr)
+	addr := fmt.Sprintf("%s:%s", cmd.ServiceAddr, cmd.ServicePort)
+	lis, err := net.Listen(cmd.ServiceNetw, addr)
 	if err != nil {
 		logger.Panic("failed to listen: %v",
 			zap.Error(err))

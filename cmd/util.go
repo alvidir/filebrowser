@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	ENV_SERVICE_PORT            = "SERVICE_PORT"
 	ENV_SERVICE_ADDR            = "SERVICE_ADDR"
 	ENV_SERVICE_NETW            = "SERVICE_NETW"
 	ENV_UID_HEADER              = "UID_HEADER"
@@ -31,7 +32,8 @@ const (
 )
 
 var (
-	ServiceAddr = "0.0.0.0:8000"
+	ServicePort = "8000"
+	ServiceAddr = "127.0.0.1"
 	ServiceNetw = "tcp"
 	UidHeader   = "X-Uid"
 )
