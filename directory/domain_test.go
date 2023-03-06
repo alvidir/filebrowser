@@ -85,7 +85,7 @@ func TestFiles(t *testing.T) {
 
 	want[1] = "/path/to/filename_1"
 
-	got := dir.Files()
+	got := dir.files
 	if len(got) != len(want) {
 		t.Errorf("got len = %v, want = %v", len(got), len(want))
 	}
@@ -94,5 +94,75 @@ func TestFiles(t *testing.T) {
 		if got, exists := got[path]; !exists || got.Id() != f.Id() {
 			t.Errorf("got file id = %v, want = %v", got, f.Id())
 		}
+	}
+}
+
+func TestAgregateFiles(t *testing.T) {
+	tests := []struct {
+		name  string
+		path  string
+		files []string
+		want  []string
+	}{
+		{
+			name: "get root files",
+			path: "/",
+			files: []string{
+				"/a_file",
+				"/another_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+				"/another_directory/a_file",
+			},
+			want: []string{
+				"/a_file",
+				"/another_file",
+				"/a_directory",
+				"/another_directory",
+			},
+		},
+		{
+			name: "get deeper directory files",
+			path: "/a_directory",
+			files: []string{
+				"/a_file",
+				"/another_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+				"/a_directory_here/a_file",
+			},
+			want: []string{
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t := t
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			dir := &Directory{
+				id:     "test",
+				userId: 999,
+				files:  make(map[string]*file.File),
+			}
+
+			for _, fileName := range test.files {
+				dir.files[fileName], _ = file.NewFile("test", "filename")
+			}
+
+			got := dir.AggregateFiles(test.path)
+			if len(test.want) != len(got) {
+				t.Fatalf("got files = %v, want = %v", got, test.want)
+			}
+
+			for _, expectedPath := range test.want {
+				if _, exists := got[expectedPath]; !exists {
+					t.Errorf("got files = %v, want = %v", got, expectedPath)
+				}
+			}
+		})
 	}
 }

@@ -200,22 +200,6 @@ func TestGet(t *testing.T) {
 				"/another_directory",
 			},
 		},
-
-		// {
-		// 	name: "get deeper directory files",
-		// 	path: "/a_directory/",
-		// 	files: []string{
-		// 		"/a_file",
-		// 		"/another_file",
-		// 		"/a_directory/a_file",
-		// 		"/a_directory/another_file",
-		// 		"/a_directory_here/a_file",
-		// 	},
-		// 	want: []string{
-		// 		"/a_directory/a_file",
-		// 		"/a_directory/another_file",
-		// 	},
-		// },
 	}
 
 	for _, test := range tests {
@@ -256,13 +240,13 @@ func TestGet(t *testing.T) {
 				t.Errorf("got user id = %v, want = %v", dir.userId, 999)
 			} else if testPath := filepath.Clean(test.path); dir.path != testPath {
 				t.Errorf("got path = %v, want = %v", dir.path, testPath)
-			} else if len(test.want) != len(dir.Files()) {
-				t.Errorf("got files = %v, want = %v", dir.Files(), test.want)
+			} else if len(test.want) != len(dir.files) {
+				t.Errorf("got files = %v, want = %v", dir.files, test.want)
 			}
 
 			for _, expectedPath := range test.want {
-				if _, exists := dir.Files()[expectedPath]; !exists {
-					t.Errorf("got files = %v, want = %v", dir.Files(), expectedPath)
+				if _, exists := dir.files[expectedPath]; !exists {
+					t.Errorf("got files = %v, want = %v", dir.files, expectedPath)
 				}
 			}
 		})
@@ -450,7 +434,7 @@ func TestRegisterFile(t *testing.T) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 
-	if got := d.Files(); len(got) != 1 {
+	if got := d.files; len(got) != 1 {
 		t.Errorf("got list len = %v, want = %v", len(got), 1)
 	} else if got, exists := got["/path/to/file"]; !exists || got.Id() != "test" {
 		t.Errorf("got file = %v, want = %v", got, "test")
@@ -497,7 +481,7 @@ func TestUnregisterFileWhenUserIsNoOwner(t *testing.T) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 
-	if got, exists := d.Files()["path/to/file"]; exists {
+	if got, exists := d.files["path/to/file"]; exists {
 		t.Errorf("got file = %v, want = %v", got, exists)
 	}
 }
@@ -525,7 +509,7 @@ func TestUnregisterFileWhenFileIsDeleted(t *testing.T) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 
-	if got, exists := d.Files()["path/to/file"]; exists {
+	if got, exists := d.files["path/to/file"]; exists {
 		t.Errorf("got file = %v, want = %v", got, nil)
 	}
 }
@@ -565,11 +549,11 @@ func TestUnregisterFileWhenFileIsShared(t *testing.T) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 
-	if got, exists := d1.Files()["path/to/file"]; exists {
+	if got, exists := d1.files["path/to/file"]; exists {
 		t.Errorf("got file = %v, want = %v", got, nil)
 	}
 
-	if got, exists := d2.Files()["path/to/file"]; exists {
+	if got, exists := d2.files["path/to/file"]; exists {
 		t.Errorf("got file = %v, want = %v", got, nil)
 	}
 
@@ -767,6 +751,25 @@ func TestMove(t *testing.T) {
 				"/a_directory/renamed_dir/another_file",
 			},
 		},
+		{
+			name:  "move directory where file with the same name",
+			dest:  "/another_dir/a_directory",
+			paths: []string{"/a_directory"},
+			files: []string{
+				"/a_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+				"/another_dir/a_directory",
+				"/another_dir/nested_dir/another_file",
+			},
+			want: []string{
+				"/a_file",
+				"/another_dir/a_directory_1/a_file",
+				"/another_dir/a_directory_1/another_file",
+				"/another_dir/a_directory",
+				"/another_dir/nested_dir/another_file",
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -775,11 +778,10 @@ func TestMove(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			f, _ := file.NewFile("test", "filename")
 			dirRepo := &directoryRepositoryMock{}
 			files := make(map[string]*file.File)
-			for _, fileName := range test.files {
-				files[fileName] = f
+			for id, fileName := range test.files {
+				files[fileName], _ = file.NewFile(strconv.Itoa(id), "filename")
 			}
 
 			dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
@@ -792,7 +794,13 @@ func TestMove(t *testing.T) {
 
 			fileRepo := &fileRepositoryMock{
 				find: func(repo *fileRepositoryMock, ctx context.Context, id string) (*file.File, error) {
-					return f, nil
+					for _, f := range files {
+						if f.Id() == id {
+							return f, nil
+						}
+					}
+
+					return nil, nil
 				},
 			}
 
@@ -812,7 +820,6 @@ func TestMove(t *testing.T) {
 					t.Errorf("got files = %v, want = %v", files, test.want)
 				}
 			}
-
 		})
 	}
 }

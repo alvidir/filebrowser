@@ -197,7 +197,7 @@ func (file *File) ProtectFields(uid int32) {
 		return
 	}
 
-	file.protected = true
+	file.MarkAsProtected()
 	for id, p := range file.permissions {
 		// if the user has read-only permissions it has the right to know
 		// who are the contributors of the file
@@ -205,6 +205,10 @@ func (file *File) ProtectFields(uid int32) {
 			delete(file.permissions, id)
 		}
 	}
+}
+
+func (file *File) MarkAsProtected() {
+	file.protected = true
 }
 
 func (file *File) IsContributor(uid int32) bool {

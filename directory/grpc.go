@@ -37,11 +37,11 @@ func NewProtoPath(absolute string) *proto.Path {
 func NewProtoDirectory(dir *Directory) *proto.Directory {
 	protoDir := &proto.Directory{
 		Id:    dir.id,
-		Files: make([]*proto.File, 0, len(dir.Files())),
+		Files: make([]*proto.File, 0, len(dir.files)),
 		Path:  NewProtoPath(dir.path),
 	}
 
-	for _, fs := range dir.Files() {
+	for _, fs := range dir.files {
 		protoDir.Files = append(protoDir.Files, file.NewProtoFile(fs))
 	}
 

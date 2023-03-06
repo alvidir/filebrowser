@@ -5,7 +5,6 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	fb "github.com/alvidir/filebrowser"
@@ -51,112 +50,49 @@ func (app *DirectoryApplication) Create(ctx context.Context, uid int32) (*Direct
 	return directory, nil
 }
 
+// Get agregates into a list of files all those files matching the given path.
 func (app *DirectoryApplication) Get(ctx context.Context, uid int32, p string) (*Directory, error) {
 	app.logger.Info("processing a \"get\" directory request",
 		zap.Int32("user_id", uid),
 		zap.String("path", p))
 
-	pDir := path.Dir(p)
-	absP := filepath.Join(PathSeparator, p)
-
-	prefix := absP
-	if absP == pDir && absP != PathSeparator {
-		prefix = absP + PathSeparator
-	}
-
-	pCount := strings.Count(p, PathSeparator)
 	dir, err := app.dirRepo.FindByUserId(ctx, uid)
 	if err != nil {
 		return nil, err
 	}
 
+	absP := filepath.Join(PathSeparator, p)
+
 	selected := NewDirectory(uid)
-	selected.id = dir.id
+	selected.files = dir.AggregateFiles(absP)
 	selected.path = absP
+	selected.id = dir.id
 
-	folders := make(map[string]int)
-
-	for fp, f := range dir.Files() {
-		absFp := filepath.Join(PathSeparator, fp)
-		fpCount := strings.Count(absFp, PathSeparator)
-		isSelected := false
-		if absP == pDir {
-			isSelected = strings.HasPrefix(absFp, prefix)
-		} else {
-			isSelected = absFp == absP
-		}
-
-		if !isSelected {
-			continue
-		}
-
-		if pCount < fpCount {
-			folderPath := filepath.Join(pathComponents(absFp)[0 : pCount+1]...)
-			folderSize, exists := folders[folderPath]
-			if !exists {
-				folderSize = 0
-			}
-
-			folders[folderPath] = folderSize + 1
-			continue
-		}
-
+	for _, f := range selected.files {
 		f.ProtectFields(uid)
-		f.SetDirectory(absP)
-		f.SetName(path.Base(absFp))
-
-		selected.files[absFp] = f
-	}
-
-	for folderPath, folderSize := range folders {
-		folder, err := file.NewFile("", path.Base(folderPath))
-		if err != nil {
-			continue
-		}
-
-		folder.SetFlag(file.Directory)
-		folder.SetDirectory(path.Dir(folderPath))
-		folder.AddMetadata(file.MetadataSizeKey, strconv.Itoa(folderSize))
-		selected.files[folderPath] = folder
 	}
 
 	return selected, nil
 }
 
-// Delete removes from the directory all those files whose path matches any of the given ones.
+// Delete removes from the directory all those files whose path matches the given one.
 func (app *DirectoryApplication) Delete(ctx context.Context, uid int32, p string) (*Directory, error) {
 	app.logger.Info("processing a \"delete\" directory request",
 		zap.Int32("user_id", uid),
 		zap.String("path", p))
-
-	pDir := path.Dir(p)
-	absP := filepath.Join(PathSeparator, p)
-
-	prefix := absP
-	if absP == pDir && absP != PathSeparator {
-		prefix = absP + PathSeparator
-	}
 
 	dir, err := app.dirRepo.FindByUserId(ctx, uid)
 	if err != nil {
 		return nil, err
 	}
 
-	for fp, f := range dir.Files() {
-		absFp := filepath.Join(PathSeparator, fp)
-		isSelected := false
-		if absP == pDir {
-			isSelected = strings.HasPrefix(absFp, prefix)
-		} else {
-			isSelected = absFp == absP
-		}
+	absP := filepath.Join(PathSeparator, p)
+	affected := NewDirectory(uid)
+	affected.files = dir.FilesByPath(absP)
+	affected.path = absP
 
-		if !isSelected {
-			continue
-		}
-
-		delete(dir.files, fp)
-
+	for _, f := range affected.files {
+		dir.RemoveFile(f)
 		if f.Permission(uid)&cert.Owner == 0 {
 			continue
 		}
@@ -170,14 +106,18 @@ func (app *DirectoryApplication) Delete(ctx context.Context, uid int32, p string
 			return nil, err
 		}
 
+		f.ProtectFields(uid)
 	}
 
 	if err := app.dirRepo.Save(ctx, dir); err != nil {
 		return nil, err
 	}
 
-	dir.path = absP
-	return dir, nil
+	for _, f := range affected.files {
+		f.ProtectFields(uid)
+	}
+
+	return affected, nil
 }
 
 // Move replaces the destination path to all these file paths in the directory matching any of the given paths.
@@ -187,58 +127,47 @@ func (app *DirectoryApplication) Move(ctx context.Context, uid int32, paths []st
 		zap.Strings("paths", paths),
 		zap.String("destination", dest))
 
-	destDir := path.Dir(dest)
-	absDest := filepath.Join(PathSeparator, dest)
 	dir, err := app.dirRepo.FindByUserId(ctx, uid)
 	if err != nil {
 		return nil, err
 	}
 
-	for fp, f := range dir.Files() {
-		absFp := filepath.Join(PathSeparator, fp)
+	destDir := path.Dir(dest)
+	absDest := filepath.Join(PathSeparator, dest)
 
-		isSelected := false
-		var prefix string
-		for _, p := range paths {
-			pDir := path.Dir(p)
-			absP := filepath.Join(PathSeparator, p)
-
-			prefix = absP
-			if absP == pDir && absP != PathSeparator {
-				prefix = absP + PathSeparator
-			}
-
-			if absP == pDir {
-				isSelected = strings.HasPrefix(absFp, prefix)
-			} else {
-				isSelected = absFp == absP
-			}
-
-			if isSelected {
-				break
-			}
+	affected := NewDirectory(uid)
+	prefixes := make(map[string]string)
+	for _, p := range paths {
+		absP := filepath.Join(PathSeparator, p)
+		for absFp, f := range dir.FilesByPath(absP) {
+			affected.files[absFp] = f
+			prefixes[absFp] = absP
 		}
+	}
 
-		if !isSelected {
-			continue
-		}
-
-		sufix := absFp[len(prefix):]
+	for absFp, f := range affected.files {
+		sufix := absFp[len(prefixes[absFp]):]
 		finalPath := path.Join(absDest, sufix)
 		if destDir == absDest {
 			finalPath = path.Join(absDest, path.Base(absFp))
 		}
 
-		delete(dir.files, fp)
+		dir.RemoveFile(f)
 		dir.AddFile(f, finalPath)
+
+		delete(affected.files, absFp)
+		affected.files[finalPath] = f
 	}
 
 	if err := app.dirRepo.Save(ctx, dir); err != nil {
 		return nil, err
 	}
 
-	// TODO: send only dest directory
-	return dir, nil
+	for _, f := range affected.files {
+		f.ProtectFields(uid)
+	}
+
+	return affected, nil
 }
 
 // RegisterFile registers the given file into the user uid directory. The given path may change if,

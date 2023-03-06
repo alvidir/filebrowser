@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/alvidir/filebrowser/file"
@@ -71,13 +72,75 @@ func (dir *Directory) AddFile(file *file.File, fp string) string {
 }
 
 func (dir *Directory) RemoveFile(file *file.File) {
-	for path, f := range dir.files {
+	for fp, f := range dir.files {
 		if f.Id() == file.Id() {
-			delete(dir.files, path)
+			delete(dir.files, fp)
+			return
 		}
 	}
 }
 
-func (dir *Directory) Files() map[string]*file.File {
-	return dir.files
+func (dir *Directory) FilesByPath(p string) map[string]*file.File {
+	absP := filepath.Join(PathSeparator, p)
+	if absP == PathSeparator {
+		return dir.files
+	}
+
+	files := make(map[string]*file.File)
+	for fp, f := range dir.files {
+		absFp := filepath.Join(PathSeparator, fp)
+
+		if strings.HasPrefix(absFp, absP) &&
+			(len(absP) == len(absFp) || path.IsAbs(absFp[len(absP):])) {
+			files[absFp] = f
+		}
+
+	}
+
+	return files
+}
+
+func (dir *Directory) AggregateFiles(p string) map[string]*file.File {
+	files := make(map[string]*file.File)
+	folders := make(map[string]int)
+
+	absP := filepath.Join(PathSeparator, p)
+	pCount := strings.Count(p, PathSeparator)
+
+	if absP != PathSeparator {
+		pCount++
+	}
+
+	for absFp, f := range dir.FilesByPath(p) {
+		if pCount < strings.Count(absFp, PathSeparator) {
+			// f is located deeper in the directory tree, and so, there is a folder at absP containing it
+			folderPath := filepath.Join(pathComponents(absFp)[0 : pCount+1]...)
+			if folderSize, exists := folders[folderPath]; exists {
+				folders[folderPath] = folderSize + 1
+			} else {
+				folders[folderPath] = 1
+			}
+
+			continue
+		}
+
+		f.MarkAsProtected() // avoid saving changes
+		f.SetDirectory(absP)
+		f.SetName(path.Base(absFp))
+		files[absFp] = f
+	}
+
+	for folderPath, folderSize := range folders {
+		folder, err := file.NewFile("", path.Base(folderPath))
+		if err != nil {
+			continue
+		}
+
+		folder.SetFlag(file.Directory)
+		folder.SetDirectory(path.Dir(folderPath))
+		folder.AddMetadata(file.MetadataSizeKey, strconv.Itoa(folderSize))
+		files[folderPath] = folder
+	}
+
+	return files
 }
