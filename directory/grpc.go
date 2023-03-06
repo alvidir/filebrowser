@@ -10,7 +10,7 @@ import (
 )
 
 type DirectoryServer struct {
-	proto.UnimplementedDirectoryServer
+	proto.UnimplementedDirectoryServiceServer
 	app    *DirectoryApplication
 	logger *zap.Logger
 	header string
@@ -24,99 +24,78 @@ func NewDirectoryServer(app *DirectoryApplication, logger *zap.Logger, authHeade
 	}
 }
 
-func (server *DirectoryServer) Create(ctx context.Context, req *proto.DirectoryLocator) (*proto.DirectoryDescriptor, error) {
-	uid, err := fb.GetUid(ctx, server.header, server.logger)
-	if err != nil {
-		return nil, err
+func NewProtoPath(absolute string) *proto.Path {
+	if len(absolute) == 0 {
+		return nil
 	}
 
-	dir, err := server.app.Create(ctx, uid)
-	if err != nil {
-		return nil, err
+	return &proto.Path{
+		Absolute: absolute,
 	}
+}
 
-	descriptor := &proto.DirectoryDescriptor{
+func NewProtoDirectory(dir *Directory) *proto.Directory {
+	protoDir := &proto.Directory{
 		Id:    dir.id,
-		Files: make([]*proto.FileDescriptor, 0, len(dir.Files())),
+		Files: make([]*proto.File, 0, len(dir.Files())),
+		Path:  NewProtoPath(dir.path),
 	}
 
 	for _, fs := range dir.Files() {
-		fileDescriptor := &proto.FileDescriptor{
-			Id:       fs.Id(),
-			Metadata: make([]*proto.FileMetadata, 0, len(fs.Metadata())),
-		}
-
-		for key, value := range fs.Metadata() {
-			fileDescriptor.Metadata = append(fileDescriptor.Metadata, &proto.FileMetadata{
-				Key:   key,
-				Value: value,
-			})
-		}
-
-		descriptor.Files = append(descriptor.Files, fileDescriptor)
+		protoDir.Files = append(protoDir.Files, file.NewProtoFile(fs))
 	}
 
-	return descriptor, nil
+	return protoDir
 }
 
-func (server *DirectoryServer) Retrieve(ctx context.Context, req *proto.DirectoryLocator) (*proto.DirectoryDescriptor, error) {
+func (server *DirectoryServer) Get(ctx context.Context, path *proto.Path) (*proto.Directory, error) {
 	uid, err := fb.GetUid(ctx, server.header, server.logger)
 	if err != nil {
 		return nil, err
 	}
 
-	dir, err := server.app.Retrieve(ctx, uid, req.GetPath(), req.GetFilter())
+	dir, err := server.app.Get(ctx, uid, path.GetAbsolute())
 	if err != nil {
 		return nil, err
 	}
 
-	descriptor := &proto.DirectoryDescriptor{
-		Id:    dir.id,
-		Files: make([]*proto.FileDescriptor, 0, len(dir.Files())),
-	}
-
-	for _, fs := range dir.Files() {
-		descriptor.Files = append(descriptor.Files, file.NewFileDescriptor(fs))
-	}
-
-	return descriptor, nil
+	return NewProtoDirectory(dir), nil
 }
 
-func (server *DirectoryServer) Delete(ctx context.Context, req *proto.DirectoryLocator) (*proto.Empty, error) {
+func (server *DirectoryServer) Delete(ctx context.Context, path *proto.Path) (*proto.Directory, error) {
 	uid, err := fb.GetUid(ctx, server.header, server.logger)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := server.app.Delete(ctx, uid); err != nil {
+	dir, err := server.app.Delete(ctx, uid, path.GetAbsolute())
+	if err != nil {
 		return nil, err
 	}
 
-	return &proto.Empty{}, nil
+	return NewProtoDirectory(dir), nil
 }
 
-func (server *DirectoryServer) Relocate(ctx context.Context, req *proto.DirectoryLocator) (*proto.Empty, error) {
+func (server *DirectoryServer) Move(ctx context.Context, req *proto.MoveRequest) (*proto.Directory, error) {
 	uid, err := fb.GetUid(ctx, server.header, server.logger)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := server.app.Relocate(ctx, uid, req.GetPath(), req.GetFilter()); err != nil {
-		return nil, err
+	protoPaths := req.GetPaths()
+	paths := make([]string, 0, len(protoPaths))
+	for _, pp := range protoPaths {
+		paths = append(paths, pp.GetAbsolute())
 	}
 
-	return &proto.Empty{}, nil
-}
-
-func (server *DirectoryServer) RemoveFiles(ctx context.Context, req *proto.DirectoryLocator) (*proto.Empty, error) {
-	uid, err := fb.GetUid(ctx, server.header, server.logger)
+	dir, err := server.app.Move(ctx, uid, paths, req.GetDestination().GetAbsolute())
 	if err != nil {
 		return nil, err
 	}
 
-	if err := server.app.RemoveFiles(ctx, uid, req.GetPath(), req.GetFilter()); err != nil {
-		return nil, err
-	}
+	return NewProtoDirectory(dir), nil
+}
 
-	return &proto.Empty{}, nil
+func (server *Directory) Search(ctx context.Context, req *proto.SearchRequest) (*proto.SearchResponse, error) {
+	return nil, nil
 }

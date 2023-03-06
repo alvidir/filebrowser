@@ -18,7 +18,7 @@ type mongoFileAccessAuthorization struct {
 	ID         primitive.ObjectID `bson:"_id,omitempty"`
 	FileID     primitive.ObjectID `bson:"file_id"`
 	UserID     int32              `bson:"user_id"`
-	Permission fb.Permission      `bson:"permission"`
+	Permission Permission         `bson:"permission"`
 	Token      string             `bson:"token,omitempty"`
 }
 

@@ -6,12 +6,11 @@ import (
 	"time"
 
 	fb "github.com/alvidir/filebrowser"
+	cert "github.com/alvidir/filebrowser/certificate"
 )
 
 const (
-	Blurred   Flag = 0x01
-	Remote    Flag = 0x02
-	Directory Flag = 0x04
+	Directory Flag = 0x01
 
 	FilenameRegex string = "^[^/]+$"
 
@@ -19,7 +18,7 @@ const (
 	MetadataUpdatedAtKey = "updated_at"
 	MetadataDeletedAtKey = "deleted_at"
 	MetadataSizeKey      = "size"
-	MetadataAppKey       = "app_id"
+	MetadataAppKey       = "app"
 
 	TimestampBase = 16
 )
@@ -30,12 +29,15 @@ var (
 
 type Metadata map[string]string
 type Flag uint8
+type Ctrl uint8
 
 type File struct {
 	id          string
 	name        string
 	metadata    Metadata
-	permissions map[int32]fb.Permission
+	directory   string
+	permissions map[int32]cert.Permission
+	protected   bool // true avoids the file from saving
 	flags       Flag
 	data        []byte
 }
@@ -54,7 +56,7 @@ func NewFile(id string, filename string) (*File, error) {
 		id:          id,
 		name:        filename,
 		metadata:    meta,
-		permissions: make(map[int32]fb.Permission),
+		permissions: make(map[int32]cert.Permission),
 		flags:       0,
 		data:        make([]byte, 0),
 	}, nil
@@ -84,10 +86,14 @@ func (file *File) Metadata() Metadata {
 	return file.metadata
 }
 
+func (file *File) Directory() string {
+	return file.directory
+}
+
 func (file *File) Owners() []int32 {
 	owners := make([]int32, 1) // a file has, for sure, at least one owner
 	for uid, perm := range file.permissions {
-		if perm&fb.Owner == 0 {
+		if perm&cert.Owner == 0 {
 			continue
 		}
 
@@ -121,7 +127,7 @@ func (file *File) SetName(name string) {
 	file.name = name
 }
 
-func (file *File) Permission(uid int32) (perm fb.Permission) {
+func (file *File) Permission(uid int32) (perm cert.Permission) {
 	if file.permissions != nil {
 		perm = file.permissions[uid]
 	}
@@ -129,15 +135,15 @@ func (file *File) Permission(uid int32) (perm fb.Permission) {
 	return
 }
 
-func (file *File) AddPermission(uid int32, perm fb.Permission) {
+func (file *File) AddPermission(uid int32, perm cert.Permission) {
 	if file.permissions == nil {
-		file.permissions = make(map[int32]fb.Permission)
+		file.permissions = make(map[int32]cert.Permission)
 	}
 
 	file.permissions[uid] |= perm
 }
 
-func (file *File) RevokePermission(uid int32, perm fb.Permission) {
+func (file *File) RevokePermission(uid int32, perm cert.Permission) {
 	if file.permissions == nil {
 		return
 	}
@@ -174,35 +180,36 @@ func (file *File) AddMetadata(key string, value string) (old string, exists bool
 	return
 }
 
+func (file *File) SetDirectory(dir string) {
+	file.directory = dir
+}
+
 func (file *File) Data() []byte {
 	return file.data
 }
 
-func (file *File) AuthorizedFieldsOnly(uid int32) {
+// ProtectFields clear from the file all those fields the given user has no permissions
+// to read.
+func (file *File) ProtectFields(uid int32) {
 	if file.IsContributor(uid) {
 		// if the user itself is contributor it has the right to know
 		// who can read and write the file
 		return
 	}
 
-	file.flags |= Blurred
+	file.protected = true
 	for id, p := range file.permissions {
 		// if the user has read-only permissions it has the right to know
 		// who are the contributors of the file
-		if id != uid && p&(fb.Owner|fb.Write) == 0 {
+		if id != uid && p&(cert.Owner|cert.Write) == 0 {
 			delete(file.permissions, id)
 		}
 	}
 }
 
-func (file *File) IsRemote() bool {
-	_, exists := file.metadata[MetadataAppKey]
-	return exists
-}
-
 func (file *File) IsContributor(uid int32) bool {
 	// is contributor if, and only if, the user is owner or has write permissions
-	return file.permissions[uid]&(fb.Owner|fb.Write) != 0
+	return file.permissions[uid]&(cert.Owner|cert.Write) != 0
 }
 
 func (file *File) SetFlag(flag Flag) {

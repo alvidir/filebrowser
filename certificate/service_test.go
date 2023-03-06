@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	fb "github.com/alvidir/filebrowser"
 	"go.uber.org/zap"
 )
 
@@ -17,11 +16,11 @@ var (
 )
 
 type FileMock struct {
-	permissions fb.Permission
+	permissions Permission
 	id          string
 }
 
-func (file *FileMock) Permission(uid int32) fb.Permission {
+func (file *FileMock) Permission(uid int32) Permission {
 	return file.permissions
 }
 
@@ -54,7 +53,7 @@ func TestCertificateValidation(t *testing.T) {
 			t.Parallel()
 			service := NewCertificateService(privateKey, "", &test.ttl, logger)
 			file := &FileMock{
-				permissions: fb.Owner,
+				permissions: Owner,
 				id:          "123",
 			}
 

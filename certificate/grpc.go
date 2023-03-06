@@ -9,7 +9,7 @@ import (
 )
 
 type CertificateServer struct {
-	proto.UnimplementedCertificateServer
+	proto.UnimplementedCertificateServiceServer
 	app    *CertificateApplication
 	logger *zap.Logger
 	header string
@@ -23,23 +23,23 @@ func NewCertificateServer(app *CertificateApplication, logger *zap.Logger, authH
 	}
 }
 
-func (server *CertificateServer) Retrieve(ctx context.Context, req *proto.CertificateLocator) (*proto.CertificateDescriptor, error) {
+func (server *CertificateServer) Get(ctx context.Context, req *proto.File) (*proto.Certificate, error) {
 	uid, err := fb.GetUid(ctx, server.header, server.logger)
 	if err != nil {
 		return nil, err
 	}
 
-	cert, err := server.app.GetFileAccessCertificate(ctx, uid, req.FileId)
+	cert, err := server.app.GetFileAccessCertificate(ctx, uid, req.GetId())
 	if err != nil {
 		return nil, err
 	}
 
-	descriptor := &proto.CertificateDescriptor{
+	descriptor := &proto.Certificate{
 		Id: cert.id,
 		Permissions: &proto.Permissions{
-			Read:  cert.permission&fb.Read != 0,
-			Write: cert.permission&fb.Write != 0,
-			Owner: cert.permission&fb.Owner != 0,
+			Read:  cert.permission&Read != 0,
+			Write: cert.permission&Write != 0,
+			Owner: cert.permission&Owner != 0,
 		},
 		Token: cert.token,
 	}

@@ -8,8 +8,16 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
+const (
+	Read  Permission = 0x01
+	Write Permission = 0x02
+	Owner Permission = 0x04
+)
+
+type Permission uint8
+
 type File interface {
-	Permission(uid int32) fb.Permission
+	Permission(uid int32) Permission
 	Id() string
 }
 
@@ -21,17 +29,17 @@ type FileAccessClaims struct {
 	Owner                bool   `json:"is_owner"`
 }
 
-func (claims *FileAccessClaims) Permission() (perms fb.Permission) {
+func (claims *FileAccessClaims) Permission() (perms Permission) {
 	if claims.Read {
-		perms |= fb.Read
+		perms |= Read
 	}
 
 	if claims.Write {
-		perms |= fb.Write
+		perms |= Write
 	}
 
 	if claims.Owner {
-		perms |= fb.Owner
+		perms |= Owner
 	}
 
 	return
@@ -41,7 +49,7 @@ type FileAccessCertificate struct {
 	id         string
 	fileId     string
 	userId     int32
-	permission fb.Permission
+	permission Permission
 	token      string
 }
 
@@ -71,9 +79,9 @@ func (cert *FileAccessCertificate) Claims(ttl *time.Duration, issuer string) (*F
 			ID:        cert.id,
 		},
 		FileId: cert.fileId,
-		Read:   cert.permission&fb.Read != 0,
-		Write:  cert.permission&fb.Write != 0,
-		Owner:  cert.permission&fb.Owner != 0,
+		Read:   cert.permission&Read != 0,
+		Write:  cert.permission&Write != 0,
+		Owner:  cert.permission&Owner != 0,
 	}
 
 	if ttl != nil {

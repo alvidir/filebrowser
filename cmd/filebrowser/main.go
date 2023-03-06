@@ -83,9 +83,9 @@ func main() {
 	fileServer := file.NewFileServer(fileApp, certApp, fileBus, cmd.UidHeader, logger)
 
 	grpcServer := grpc.NewServer()
-	proto.RegisterDirectoryServer(grpcServer, directoryServer)
-	proto.RegisterFileServer(grpcServer, fileServer)
-	proto.RegisterCertificateServer(grpcServer, certServer)
+	proto.RegisterDirectoryServiceServer(grpcServer, directoryServer)
+	proto.RegisterFileServiceServer(grpcServer, fileServer)
+	proto.RegisterCertificateServiceServer(grpcServer, certServer)
 	lis := getNetworkListener(logger)
 
 	logger.Info("server ready to accept connections",

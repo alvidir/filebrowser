@@ -3,11 +3,14 @@ package directory
 import (
 	"context"
 	"errors"
+	"path"
+	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
 
 	fb "github.com/alvidir/filebrowser"
+	cert "github.com/alvidir/filebrowser/certificate"
 	"github.com/alvidir/filebrowser/file"
 	"go.uber.org/zap"
 )
@@ -153,7 +156,7 @@ func TestCreate(t *testing.T) {
 	}
 }
 
-func TestRetrieveWhenDirectoryDoesNotExists(t *testing.T) {
+func TestGetWhenDirectoryDoesNotExists(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 
@@ -165,40 +168,104 @@ func TestRetrieveWhenDirectoryDoesNotExists(t *testing.T) {
 	fileRepo := &fileRepositoryMock{}
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
-	if _, err := app.Retrieve(context.TODO(), 999, "", ""); !errors.Is(err, fb.ErrNotFound) {
+	if _, err := app.Get(context.TODO(), 999, ""); !errors.Is(err, fb.ErrNotFound) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 }
 
-func TestRetrieve(t *testing.T) {
+func TestGet(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 
-	dirRepo := &directoryRepositoryMock{}
-	dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
-		f, _ := file.NewFile("", "filename")
-		return &Directory{
-			id:     "test",
-			userId: 999,
-			files: map[string]*file.File{
-				"a_file": f,
+	tests := []struct {
+		name  string
+		path  string
+		files []string
+		want  []string
+	}{
+		{
+			name: "get root files",
+			path: "/",
+			files: []string{
+				"/a_file",
+				"/another_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+				"/another_directory/a_file",
 			},
-		}, nil
+			want: []string{
+				"/a_file",
+				"/another_file",
+				"/a_directory",
+				"/another_directory",
+			},
+		},
+
+		// {
+		// 	name: "get deeper directory files",
+		// 	path: "/a_directory/",
+		// 	files: []string{
+		// 		"/a_file",
+		// 		"/another_file",
+		// 		"/a_directory/a_file",
+		// 		"/a_directory/another_file",
+		// 		"/a_directory_here/a_file",
+		// 	},
+		// 	want: []string{
+		// 		"/a_directory/a_file",
+		// 		"/a_directory/another_file",
+		// 	},
+		// },
 	}
 
-	fileRepo := &fileRepositoryMock{}
-	fileRepo.findAll = func(repo *fileRepositoryMock, ctx context.Context, ids []string) ([]*file.File, error) {
-		return nil, nil
-	}
+	for _, test := range tests {
+		t := t
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 
-	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
+			f, _ := file.NewFile("test", "filename")
+			dirRepo := &directoryRepositoryMock{}
+			files := make(map[string]*file.File)
+			for _, fileName := range test.files {
+				files[fileName] = f
+			}
 
-	if dir, err := app.Retrieve(context.TODO(), 999, "", ""); err != nil {
-		t.Errorf("got error = %v, want = %v", err, nil)
-	} else if dir.id != "test" {
-		t.Errorf("got id = %v, want = %v", dir.id, "test")
-	} else if dir.userId != 999 {
-		t.Errorf("got user id = %v, want = %v", dir.userId, 999)
+			dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
+				return &Directory{
+					id:     "test",
+					userId: 999,
+					files:  files,
+				}, nil
+			}
+
+			fileRepo := &fileRepositoryMock{
+				find: func(repo *fileRepositoryMock, ctx context.Context, id string) (*file.File, error) {
+					return f, nil
+				},
+			}
+
+			app := NewDirectoryApplication(dirRepo, fileRepo, logger)
+			dir, err := app.Get(context.TODO(), 999, test.path)
+
+			if err != nil {
+				t.Errorf("got error = %v, want = %v", err, nil)
+			} else if dir.id != "test" {
+				t.Errorf("got id = %v, want = %v", dir.id, "test")
+			} else if dir.userId != 999 {
+				t.Errorf("got user id = %v, want = %v", dir.userId, 999)
+			} else if testPath := filepath.Clean(test.path); dir.path != testPath {
+				t.Errorf("got path = %v, want = %v", dir.path, testPath)
+			} else if len(test.want) != len(dir.Files()) {
+				t.Errorf("got files = %v, want = %v", dir.Files(), test.want)
+			}
+
+			for _, expectedPath := range test.want {
+				if _, exists := dir.Files()[expectedPath]; !exists {
+					t.Errorf("got files = %v, want = %v", dir.Files(), expectedPath)
+				}
+			}
+		})
 	}
 }
 
@@ -214,7 +281,7 @@ func TestDeleteWhenDirectoryDoesNotExists(t *testing.T) {
 	fileRepo := &fileRepositoryMock{}
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
-	if err := app.Delete(context.TODO(), 999); !errors.Is(err, fb.ErrNotFound) {
+	if _, err := app.Delete(context.TODO(), 999, ""); !errors.Is(err, fb.ErrNotFound) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 }
@@ -224,7 +291,7 @@ func TestDeleteWhenUserIsSingleOwner(t *testing.T) {
 	defer logger.Sync()
 
 	f, _ := file.NewFile("test", "filename")
-	f.AddPermission(999, fb.Owner)
+	f.AddPermission(999, cert.Owner)
 
 	dirRepo := &directoryRepositoryMock{
 		delete: func(ctx context.Context, dir *Directory) error {
@@ -237,7 +304,7 @@ func TestDeleteWhenUserIsSingleOwner(t *testing.T) {
 			id:     "test",
 			userId: 999,
 			files: map[string]*file.File{
-				"path/to/file": f,
+				"/path/to/file": f,
 			},
 		}, nil
 	}
@@ -246,11 +313,15 @@ func TestDeleteWhenUserIsSingleOwner(t *testing.T) {
 		find: func(repo *fileRepositoryMock, ctx context.Context, id string) (*file.File, error) {
 			return f, nil
 		},
+
+		delete: func(repo *fileRepositoryMock, ctx context.Context, file *file.File) error {
+			return nil
+		},
 	}
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
 	before := time.Now().Unix()
-	if err := app.Delete(context.TODO(), 999); err != nil {
+	if _, err := app.Delete(context.TODO(), 999, "/path/to/file"); err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
 	}
 
@@ -270,8 +341,8 @@ func TestDeleteWhenUserIsNotSingleOwner(t *testing.T) {
 	defer logger.Sync()
 
 	f, _ := file.NewFile("test", "filename")
-	f.AddPermission(999, fb.Owner)
-	f.AddPermission(888, fb.Owner)
+	f.AddPermission(999, cert.Owner)
+	f.AddPermission(888, cert.Owner)
 
 	dirRepo := &directoryRepositoryMock{
 		delete: func(ctx context.Context, dir *Directory) error {
@@ -296,7 +367,7 @@ func TestDeleteWhenUserIsNotSingleOwner(t *testing.T) {
 	}
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
-	if err := app.Delete(context.TODO(), 999); err != nil {
+	if _, err := app.Delete(context.TODO(), 999, ""); err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
 	}
 
@@ -333,7 +404,7 @@ func TestDeleteWhenUserIsNotOwner(t *testing.T) {
 	}
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
-	if err := app.Delete(context.TODO(), 999); err != nil {
+	if _, err := app.Delete(context.TODO(), 999, ""); err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
 	}
 
@@ -419,7 +490,7 @@ func TestUnregisterFileWhenUserIsNoOwner(t *testing.T) {
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
 	f, _ := file.NewFile("test", "filename")
-	f.AddPermission(999, fb.Read)
+	f.AddPermission(999, cert.Read)
 	d.AddFile(f, "path/to/file")
 
 	if err := app.UnregisterFile(context.TODO(), f, 999); err != nil {
@@ -447,7 +518,7 @@ func TestUnregisterFileWhenFileIsDeleted(t *testing.T) {
 
 	f, _ := file.NewFile("test", "filename")
 	f.AddMetadata(file.MetadataDeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
-	f.AddPermission(999, fb.Owner)
+	f.AddPermission(999, cert.Owner)
 	d.AddFile(f, "path/to/file")
 
 	if err := app.UnregisterFile(context.TODO(), f, 999); err != nil {
@@ -484,8 +555,8 @@ func TestUnregisterFileWhenFileIsShared(t *testing.T) {
 
 	f, _ := file.NewFile("test", "filename")
 	f.AddMetadata(file.MetadataDeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
-	f.AddPermission(999, fb.Owner)
-	f.AddPermission(888, fb.Read|fb.Write)
+	f.AddPermission(999, cert.Owner)
+	f.AddPermission(888, cert.Read|cert.Write)
 
 	d1.AddFile(f, "path/to/file")
 	d2.AddFile(f, "path/to/file")
@@ -504,21 +575,21 @@ func TestUnregisterFileWhenFileIsShared(t *testing.T) {
 
 }
 
-func TestRelocate(t *testing.T) {
+func TestMove(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 
 	tests := []struct {
-		name   string
-		target string
-		filter string
-		files  []string
-		want   []string
+		name  string
+		dest  string
+		paths []string
+		files []string
+		want  []string
 	}{
 		{
-			name:   "move to a new directory",
-			target: "new_directory",
-			filter: "^/a_file$|^/another_file$",
+			name:  "move to a new directory",
+			dest:  "/new_directory/",
+			paths: []string{"/a_file", "/another_file"},
 			files: []string{
 				"/a_file",
 				"/another_file",
@@ -529,9 +600,9 @@ func TestRelocate(t *testing.T) {
 			},
 		},
 		{
-			name:   "move to a existing directory",
-			target: "a_directory",
-			filter: "^/a_file$",
+			name:  "move to a existing directory",
+			dest:  "/a_directory/",
+			paths: []string{"/a_file"},
 			files: []string{
 				"/a_file",
 				"/a_directory/another_file",
@@ -542,9 +613,9 @@ func TestRelocate(t *testing.T) {
 			},
 		},
 		{
-			name:   "move directory to another directory",
-			target: "another_dir",
-			filter: "^/a_directory",
+			name:  "move directory to another directory",
+			dest:  "/another_dir/a_directory/",
+			paths: []string{"/a_directory/"},
 			files: []string{
 				"/a_directory/a_file",
 				"/a_directory/another_file",
@@ -557,9 +628,9 @@ func TestRelocate(t *testing.T) {
 			},
 		},
 		{
-			name:   "move file to parent directory",
-			target: "/",
-			filter: "^/a_directory/(a_file.*)",
+			name:  "move file to parent directory",
+			dest:  "/",
+			paths: []string{"/a_directory/a_file"},
 			files: []string{
 				"/a_directory/a_file",
 				"/a_directory/another_file",
@@ -570,9 +641,9 @@ func TestRelocate(t *testing.T) {
 			},
 		},
 		{
-			name:   "move to a directory with a file with the same name",
-			target: "a_directory",
-			filter: "^/a_file$",
+			name:  "move to a directory with a file with the same name",
+			dest:  "/a_directory/",
+			paths: []string{"/a_file"},
 			files: []string{
 				"/a_file",
 				"/a_directory/a_file",
@@ -583,9 +654,9 @@ func TestRelocate(t *testing.T) {
 			},
 		},
 		{
-			name:   "move to new directory with same name as file",
-			target: "another_dir/an_item",
-			filter: "^/a_directory",
+			name:  "move to new directory with same name as file",
+			dest:  "/another_dir/an_item/a_directory/",
+			paths: []string{"/a_directory/"},
 			files: []string{
 				"/a_directory/a_file",
 				"/another_dir/an_item",
@@ -596,9 +667,9 @@ func TestRelocate(t *testing.T) {
 			},
 		},
 		{
-			name:   "move from a directory to another",
-			target: "/a_directory",
-			filter: "^/another_dir/(a_file.*)$",
+			name:  "move from a directory to another",
+			dest:  "/a_directory/",
+			paths: []string{"/another_dir/a_file"},
 			files: []string{
 				"/a_directory/a_file",
 				"/another_dir/a_file",
@@ -609,9 +680,9 @@ func TestRelocate(t *testing.T) {
 			},
 		},
 		{
-			name:   "move file with similar name to directory",
-			target: "/a_directory",
-			filter: "^/(a_file(/.*)?)$",
+			name:  "move file with similar name to directory",
+			dest:  "/a_directory/",
+			paths: []string{"/a_file"},
 			files: []string{
 				"/a_file",
 				"/a_file_1",
@@ -622,9 +693,9 @@ func TestRelocate(t *testing.T) {
 			},
 		},
 		{
-			name:   "move file with similar name to directory - 2",
-			target: "/a_directory",
-			filter: "^/(a_file_1(/.*)?)$",
+			name:  "move file with similar name to directory - 2",
+			dest:  "/a_directory/",
+			paths: []string{"/a_file_1"},
 			files: []string{
 				"/a_file",
 				"/a_file_1",
@@ -635,9 +706,9 @@ func TestRelocate(t *testing.T) {
 			},
 		},
 		{
-			name:   "rename file",
-			target: "/renamed_file",
-			filter: "^(/a_file(/.*)?)$",
+			name:  "rename file",
+			dest:  "/renamed_file",
+			paths: []string{"/a_file"},
 			files: []string{
 				"/a_file",
 				"/a_file_1",
@@ -648,9 +719,9 @@ func TestRelocate(t *testing.T) {
 			},
 		},
 		{
-			name:   "rename deeper file",
-			target: "/a_directory/renamed_file",
-			filter: "^(/a_directory/a_file(/.*)?)$",
+			name:  "rename deeper file",
+			dest:  "/a_directory/renamed_file",
+			paths: []string{"/a_directory/a_file"},
 			files: []string{
 				"/a_file",
 				"/a_directory/a_file",
@@ -663,9 +734,9 @@ func TestRelocate(t *testing.T) {
 			},
 		},
 		{
-			name:   "rename directory",
-			target: "/renamed_dir",
-			filter: "^/a_directory(/.*)?$",
+			name:  "rename directory",
+			dest:  "/renamed_dir/",
+			paths: []string{"/a_directory/"},
 			files: []string{
 				"/a_file",
 				"/a_directory/a_file",
@@ -678,9 +749,9 @@ func TestRelocate(t *testing.T) {
 			},
 		},
 		{
-			name:   "rename deeper directory",
-			target: "/a_directory/renamed_dir",
-			filter: "^/a_directory/another_dir(/.*)?$",
+			name:  "rename deeper directory",
+			dest:  "/a_directory/renamed_dir/",
+			paths: []string{"/a_directory/another_dir/"},
 			files: []string{
 				"/a_file",
 				"/a_directory/a_file",
@@ -727,7 +798,7 @@ func TestRelocate(t *testing.T) {
 
 			app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
-			err := app.Relocate(context.TODO(), 999, test.target, test.filter)
+			_, err := app.Move(context.TODO(), 999, test.paths, test.dest)
 			if err != nil {
 				t.Errorf("got error = %v, want = nil", err)
 			}
@@ -746,21 +817,19 @@ func TestRelocate(t *testing.T) {
 	}
 }
 
-func TestRemoveFiles(t *testing.T) {
+func TestDeleteFiles(t *testing.T) {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 
 	tests := []struct {
-		name   string
-		target string
-		filter string
-		files  []string
-		want   []string
+		name  string
+		path  string
+		files []string
+		want  []string
 	}{
 		{
-			name:   "filter single file by regex",
-			target: "",
-			filter: "^/a_file$",
+			name: "filter single file",
+			path: "/a_file",
 			files: []string{
 				"/a_file",
 				"/a_directory/a_file",
@@ -770,22 +839,8 @@ func TestRemoveFiles(t *testing.T) {
 			},
 		},
 		{
-			name:   "filter multiple files by regex",
-			target: "",
-			filter: "^/a_file$|^/another_file$",
-			files: []string{
-				"/a_file",
-				"/another_file",
-				"/a_directory/a_file",
-			},
-			want: []string{
-				"/a_directory/a_file",
-			},
-		},
-		{
-			name:   "filter directory by prefix",
-			target: "/a_directory",
-			filter: "",
+			name: "filter directory",
+			path: "/a_directory/",
 			files: []string{
 				"/a_file",
 				"/a_directory/a_file",
@@ -793,22 +848,6 @@ func TestRemoveFiles(t *testing.T) {
 			},
 			want: []string{
 				"/a_file",
-			},
-		},
-		{
-			name:   "filter by prefix and regex",
-			target: "/a_directory",
-			filter: "/a_file$",
-			files: []string{
-				"/a_file",
-				"/another_file",
-				"/a_directory/a_file",
-				"/a_directory/another_file",
-			},
-			want: []string{
-				"/a_file",
-				"/another_file",
-				"/a_directory/another_file",
 			},
 		},
 	}
@@ -821,9 +860,10 @@ func TestRemoveFiles(t *testing.T) {
 
 			dirRepo := &directoryRepositoryMock{}
 			files := make(map[string]*file.File)
-			for index, filename := range test.files {
-				files[filename], _ = file.NewFile(strconv.Itoa(index), "filename")
-				t.Logf("got f as %v", files[filename])
+			for index, fp := range test.files {
+				id := strconv.Itoa(index)
+				files[fp], _ = file.NewFile(id, path.Base(fp))
+				files[fp].SetDirectory(path.Dir(fp))
 			}
 
 			dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
@@ -836,24 +876,36 @@ func TestRemoveFiles(t *testing.T) {
 
 			fileRepo := &fileRepositoryMock{
 				find: func(repo *fileRepositoryMock, ctx context.Context, id string) (*file.File, error) {
-					return files[id], nil
+					for _, f := range files {
+						if f.Id() == id {
+							return f, nil
+						}
+					}
+
+					return nil, fb.ErrNotFound
 				},
 			}
 
 			app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
-			err := app.RemoveFiles(context.TODO(), 999, test.target, test.filter)
+			_, err := app.Delete(context.TODO(), 999, test.path)
 			if err != nil {
 				t.Errorf("got error = %v, want = nil", err)
 			}
 
+			filenames := make([]string, 0, len(files))
+			for _, f := range files {
+				fp := filepath.Join(PathSeparator, f.Directory(), f.Name())
+				filenames = append(filenames, fp)
+			}
+
 			if len(test.want) != len(files) {
-				t.Errorf("got files = %v, want = %v", files, test.want)
+				t.Errorf("got files = %+v, want = %v", filenames, test.want)
 			}
 
 			for _, expectedPath := range test.want {
 				if _, exists := files[expectedPath]; !exists {
-					t.Errorf("got files = %v, want = %v", files, test.want)
+					t.Errorf("got files = %v, want = %v", filenames, test.want)
 				}
 			}
 
