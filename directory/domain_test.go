@@ -2,6 +2,9 @@ package directory
 
 import (
 	"fmt"
+	"path"
+	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/alvidir/filebrowser/file"
@@ -163,6 +166,104 @@ func TestAgregateFiles(t *testing.T) {
 					t.Errorf("got files = %v, want = %v", got, expectedPath)
 				}
 			}
+		})
+	}
+}
+
+func TestSearch(t *testing.T) {
+	tests := []struct {
+		name   string
+		search string
+		files  []string
+		want   []string
+	}{
+		{
+			name:   "search by filename",
+			search: "a_file",
+			files: []string{
+				"/a_file",
+				"/a_directory/a_file",
+			},
+			want: []string{
+				"/a_file",
+				"/a_directory/a_file",
+			},
+		},
+		{
+			name:   "search by directory name",
+			search: "a_directory",
+			files: []string{
+				"/a_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+			},
+			want: []string{
+				"/a_directory",
+			},
+		},
+		{
+			name:   "search by partial string",
+			search: "ry/a_",
+			files: []string{
+				"/a_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+			},
+			want: []string{
+				"/a_directory/a_file",
+			},
+		},
+		{
+			name:   "search by partial string",
+			search: "a_",
+			files: []string{
+				"/a_directory/with_a_dir/with_a_file",
+			},
+			want: []string{
+				"/a_directory",
+				"/a_directory/with_a_dir",
+				"/a_directory/with_a_dir/with_a_file",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t := t
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			dir := &Directory{
+				id:     "test",
+				userId: 999,
+				files:  make(map[string]*file.File),
+			}
+
+			for i, fp := range test.files {
+				id := strconv.Itoa(i)
+				dir.files[fp], _ = file.NewFile(id, path.Base(fp))
+				dir.files[fp].SetDirectory(path.Dir(fp))
+			}
+
+			matches := dir.Search(test.search)
+			if len(test.want) != len(matches) {
+				t.Errorf("got files = %+v, want = %v", matches, test.want)
+			}
+
+			for _, expectedPath := range test.want {
+				exists := false
+				for _, match := range matches {
+					fullpath := filepath.Join(match.file.Directory(), match.file.Name())
+					if exists = fullpath == expectedPath; exists {
+						break
+					}
+				}
+
+				if !exists {
+					t.Errorf("got files = %v, want = %v", matches, expectedPath)
+				}
+			}
+
 		})
 	}
 }

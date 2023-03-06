@@ -170,6 +170,25 @@ func (app *DirectoryApplication) Move(ctx context.Context, uid int32, paths []st
 	return affected, nil
 }
 
+// Search returns alls these files whose path matches with the given regex
+func (app *DirectoryApplication) Search(ctx context.Context, uid int32, regex string) ([]SearchMatch, error) {
+	app.logger.Info("processing a \"search\" in directory request",
+		zap.Int32("user_id", uid),
+		zap.String("regex", regex))
+
+	dir, err := app.dirRepo.FindByUserId(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+
+	search := dir.Search(regex)
+	for _, match := range search {
+		match.file.ProtectFields(uid)
+	}
+
+	return search, nil
+}
+
 // RegisterFile registers the given file into the user uid directory. The given path may change if,
 // and only if, another file with the same name exists in the same path.
 func (app *DirectoryApplication) RegisterFile(ctx context.Context, file *file.File, uid int32, fp string) (string, error) {

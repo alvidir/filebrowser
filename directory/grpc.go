@@ -34,6 +34,27 @@ func NewProtoPath(absolute string) *proto.Path {
 	}
 }
 
+func NewProtoSearchMatch(match SearchMatch) *proto.SearchMatch {
+	return &proto.SearchMatch{
+		File:       file.NewProtoFile(match.file),
+		MatchStart: int32(match.start),
+		MatchEnd:   int32(match.end),
+	}
+}
+
+func NewProtoSearchResponse(matches []SearchMatch) *proto.SearchResponse {
+	search := &proto.SearchResponse{
+		Matches: make([]*proto.SearchMatch, 0, len(matches)),
+	}
+
+	for _, match := range matches {
+		match := NewProtoSearchMatch(match)
+		search.Matches = append(search.Matches, match)
+	}
+
+	return search
+}
+
 func NewProtoDirectory(dir *Directory) *proto.Directory {
 	protoDir := &proto.Directory{
 		Id:    dir.id,
@@ -96,6 +117,16 @@ func (server *DirectoryServer) Move(ctx context.Context, req *proto.MoveRequest)
 	return NewProtoDirectory(dir), nil
 }
 
-func (server *Directory) Search(ctx context.Context, req *proto.SearchRequest) (*proto.SearchResponse, error) {
-	return nil, nil
+func (server *DirectoryServer) Search(ctx context.Context, req *proto.SearchRequest) (*proto.SearchResponse, error) {
+	uid, err := fb.GetUid(ctx, server.header, server.logger)
+	if err != nil {
+		return nil, err
+	}
+
+	search, err := server.app.Search(ctx, uid, req.GetSearch())
+	if err != nil {
+		return nil, err
+	}
+
+	return NewProtoSearchResponse(search), nil
 }

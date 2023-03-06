@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -13,6 +14,12 @@ import (
 const (
 	PathSeparator = "/"
 )
+
+type SearchMatch struct {
+	file  *file.File
+	start int
+	end   int
+}
 
 type Directory struct {
 	id     string
@@ -143,4 +150,43 @@ func (dir *Directory) AggregateFiles(p string) map[string]*file.File {
 	}
 
 	return files
+}
+
+func (dir *Directory) Search(regex string) []SearchMatch {
+	re := regexp.MustCompile(regex)
+	searchMatches := make([]SearchMatch, 0)
+	matchingfiles := make(map[string]*file.File)
+
+	for fp, f := range dir.files {
+		absFp := filepath.Join(PathSeparator, fp)
+
+		for _, match := range re.FindAllStringIndex(absFp, -1) {
+			matchFile := f
+			if end := match[1]; end <= len(path.Dir(absFp)) {
+				// the match occurs somewhere in the Dir part of the filepath
+				directory := path.Dir(absFp[:end])
+				paths := pathComponents(absFp[len(directory):])
+				name := paths[1] // 1 since pathComponents includes "/" at the beginning
+
+				matchFile, _ = file.NewFile("", name)
+				matchFile.SetDirectory(directory)
+				matchFile.SetFlag(file.Directory)
+			}
+
+			filepath := filepath.Join(matchFile.Directory(), matchFile.Name())
+			if _, exists := matchingfiles[filepath]; exists {
+				continue
+			}
+
+			searchMatches = append(searchMatches, SearchMatch{
+				file:  matchFile,
+				start: match[0],
+				end:   match[1],
+			})
+
+			matchingfiles[filepath] = matchFile
+		}
+	}
+
+	return searchMatches
 }

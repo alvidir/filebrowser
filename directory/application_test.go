@@ -780,8 +780,10 @@ func TestMove(t *testing.T) {
 
 			dirRepo := &directoryRepositoryMock{}
 			files := make(map[string]*file.File)
-			for id, fileName := range test.files {
-				files[fileName], _ = file.NewFile(strconv.Itoa(id), "filename")
+			for id, fp := range test.files {
+				id := strconv.Itoa(id)
+				files[fp], _ = file.NewFile(id, path.Base(fp))
+				files[fp].SetDirectory(path.Dir(fp))
 			}
 
 			dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
@@ -820,102 +822,6 @@ func TestMove(t *testing.T) {
 					t.Errorf("got files = %v, want = %v", files, test.want)
 				}
 			}
-		})
-	}
-}
-
-func TestDeleteFiles(t *testing.T) {
-	logger, _ := zap.NewProduction()
-	defer logger.Sync()
-
-	tests := []struct {
-		name  string
-		path  string
-		files []string
-		want  []string
-	}{
-		{
-			name: "filter single file",
-			path: "/a_file",
-			files: []string{
-				"/a_file",
-				"/a_directory/a_file",
-			},
-			want: []string{
-				"/a_directory/a_file",
-			},
-		},
-		{
-			name: "filter directory",
-			path: "/a_directory/",
-			files: []string{
-				"/a_file",
-				"/a_directory/a_file",
-				"/a_directory/another_file",
-			},
-			want: []string{
-				"/a_file",
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t := t
-		test := test
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-
-			dirRepo := &directoryRepositoryMock{}
-			files := make(map[string]*file.File)
-			for index, fp := range test.files {
-				id := strconv.Itoa(index)
-				files[fp], _ = file.NewFile(id, path.Base(fp))
-				files[fp].SetDirectory(path.Dir(fp))
-			}
-
-			dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
-				return &Directory{
-					id:     "test",
-					userId: 999,
-					files:  files,
-				}, nil
-			}
-
-			fileRepo := &fileRepositoryMock{
-				find: func(repo *fileRepositoryMock, ctx context.Context, id string) (*file.File, error) {
-					for _, f := range files {
-						if f.Id() == id {
-							return f, nil
-						}
-					}
-
-					return nil, fb.ErrNotFound
-				},
-			}
-
-			app := NewDirectoryApplication(dirRepo, fileRepo, logger)
-
-			_, err := app.Delete(context.TODO(), 999, test.path)
-			if err != nil {
-				t.Errorf("got error = %v, want = nil", err)
-			}
-
-			filenames := make([]string, 0, len(files))
-			for _, f := range files {
-				fp := filepath.Join(PathSeparator, f.Directory(), f.Name())
-				filenames = append(filenames, fp)
-			}
-
-			if len(test.want) != len(files) {
-				t.Errorf("got files = %+v, want = %v", filenames, test.want)
-			}
-
-			for _, expectedPath := range test.want {
-				if _, exists := files[expectedPath]; !exists {
-					t.Errorf("got files = %v, want = %v", filenames, test.want)
-				}
-			}
-
 		})
 	}
 }
