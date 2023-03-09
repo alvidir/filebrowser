@@ -163,7 +163,12 @@ func (dir *Directory) Search(regex string) []SearchMatch {
 		for _, match := range re.FindAllStringIndex(strings.ToLower(absFp), -1) {
 			matchingFile := f
 
-			if end := match[1]; end <= len(path.Dir(absFp)) {
+			offset := 0
+			if regex == PathSeparator {
+				offset = 1
+			}
+
+			if end := match[1]; end+offset <= len(path.Dir(absFp)) {
 				// the match occurs somewhere in the file's directory
 				directory := path.Dir(absFp[:end])
 				paths := pathComponents(absFp[len(directory):])

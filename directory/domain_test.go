@@ -267,3 +267,30 @@ func TestSearch(t *testing.T) {
 		})
 	}
 }
+
+func TestSearchRootpath(t *testing.T) {
+	dir := &Directory{
+		id:     "test",
+		userId: 999,
+		files:  make(map[string]*file.File),
+	}
+
+	files := []string{
+		"/a_file",
+	}
+
+	for i, fp := range files {
+		id := strconv.Itoa(i)
+		dir.files[fp], _ = file.NewFile(id, path.Base(fp))
+		dir.files[fp].SetDirectory(path.Dir(fp))
+	}
+
+	matches := dir.Search("/")
+	if len(matches) == 0 {
+		t.Fatal("got no files")
+	}
+
+	if matches[0].file.Flags()&file.Directory != 0 {
+		t.Errorf("got directory, want file")
+	}
+}
