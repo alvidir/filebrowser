@@ -153,38 +153,44 @@ func (dir *Directory) AggregateFiles(p string) map[string]*file.File {
 }
 
 func (dir *Directory) Search(regex string) []SearchMatch {
-	re := regexp.MustCompile(regex)
+	re := regexp.MustCompile(strings.ToLower(regex))
 	searchMatches := make([]SearchMatch, 0)
 	matchingfiles := make(map[string]*file.File)
 
 	for fp, f := range dir.files {
 		absFp := filepath.Join(PathSeparator, fp)
 
-		for _, match := range re.FindAllStringIndex(absFp, -1) {
-			matchFile := f
+		for _, match := range re.FindAllStringIndex(strings.ToLower(absFp), -1) {
+			matchingFile := f
+
 			if end := match[1]; end <= len(path.Dir(absFp)) {
-				// the match occurs somewhere in the Dir part of the filepath
+				// the match occurs somewhere in the file's directory
 				directory := path.Dir(absFp[:end])
 				paths := pathComponents(absFp[len(directory):])
 				name := paths[1] // 1 since pathComponents includes "/" at the beginning
 
-				matchFile, _ = file.NewFile("", name)
-				matchFile.SetDirectory(directory)
-				matchFile.SetFlag(file.Directory)
+				matchingFile, _ = file.NewFile("", name)
+				matchingFile.SetDirectory(directory)
+				matchingFile.SetFlag(file.Directory)
+			} else {
+				// the match occurs somewhere in the filepath
+				matchingFile.MarkAsProtected()
+				matchingFile.SetDirectory(path.Dir(absFp))
+				matchingFile.SetName(path.Base(absFp))
 			}
 
-			filepath := filepath.Join(matchFile.Directory(), matchFile.Name())
+			filepath := filepath.Join(matchingFile.Directory(), matchingFile.Name())
 			if _, exists := matchingfiles[filepath]; exists {
 				continue
 			}
 
 			searchMatches = append(searchMatches, SearchMatch{
-				file:  matchFile,
+				file:  matchingFile,
 				start: match[0],
 				end:   match[1],
 			})
 
-			matchingfiles[filepath] = matchFile
+			matchingfiles[filepath] = matchingFile
 		}
 	}
 

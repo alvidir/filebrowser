@@ -68,10 +68,6 @@ func (app *DirectoryApplication) Get(ctx context.Context, uid int32, p string) (
 	selected.path = absP
 	selected.id = dir.id
 
-	for _, f := range selected.files {
-		f.ProtectFields(uid)
-	}
-
 	return selected, nil
 }
 
@@ -181,12 +177,7 @@ func (app *DirectoryApplication) Search(ctx context.Context, uid int32, regex st
 		return nil, err
 	}
 
-	search := dir.Search(regex)
-	for _, match := range search {
-		match.file.ProtectFields(uid)
-	}
-
-	return search, nil
+	return dir.Search(regex), nil
 }
 
 // RegisterFile registers the given file into the user uid directory. The given path may change if,

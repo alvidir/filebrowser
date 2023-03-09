@@ -19,6 +19,7 @@ const (
 	MetadataDeletedAtKey = "deleted_at"
 	MetadataSizeKey      = "size"
 	MetadataAppKey       = "app"
+	MetadataRefKey       = "ref"
 
 	TimestampBase = 16
 )

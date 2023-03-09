@@ -66,13 +66,14 @@ func (handler *FileEventHandler) onFileCreatedEvent(ctx context.Context, event *
 
 	meta := Metadata{
 		MetadataAppKey: event.AppID,
+		MetadataRefKey: event.FileID,
 	}
 
 	_, err := handler.fileApp.Create(ctx, event.UserID, event.FileName, nil, meta)
 	if err != nil {
 		handler.logger.Error("creating file",
 			zap.String("issuer", event.Issuer),
-			zap.String("app", event.AppID),
+			zap.String("app_id", event.AppID),
 			zap.String("file_name", event.FileName),
 			zap.String("file_id", event.FileID),
 			zap.Int32("user_id", event.UserID),

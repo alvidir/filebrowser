@@ -202,7 +202,7 @@ func TestSearch(t *testing.T) {
 			},
 		},
 		{
-			name:   "search by partial string",
+			name:   "search by partial path",
 			search: "ry/a_",
 			files: []string{
 				"/a_file",
@@ -214,7 +214,7 @@ func TestSearch(t *testing.T) {
 			},
 		},
 		{
-			name:   "search by partial string",
+			name:   "search by partial name",
 			search: "a_",
 			files: []string{
 				"/a_directory/with_a_dir/with_a_file",
