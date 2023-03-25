@@ -109,7 +109,13 @@ func (dir *Directory) FilesByPath(p string) map[string]*file.File {
 
 func (dir *Directory) AggregateFiles(p string) map[string]*file.File {
 	files := make(map[string]*file.File)
-	folders := make(map[string]int)
+
+	type FolderAggregate struct {
+		size      int
+		updatedAt int
+	}
+
+	folders := make(map[string]*FolderAggregate)
 
 	absP := filepath.Join(PathSeparator, p)
 	pCount := strings.Count(p, PathSeparator)
@@ -120,12 +126,26 @@ func (dir *Directory) AggregateFiles(p string) map[string]*file.File {
 
 	for absFp, f := range dir.FilesByPath(p) {
 		if pCount < strings.Count(absFp, PathSeparator) {
+			updatedAt := 0
+			if sizeStr, exists := f.Metadata()[file.MetadataUpdatedAtKey]; exists {
+				if unix, err := strconv.ParseInt(sizeStr, file.TimestampBase, 64); err == nil {
+					updatedAt = int(unix)
+				}
+			}
+
 			// f is located deeper in the directory tree, and so, there is a folder at absP containing it
 			folderPath := filepath.Join(pathComponents(absFp)[0 : pCount+1]...)
-			if folderSize, exists := folders[folderPath]; exists {
-				folders[folderPath] = folderSize + 1
+			if folder, exists := folders[folderPath]; exists {
+				folder.size += 1
+
+				if updatedAt > folder.updatedAt {
+					folder.updatedAt = updatedAt
+				}
 			} else {
-				folders[folderPath] = 1
+				folders[folderPath] = &FolderAggregate{
+					size:      1,
+					updatedAt: updatedAt,
+				}
 			}
 
 			continue
@@ -137,7 +157,7 @@ func (dir *Directory) AggregateFiles(p string) map[string]*file.File {
 		files[absFp] = f
 	}
 
-	for folderPath, folderSize := range folders {
+	for folderPath, aggregate := range folders {
 		folder, err := file.NewFile("", path.Base(folderPath))
 		if err != nil {
 			continue
@@ -145,7 +165,8 @@ func (dir *Directory) AggregateFiles(p string) map[string]*file.File {
 
 		folder.SetFlag(file.Directory)
 		folder.SetDirectory(path.Dir(folderPath))
-		folder.AddMetadata(file.MetadataSizeKey, strconv.Itoa(folderSize))
+		folder.AddMetadata(file.MetadataSizeKey, strconv.Itoa(aggregate.size))
+		folder.AddMetadata(file.MetadataUpdatedAtKey, strconv.Itoa(aggregate.updatedAt))
 		files[folderPath] = folder
 	}
 

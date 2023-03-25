@@ -170,6 +170,41 @@ func TestAgregateFiles(t *testing.T) {
 	}
 }
 
+func TestAggregateUpdatedAt(t *testing.T) {
+	dir := NewDirectory(999)
+
+	f1, _ := file.NewFile("111", "test_1")
+	f1.AddMetadata(file.MetadataUpdatedAtKey, "1")
+	dir.files["/test_1"] = f1
+
+	f2, _ := file.NewFile("222", "test_2")
+	f2.AddMetadata(file.MetadataUpdatedAtKey, "2")
+	dir.files["/directory/test_2"] = f2
+
+	f3, _ := file.NewFile("333", "test_3")
+	f3.AddMetadata(file.MetadataUpdatedAtKey, "3")
+	dir.files["/directory/test_3"] = f3
+
+	if got := len(dir.AggregateFiles("/")); got != 2 {
+		t.Fatalf("got %v items, want  %v", got, 2)
+	}
+
+	folder, exists := dir.AggregateFiles("/")["/directory"]
+	if !exists {
+		t.Fatalf("directory does not exists")
+	}
+
+	updatedAt, exists := folder.Metadata()[file.MetadataUpdatedAtKey]
+	if !exists {
+		t.Fatalf("directory does not contains updated_at metadata")
+	}
+
+	want := "3"
+	if got := updatedAt; got != want {
+		t.Fatalf("got updatedAt = %v, want = %v", got, want)
+	}
+}
+
 func TestSearch(t *testing.T) {
 	tests := []struct {
 		name   string
