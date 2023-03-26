@@ -14,8 +14,17 @@ type EventBus interface {
 	EmitFileDeleted(uid int32, f *File) error
 }
 
-func NewFileServer(fileApp *FileApplication, certApp *cert.CertificateApplication, bus EventBus, authHeader string, logger *zap.Logger) *FileServer {
-	return &FileServer{
+type FileGrpcServer struct {
+	proto.UnimplementedFileServiceServer
+	fileApp   *FileApplication
+	certApp   *cert.CertificateApplication
+	fileBus   EventBus
+	logger    *zap.Logger
+	uidHeader string
+}
+
+func NewFileGrpcServer(fileApp *FileApplication, certApp *cert.CertificateApplication, bus EventBus, authHeader string, logger *zap.Logger) *FileGrpcServer {
+	return &FileGrpcServer{
 		fileApp:   fileApp,
 		certApp:   certApp,
 		fileBus:   bus,
@@ -58,17 +67,8 @@ func NewProtoFile(file *File) *proto.File {
 	return descriptor
 }
 
-type FileServer struct {
-	proto.UnimplementedFileServiceServer
-	fileApp   *FileApplication
-	certApp   *cert.CertificateApplication
-	fileBus   EventBus
-	logger    *zap.Logger
-	uidHeader string
-}
-
-func (server *FileServer) Create(ctx context.Context, req *proto.File) (*proto.File, error) {
-	uid, err := fb.GetUid(ctx, server.uidHeader, server.logger)
+func (server *FileGrpcServer) Create(ctx context.Context, req *proto.File) (*proto.File, error) {
+	uid, err := fb.GetUidFromGrpcCtx(ctx, server.uidHeader, server.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -93,8 +93,8 @@ func (server *FileServer) Create(ctx context.Context, req *proto.File) (*proto.F
 	return NewProtoFile(file), nil
 }
 
-func (server *FileServer) Get(ctx context.Context, req *proto.File) (*proto.File, error) {
-	uid, err := fb.GetUid(ctx, server.uidHeader, server.logger)
+func (server *FileGrpcServer) Get(ctx context.Context, req *proto.File) (*proto.File, error) {
+	uid, err := fb.GetUidFromGrpcCtx(ctx, server.uidHeader, server.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -107,8 +107,8 @@ func (server *FileServer) Get(ctx context.Context, req *proto.File) (*proto.File
 	return NewProtoFile(file), nil
 }
 
-func (server *FileServer) Update(ctx context.Context, req *proto.File) (*proto.File, error) {
-	uid, err := fb.GetUid(ctx, server.uidHeader, server.logger)
+func (server *FileGrpcServer) Update(ctx context.Context, req *proto.File) (*proto.File, error) {
+	uid, err := fb.GetUidFromGrpcCtx(ctx, server.uidHeader, server.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -126,8 +126,8 @@ func (server *FileServer) Update(ctx context.Context, req *proto.File) (*proto.F
 	return NewProtoFile(file), nil
 }
 
-func (server *FileServer) Delete(ctx context.Context, req *proto.File) (*proto.File, error) {
-	uid, err := fb.GetUid(ctx, server.uidHeader, server.logger)
+func (server *FileGrpcServer) Delete(ctx context.Context, req *proto.File) (*proto.File, error) {
+	uid, err := fb.GetUidFromGrpcCtx(ctx, server.uidHeader, server.logger)
 	if err != nil {
 		return nil, err
 	}

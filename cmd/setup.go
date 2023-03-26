@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"crypto/ecdsa"
+	"fmt"
+	"net"
 	"os"
 	"time"
 
@@ -37,6 +39,29 @@ var (
 	ServiceNetw = "tcp"
 	UidHeader   = "X-Uid"
 )
+
+func GetNetworkListener(logger *zap.Logger) net.Listener {
+	if port, exists := os.LookupEnv(ENV_SERVICE_PORT); exists {
+		ServicePort = port
+	}
+
+	if addr, exists := os.LookupEnv(ENV_SERVICE_ADDR); exists {
+		ServiceAddr = addr
+	}
+
+	if netw, exists := os.LookupEnv(ENV_SERVICE_NETW); exists {
+		ServiceNetw = netw
+	}
+
+	addr := fmt.Sprintf("%s:%s", ServiceAddr, ServicePort)
+	lis, err := net.Listen(ServiceNetw, addr)
+	if err != nil {
+		logger.Panic("failed to listen: %v",
+			zap.Error(err))
+	}
+
+	return lis
+}
 
 func GetMongoConnection(logger *zap.Logger) *mongo.Database {
 	mongoUri, exists := os.LookupEnv(ENV_MONGO_DSN)

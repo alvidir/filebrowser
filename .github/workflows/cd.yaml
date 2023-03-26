@@ -11,8 +11,8 @@ env:
   IMAGE_NAME: alvidir/filebrowser
 
 jobs:
-  push_server_to_registry:
-    name: Push server image to registry
+  push_grpc_server_to_registry:
+    name: Push gRPC server image
     runs-on: ubuntu-latest
 
     steps:
@@ -26,9 +26,9 @@ jobs:
         uses: redhat-actions/buildah-build@v2
         with:
           image: ${{ env.IMAGE_NAME }}
-          tags: latest ${{ github.event.release.tag_name }}
+          tags: ${{ github.event.release.tag_name }}-grpc
           containerfiles: |
-            ./container/filebrowser/containerfile
+            ./container/grpc/containerfile
 
       - name: Log in to registry
         uses: redhat-actions/podman-login@v1
@@ -44,8 +44,41 @@ jobs:
           tags: ${{ steps.build-image.outputs.tags }}
           registry: ${{ env.IMAGE_REGISTRY }}
 
-  push_worker_to_registry:
-    name: Push worker image to registry
+  push_rest_server_to_registry:
+    name: Push REST server image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Build image
+        id: build-image
+        uses: redhat-actions/buildah-build@v2
+        with:
+          image: ${{ env.IMAGE_NAME }}
+          tags: ${{ github.event.release.tag_name }}-rest
+          containerfiles: |
+            ./container/rest/containerfile
+
+      - name: Log in to registry
+        uses: redhat-actions/podman-login@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          registry: ${{ env.IMAGE_REGISTRY }}
+
+      - name: Push image
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          image: ${{ steps.build-image.outputs.image }}
+          tags: ${{ steps.build-image.outputs.tags }}
+          registry: ${{ env.IMAGE_REGISTRY }}
+
+  push_agent_to_registry:
+    name: Push agent image
     runs-on: ubuntu-latest
 
     steps:

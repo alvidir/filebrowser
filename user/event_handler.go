@@ -10,15 +10,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const (
-	userSettingsPath = ".settings"
-)
-
-type UserProfile struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
-}
-
 type UserEventPayload struct {
 	UserID int32  `json:"id"`
 	Kind   string `json:"kind"`
@@ -79,10 +70,10 @@ func (handler *UserEventHandler) onUserCreatedEvent(ctx context.Context, event *
 		return
 	}
 
-	_, err = handler.fileApp.Create(ctx, event.UserID, userSettingsPath, data, nil)
+	_, err = handler.fileApp.Create(ctx, event.UserID, profilePath, data, nil)
 	if err != nil {
 		handler.logger.Error("creating file",
-			zap.String("file_path", userSettingsPath),
+			zap.String("file_path", profilePath),
 			zap.Int32("user_id", event.UserID),
 			zap.ByteString("data", data),
 			zap.Error(err))

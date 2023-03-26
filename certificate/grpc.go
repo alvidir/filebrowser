@@ -8,23 +8,23 @@ import (
 	"go.uber.org/zap"
 )
 
-type CertificateServer struct {
+type CertificateGrpcServer struct {
 	proto.UnimplementedCertificateServiceServer
 	app    *CertificateApplication
 	logger *zap.Logger
 	header string
 }
 
-func NewCertificateServer(app *CertificateApplication, logger *zap.Logger, authHeader string) *CertificateServer {
-	return &CertificateServer{
+func NewCertificateGrpcServer(app *CertificateApplication, logger *zap.Logger, authHeader string) *CertificateGrpcServer {
+	return &CertificateGrpcServer{
 		app:    app,
 		logger: logger,
 		header: authHeader,
 	}
 }
 
-func (server *CertificateServer) Get(ctx context.Context, req *proto.File) (*proto.Certificate, error) {
-	uid, err := fb.GetUid(ctx, server.header, server.logger)
+func (server *CertificateGrpcServer) Get(ctx context.Context, req *proto.File) (*proto.Certificate, error) {
+	uid, err := fb.GetUidFromGrpcCtx(ctx, server.header, server.logger)
 	if err != nil {
 		return nil, err
 	}

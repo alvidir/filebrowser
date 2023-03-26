@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-	"net"
 	"os"
 
 	fb "github.com/alvidir/filebrowser"
@@ -15,29 +13,6 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
-
-func getNetworkListener(logger *zap.Logger) net.Listener {
-	if port, exists := os.LookupEnv(cmd.ENV_SERVICE_PORT); exists {
-		cmd.ServicePort = port
-	}
-
-	if addr, exists := os.LookupEnv(cmd.ENV_SERVICE_ADDR); exists {
-		cmd.ServiceAddr = addr
-	}
-
-	if netw, exists := os.LookupEnv(cmd.ENV_SERVICE_NETW); exists {
-		cmd.ServiceNetw = netw
-	}
-
-	addr := fmt.Sprintf("%s:%s", cmd.ServiceAddr, cmd.ServicePort)
-	lis, err := net.Listen(cmd.ServiceNetw, addr)
-	if err != nil {
-		logger.Panic("failed to listen: %v",
-			zap.Error(err))
-	}
-
-	return lis
-}
 
 func main() {
 	logger, _ := zap.NewProduction()
@@ -57,7 +32,7 @@ func main() {
 
 	directoryRepo := dir.NewMongoDirectoryRepository(mongoConn, fileRepo, logger)
 	directoryApp := dir.NewDirectoryApplication(directoryRepo, fileRepo, logger)
-	directoryServer := dir.NewDirectoryServer(directoryApp, logger, cmd.UidHeader)
+	directoryServer := dir.NewDirectoryGrpcServer(directoryApp, logger, cmd.UidHeader)
 
 	privateKey := cmd.GetPrivateKey(logger)
 	tokenTTL := cmd.GetTokenTTL(logger)
@@ -65,7 +40,7 @@ func main() {
 	certSrv := cert.NewCertificateService(privateKey, tokenIssuer, tokenTTL, logger)
 	certRepo := cert.NewMongoCertificateRepository(mongoConn, logger)
 	certApp := cert.NewCertificateApplication(certRepo, certSrv, logger)
-	certServer := cert.NewCertificateServer(certApp, logger, cmd.UidHeader)
+	certServer := cert.NewCertificateGrpcServer(certApp, logger, cmd.UidHeader)
 
 	conn := cmd.GetAmqpConnection(logger)
 	defer conn.Close()
@@ -80,13 +55,13 @@ func main() {
 	fileBus := file.NewFileEventBus(bus, fileExchange, eventIssuer)
 
 	fileApp := file.NewFileApplication(fileRepo, directoryApp, certApp, logger)
-	fileServer := file.NewFileServer(fileApp, certApp, fileBus, cmd.UidHeader, logger)
+	fileServer := file.NewFileGrpcServer(fileApp, certApp, fileBus, cmd.UidHeader, logger)
 
 	grpcServer := grpc.NewServer()
 	proto.RegisterDirectoryServiceServer(grpcServer, directoryServer)
 	proto.RegisterFileServiceServer(grpcServer, fileServer)
 	proto.RegisterCertificateServiceServer(grpcServer, certServer)
-	lis := getNetworkListener(logger)
+	lis := cmd.GetNetworkListener(logger)
 
 	logger.Info("server ready to accept connections",
 		zap.String("address", cmd.ServiceAddr))

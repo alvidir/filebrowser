@@ -9,18 +9,18 @@ import (
 	"go.uber.org/zap"
 )
 
-type DirectoryServer struct {
+type DirectoryGrpcServer struct {
 	proto.UnimplementedDirectoryServiceServer
-	app    *DirectoryApplication
-	logger *zap.Logger
-	header string
+	app       *DirectoryApplication
+	logger    *zap.Logger
+	uidHeader string
 }
 
-func NewDirectoryServer(app *DirectoryApplication, logger *zap.Logger, authHeader string) *DirectoryServer {
-	return &DirectoryServer{
-		app:    app,
-		logger: logger,
-		header: authHeader,
+func NewDirectoryGrpcServer(app *DirectoryApplication, logger *zap.Logger, authHeader string) *DirectoryGrpcServer {
+	return &DirectoryGrpcServer{
+		app:       app,
+		logger:    logger,
+		uidHeader: authHeader,
 	}
 }
 
@@ -69,8 +69,8 @@ func NewProtoDirectory(dir *Directory) *proto.Directory {
 	return protoDir
 }
 
-func (server *DirectoryServer) Get(ctx context.Context, path *proto.Path) (*proto.Directory, error) {
-	uid, err := fb.GetUid(ctx, server.header, server.logger)
+func (server *DirectoryGrpcServer) Get(ctx context.Context, path *proto.Path) (*proto.Directory, error) {
+	uid, err := fb.GetUidFromGrpcCtx(ctx, server.uidHeader, server.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -83,8 +83,8 @@ func (server *DirectoryServer) Get(ctx context.Context, path *proto.Path) (*prot
 	return NewProtoDirectory(dir), nil
 }
 
-func (server *DirectoryServer) Delete(ctx context.Context, path *proto.Path) (*proto.Directory, error) {
-	uid, err := fb.GetUid(ctx, server.header, server.logger)
+func (server *DirectoryGrpcServer) Delete(ctx context.Context, path *proto.Path) (*proto.Directory, error) {
+	uid, err := fb.GetUidFromGrpcCtx(ctx, server.uidHeader, server.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -97,8 +97,8 @@ func (server *DirectoryServer) Delete(ctx context.Context, path *proto.Path) (*p
 	return NewProtoDirectory(dir), nil
 }
 
-func (server *DirectoryServer) Move(ctx context.Context, req *proto.MoveRequest) (*proto.Directory, error) {
-	uid, err := fb.GetUid(ctx, server.header, server.logger)
+func (server *DirectoryGrpcServer) Move(ctx context.Context, req *proto.MoveRequest) (*proto.Directory, error) {
+	uid, err := fb.GetUidFromGrpcCtx(ctx, server.uidHeader, server.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -117,8 +117,8 @@ func (server *DirectoryServer) Move(ctx context.Context, req *proto.MoveRequest)
 	return NewProtoDirectory(dir), nil
 }
 
-func (server *DirectoryServer) Search(ctx context.Context, req *proto.SearchRequest) (*proto.SearchResponse, error) {
-	uid, err := fb.GetUid(ctx, server.header, server.logger)
+func (server *DirectoryGrpcServer) Search(ctx context.Context, req *proto.SearchRequest) (*proto.SearchResponse, error) {
+	uid, err := fb.GetUidFromGrpcCtx(ctx, server.uidHeader, server.logger)
 	if err != nil {
 		return nil, err
 	}
