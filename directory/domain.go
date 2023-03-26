@@ -166,7 +166,7 @@ func (dir *Directory) AggregateFiles(p string) map[string]*file.File {
 		folder.SetFlag(file.Directory)
 		folder.SetDirectory(path.Dir(folderPath))
 		folder.AddMetadata(file.MetadataSizeKey, strconv.Itoa(aggregate.size))
-		folder.AddMetadata(file.MetadataUpdatedAtKey, strconv.Itoa(aggregate.updatedAt))
+		folder.AddMetadata(file.MetadataUpdatedAtKey, strconv.FormatInt(int64(aggregate.updatedAt), file.TimestampBase))
 		files[folderPath] = folder
 	}
 
