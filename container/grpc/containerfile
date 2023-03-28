@@ -12,7 +12,7 @@ COPY . .
 RUN make go-install && \
     make proto -B
 
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o filebrowser cmd/grpc/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o filebrowser-grpc cmd/grpc/main.go
 
 ######## Start a new stage from scratch #######
 FROM docker.io/alpine:3.16 
@@ -21,6 +21,6 @@ RUN apk --no-cache add ca-certificates
 
 WORKDIR /app
 
-COPY --from=builder /app/filebrowser .
+COPY --from=builder /app/filebrowser-grpc .
 
-CMD [ "./filebrowser" ]
+CMD [ "./filebrowser-grpc" ]

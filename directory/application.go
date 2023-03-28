@@ -13,8 +13,12 @@ import (
 	"go.uber.org/zap"
 )
 
+type RepoOptions struct {
+	LazyLoading bool
+}
+
 type DirectoryRepository interface {
-	FindByUserId(ctx context.Context, userId int32) (*Directory, error)
+	FindByUserId(ctx context.Context, userId int32, options *RepoOptions) (*Directory, error)
 	Create(ctx context.Context, directory *Directory) error
 	Save(ctx context.Context, directory *Directory) error
 	Delete(ctx context.Context, directory *Directory) error
@@ -34,11 +38,12 @@ func NewDirectoryApplication(dirRepo DirectoryRepository, fileRepo file.FileRepo
 	}
 }
 
+// Create creates a new directory if, and only if, there is no other for the given user uid. Otherwise returns an error.
 func (app *DirectoryApplication) Create(ctx context.Context, uid int32) (*Directory, error) {
 	app.logger.Info("processing a \"create\" directory request",
 		zap.Int32("user_id", uid))
 
-	if _, err := app.dirRepo.FindByUserId(ctx, uid); err == nil {
+	if _, err := app.dirRepo.FindByUserId(ctx, uid, &RepoOptions{}); err == nil {
 		return nil, fb.ErrAlreadyExists
 	}
 
@@ -56,7 +61,7 @@ func (app *DirectoryApplication) Get(ctx context.Context, uid int32, p string) (
 		zap.Int32("user_id", uid),
 		zap.String("path", p))
 
-	dir, err := app.dirRepo.FindByUserId(ctx, uid)
+	dir, err := app.dirRepo.FindByUserId(ctx, uid, &RepoOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +82,7 @@ func (app *DirectoryApplication) Delete(ctx context.Context, uid int32, p string
 		zap.Int32("user_id", uid),
 		zap.String("path", p))
 
-	dir, err := app.dirRepo.FindByUserId(ctx, uid)
+	dir, err := app.dirRepo.FindByUserId(ctx, uid, &RepoOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +128,7 @@ func (app *DirectoryApplication) Move(ctx context.Context, uid int32, paths []st
 		zap.Strings("paths", paths),
 		zap.String("destination", dest))
 
-	dir, err := app.dirRepo.FindByUserId(ctx, uid)
+	dir, err := app.dirRepo.FindByUserId(ctx, uid, &RepoOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +177,7 @@ func (app *DirectoryApplication) Search(ctx context.Context, uid int32, regex st
 		zap.Int32("user_id", uid),
 		zap.String("regex", regex))
 
-	dir, err := app.dirRepo.FindByUserId(ctx, uid)
+	dir, err := app.dirRepo.FindByUserId(ctx, uid, &RepoOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +194,7 @@ func (app *DirectoryApplication) RegisterFile(ctx context.Context, file *file.Fi
 		zap.String("path", fp))
 
 	absFp := filepath.Join(PathSeparator, fp)
-	dir, err := app.dirRepo.FindByUserId(ctx, uid)
+	dir, err := app.dirRepo.FindByUserId(ctx, uid, &RepoOptions{})
 	if err != nil {
 		return "", err
 	}
@@ -204,7 +209,7 @@ func (app *DirectoryApplication) UnregisterFile(ctx context.Context, f *file.Fil
 	app.logger.Info("processing a directory's \"unregister file\" request",
 		zap.Int32("user_id", uid))
 
-	dir, err := app.dirRepo.FindByUserId(ctx, uid)
+	dir, err := app.dirRepo.FindByUserId(ctx, uid, &RepoOptions{})
 	if err != nil {
 		return err
 	}

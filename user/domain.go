@@ -4,7 +4,7 @@ const (
 	profilePath = ".profile"
 )
 
-type UserProfile struct {
+type Profile struct {
 	Name  string `json:"name"`
 	Email string `json:"email"`
 }

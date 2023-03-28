@@ -38,7 +38,7 @@ func (server *UserHttpServer) getProfileHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	profile, err := server.app.GetProfile(uid)
+	profile, err := server.app.GetProfile(r.Context(), uid)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -51,5 +51,8 @@ func (server *UserHttpServer) getProfileHandler(w http.ResponseWriter, r *http.R
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(body)
+	if _, err := w.Write(body); err != nil {
+		server.logger.Error("writing http response",
+			zap.Error(err))
+	}
 }

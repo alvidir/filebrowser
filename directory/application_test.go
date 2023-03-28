@@ -20,15 +20,15 @@ const (
 )
 
 type directoryRepositoryMock struct {
-	findByUserId func(ctx context.Context, userId int32) (*Directory, error)
+	findByUserId func(ctx context.Context, userId int32, opttions *RepoOptions) (*Directory, error)
 	create       func(ctx context.Context, dir *Directory) error
 	save         func(ctx context.Context, dir *Directory) error
 	delete       func(ctx context.Context, dir *Directory) error
 }
 
-func (mock *directoryRepositoryMock) FindByUserId(ctx context.Context, userId int32) (*Directory, error) {
+func (mock *directoryRepositoryMock) FindByUserId(ctx context.Context, userId int32, options *RepoOptions) (*Directory, error) {
 	if mock.findByUserId != nil {
-		return mock.findByUserId(ctx, userId)
+		return mock.findByUserId(ctx, userId, options)
 	}
 
 	dir := NewDirectory(userId)
@@ -116,7 +116,7 @@ func TestCreateWhenAlreadyExists(t *testing.T) {
 	defer logger.Sync()
 
 	dirRepo := &directoryRepositoryMock{}
-	dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
+	dirRepo.findByUserId = func(ctx context.Context, userId int32, options *RepoOptions) (*Directory, error) {
 		return nil, nil
 	}
 
@@ -134,7 +134,7 @@ func TestCreate(t *testing.T) {
 	defer logger.Sync()
 
 	dirRepo := &directoryRepositoryMock{}
-	dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
+	dirRepo.findByUserId = func(ctx context.Context, userId int32, options *RepoOptions) (*Directory, error) {
 		return nil, fb.ErrNotFound
 	}
 
@@ -161,7 +161,7 @@ func TestGetWhenDirectoryDoesNotExists(t *testing.T) {
 	defer logger.Sync()
 
 	dirRepo := &directoryRepositoryMock{}
-	dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
+	dirRepo.findByUserId = func(ctx context.Context, userId int32, options *RepoOptions) (*Directory, error) {
 		return nil, fb.ErrNotFound
 	}
 
@@ -215,7 +215,7 @@ func TestGet(t *testing.T) {
 				files[fileName] = f
 			}
 
-			dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
+			dirRepo.findByUserId = func(ctx context.Context, userId int32, options *RepoOptions) (*Directory, error) {
 				return &Directory{
 					id:     "test",
 					userId: 999,
@@ -258,7 +258,7 @@ func TestDeleteWhenDirectoryDoesNotExists(t *testing.T) {
 	defer logger.Sync()
 
 	dirRepo := &directoryRepositoryMock{}
-	dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
+	dirRepo.findByUserId = func(ctx context.Context, userId int32, options *RepoOptions) (*Directory, error) {
 		return nil, fb.ErrNotFound
 	}
 
@@ -283,7 +283,7 @@ func TestDeleteWhenUserIsSingleOwner(t *testing.T) {
 		},
 	}
 
-	dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
+	dirRepo.findByUserId = func(ctx context.Context, userId int32, options *RepoOptions) (*Directory, error) {
 		return &Directory{
 			id:     "test",
 			userId: 999,
@@ -334,7 +334,7 @@ func TestDeleteWhenUserIsNotSingleOwner(t *testing.T) {
 		},
 	}
 
-	dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
+	dirRepo.findByUserId = func(ctx context.Context, userId int32, options *RepoOptions) (*Directory, error) {
 		return &Directory{
 			id:     "test",
 			userId: 999,
@@ -371,7 +371,7 @@ func TestDeleteWhenUserIsNotOwner(t *testing.T) {
 		},
 	}
 
-	dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
+	dirRepo.findByUserId = func(ctx context.Context, userId int32, options *RepoOptions) (*Directory, error) {
 		return &Directory{
 			id:     "test",
 			userId: 999,
@@ -402,7 +402,7 @@ func TestRegisterFileWhenDirectoryDoesNotExists(t *testing.T) {
 	defer logger.Sync()
 
 	dirRepo := &directoryRepositoryMock{}
-	dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
+	dirRepo.findByUserId = func(ctx context.Context, userId int32, options *RepoOptions) (*Directory, error) {
 		return nil, fb.ErrNotFound
 	}
 
@@ -422,7 +422,7 @@ func TestRegisterFile(t *testing.T) {
 	d := NewDirectory(999)
 
 	dirRepo := &directoryRepositoryMock{}
-	dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
+	dirRepo.findByUserId = func(ctx context.Context, userId int32, options *RepoOptions) (*Directory, error) {
 		return d, nil
 	}
 
@@ -446,7 +446,7 @@ func TestUnregisterFileWhenDirectoryDoesNotExists(t *testing.T) {
 	defer logger.Sync()
 
 	dirRepo := &directoryRepositoryMock{}
-	dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
+	dirRepo.findByUserId = func(ctx context.Context, userId int32, options *RepoOptions) (*Directory, error) {
 		return nil, fb.ErrNotFound
 	}
 
@@ -466,7 +466,7 @@ func TestUnregisterFileWhenUserIsNoOwner(t *testing.T) {
 	d := NewDirectory(999)
 
 	dirRepo := &directoryRepositoryMock{}
-	dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
+	dirRepo.findByUserId = func(ctx context.Context, userId int32, options *RepoOptions) (*Directory, error) {
 		return d, nil
 	}
 
@@ -493,7 +493,7 @@ func TestUnregisterFileWhenFileIsDeleted(t *testing.T) {
 	d := NewDirectory(999)
 
 	dirRepo := &directoryRepositoryMock{}
-	dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
+	dirRepo.findByUserId = func(ctx context.Context, userId int32, options *RepoOptions) (*Directory, error) {
 		return d, nil
 	}
 
@@ -522,7 +522,7 @@ func TestUnregisterFileWhenFileIsShared(t *testing.T) {
 	d2 := NewDirectory(888)
 
 	dirRepo := &directoryRepositoryMock{}
-	dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
+	dirRepo.findByUserId = func(ctx context.Context, userId int32, options *RepoOptions) (*Directory, error) {
 		if userId == 999 {
 			return d1, nil
 		}
@@ -786,7 +786,7 @@ func TestMove(t *testing.T) {
 				files[fp].SetDirectory(path.Dir(fp))
 			}
 
-			dirRepo.findByUserId = func(ctx context.Context, userId int32) (*Directory, error) {
+			dirRepo.findByUserId = func(ctx context.Context, userId int32, options *RepoOptions) (*Directory, error) {
 				return &Directory{
 					id:     "test",
 					userId: 999,

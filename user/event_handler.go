@@ -13,7 +13,7 @@ import (
 type UserEventPayload struct {
 	UserID int32  `json:"id"`
 	Kind   string `json:"kind"`
-	UserProfile
+	Profile
 }
 
 type UserEventHandler struct {
@@ -62,7 +62,7 @@ func (handler *UserEventHandler) onUserCreatedEvent(ctx context.Context, event *
 		return
 	}
 
-	data, err := json.Marshal(event.UserProfile)
+	data, err := json.Marshal(event.Profile)
 	if err != nil {
 		handler.logger.Error("marshaling user profile",
 			zap.Error(err))

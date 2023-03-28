@@ -107,6 +107,11 @@ func (dir *Directory) FilesByPath(p string) map[string]*file.File {
 	return files
 }
 
+func (dir *Directory) FileByPath(p string) *file.File {
+	absP := filepath.Join(PathSeparator, p)
+	return dir.files[absP]
+}
+
 func (dir *Directory) AggregateFiles(p string) map[string]*file.File {
 	files := make(map[string]*file.File)
 

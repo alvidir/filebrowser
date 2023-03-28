@@ -13,7 +13,8 @@ proto:
 	go mod tidy
 
 build:
-	podman build -t alvidir/filebrowser:latest -f ./container/filebrowser/containerfile .
+	podman build -t alvidir/filebrowser:latest-grpc -f ./container/grpc/containerfile .
+	podman build -t alvidir/filebrowser:latest-rest -f ./container/rest/containerfile .
 	podman build -t alvidir/filebrowser:latest-agent -f ./container/agent/containerfile .
 
 setup:
@@ -24,22 +25,14 @@ setup:
 	
 	cat .ssh/pkcs8_key.pem | base64 | tr -d '\n' > .ssh/pkcs8_key.base64
 	
-
 deploy:
 	podman-compose -f compose.yaml up -d
-
-
-follow:
-	podman logs --follow --names filebrowser-server
 
 undeploy:
 	podman-compose -f compose.yaml down
 
-run:
-	go run cmd/filebrowser/main.go
-
-agent:
-	go run cmd/agent/main.go
+follow:
+	podman logs --follow --names $(srv)
 
 test:
 	go test -v -race ./...
