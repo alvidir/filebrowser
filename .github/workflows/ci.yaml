@@ -30,7 +30,7 @@ jobs:
 
     needs: changelog
     if: |
-      contains(needs.changelog.outputs.changelog, 'go') ||
+      contains(needs.changelog.outputs.changelog, '.go') ||
       contains(needs.changelog.outputs.changelog, 'proto')
 
     steps:
