@@ -44,7 +44,7 @@ clean-images:
 	@-podman image rm alvidir/$(BINARY_NAME):latest-rest
 	@-podman image rm alvidir/$(BINARY_NAME):latest-agent
 
-test:
+test: protobuf
 	@go test -v -race ./...
 
 secrets:
