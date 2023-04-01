@@ -49,14 +49,8 @@ jobs:
         with:
           version: "3.x"
 
-      - name: Install plugins
-        run: make go-install
-
-      - name: Generate protos
-        run: make proto -B
-
       - name: Test
-        run: go test -v -race ./...
+        run: PKG_MANAGER=apt make test
 
   release_version:
     name: Release version

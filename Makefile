@@ -21,17 +21,16 @@ else
 	-podman build -t alvidir/$(BINARY_NAME):latest-agent -f ./container/agent/containerfile .
 endif
 
-protobuf:
+protobuf: install-deps
 	@protoc --proto_path=. --go_out=. --go_opt=paths=source_relative \
 		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
 		proto/*.proto
 	@go mod tidy
 
 install-deps:
-	$(PKG_MANAGER) install -y protobuf-compiler
+	-$(PKG_MANAGER) install -y protobuf-compiler
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-	@go mod tidy
 	
 clean:
 	@-go clean
