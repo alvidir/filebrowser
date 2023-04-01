@@ -3,44 +3,31 @@ option go_package = "github.com/alvidir/filebrowser/proto";
 
 package proto;
 
-message FileConstructor {
-    string path = 1;
-    repeated FileMetadata metadata = 2;
-    bytes data = 3;
-}
-
-message FileLocator {
-    string target = 1;
-}
-
-message FileMetadata {
+message Metadata {
     string key = 1;
     string value = 2;
 }
 
 message Permissions {
-    bool read = 1;
-    bool write = 2;
-    bool owner = 3;
+    int32 user_id = 1;
+    bool read = 2;
+    bool write = 3;
+    bool owner = 4;
 }
 
-message FilePermissions {
-    int32 uid = 1;
-    Permissions permissions = 2;
-}
-
-message FileDescriptor {
+message File {
     string id = 1;
     string name = 2;
-    repeated FileMetadata metadata = 3;
-    repeated FilePermissions permissions = 4;
-    uint32 flags = 5;
-    bytes data = 6;
+    string directory = 3;
+    repeated Metadata metadata = 4;
+    repeated Permissions permissions = 5;
+    uint32 flags = 6;
+    bytes data = 7;
 }
 
-service File {
-    rpc Create(FileConstructor) returns (FileDescriptor); 
-    rpc Retrieve(FileLocator) returns (FileDescriptor);
-    rpc Update(FileDescriptor) returns (FileDescriptor);
-    rpc Delete(FileLocator) returns (FileDescriptor);
+service FileService {
+    rpc Create(File) returns (File); 
+    rpc Get(File) returns (File);
+    rpc Update(File) returns (File);
+    rpc Delete(File) returns (File);
 }

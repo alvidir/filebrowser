@@ -4,22 +4,38 @@ option go_package = "github.com/alvidir/filebrowser/proto";
 package proto;
 import "proto/file.proto";
 
-message DirectoryLocator {
-    string path = 1;
-    string filter = 2;
+message Path {
+    string absolute = 1;
 }
 
-message DirectoryDescriptor {
+message Directory {
     string id = 1;
-    repeated FileDescriptor files = 2;
+    Path path = 2;
+    repeated File files = 3;
 }
 
-message Empty {}
+message MoveRequest {
+    repeated Path paths = 1;
+    Path destination = 2;
+}
 
-service Directory {
-    rpc Create(DirectoryLocator) returns (DirectoryDescriptor);
-    rpc Retrieve(DirectoryLocator) returns (DirectoryDescriptor);
-    rpc Delete(DirectoryLocator) returns (Empty);
-    rpc Relocate(DirectoryLocator) returns (Empty);
-    rpc RemoveFiles(DirectoryLocator) returns (Empty);
+message SearchRequest {
+    string search = 1;
+}
+
+message SearchMatch {
+    File file = 1;
+    int32 matchStart = 2;
+    int32 matchEnd = 3;
+}
+
+message SearchResponse {
+    repeated SearchMatch matches = 1;
+}
+
+service DirectoryService {
+    rpc Get(Path) returns (Directory);
+    rpc Delete(Path) returns (Directory);
+    rpc Move(MoveRequest) returns (Directory);
+    rpc Search(SearchRequest) returns (SearchResponse);
 }

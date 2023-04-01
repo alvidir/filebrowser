@@ -12,7 +12,7 @@ var (
 	ErrInvalidHeader = errors.New("E007")
 	ErrAlreadyExists = errors.New("E010")
 
-	ErrChannelClosed  = errors.New("channel closed")
-	ErrBlurredContent = errors.New("blurred content")
-	ErrUnidentified   = errors.New("unidentified")
+	ErrChannelClosed    = errors.New("channel closed")
+	ErrProtectedContent = errors.New("protected content")
+	ErrUnidentified     = errors.New("unidentified")
 )

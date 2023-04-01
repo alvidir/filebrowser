@@ -22,7 +22,7 @@ jobs:
 
       - name: Get changed files
         id: changed-files
-        uses: tj-actions/changed-files@v35.4.4
+        uses: tj-actions/changed-files@v35.7.6
 
   run_unitary_tests:
     name: Run unitary tests
@@ -40,7 +40,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: 1.19.x
 
@@ -49,14 +49,8 @@ jobs:
         with:
           version: "3.x"
 
-      - name: Install plugins
-        run: make go-install
-
-      - name: Generate protos
-        run: make proto -B
-
       - name: Test
-        run: go test -v -race ./...
+        run: PKG_MANAGER=apt make test
 
   release_version:
     name: Release version

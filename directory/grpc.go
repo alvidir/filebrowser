@@ -9,114 +9,124 @@ import (
 	"go.uber.org/zap"
 )
 
-type DirectoryServer struct {
-	proto.UnimplementedDirectoryServer
-	app    *DirectoryApplication
-	logger *zap.Logger
-	header string
+type DirectoryGrpcServer struct {
+	proto.UnimplementedDirectoryServiceServer
+	app       *DirectoryApplication
+	logger    *zap.Logger
+	uidHeader string
 }
 
-func NewDirectoryServer(app *DirectoryApplication, logger *zap.Logger, authHeader string) *DirectoryServer {
-	return &DirectoryServer{
-		app:    app,
-		logger: logger,
-		header: authHeader,
+func NewDirectoryGrpcServer(app *DirectoryApplication, logger *zap.Logger, authHeader string) *DirectoryGrpcServer {
+	return &DirectoryGrpcServer{
+		app:       app,
+		logger:    logger,
+		uidHeader: authHeader,
 	}
 }
 
-func (server *DirectoryServer) Create(ctx context.Context, req *proto.DirectoryLocator) (*proto.DirectoryDescriptor, error) {
-	uid, err := fb.GetUid(ctx, server.header, server.logger)
-	if err != nil {
-		return nil, err
+func NewProtoPath(absolute string) *proto.Path {
+	if len(absolute) == 0 {
+		return nil
 	}
 
-	dir, err := server.app.Create(ctx, uid)
-	if err != nil {
-		return nil, err
+	return &proto.Path{
+		Absolute: absolute,
+	}
+}
+
+func NewProtoSearchMatch(match SearchMatch) *proto.SearchMatch {
+	return &proto.SearchMatch{
+		File:       file.NewProtoFile(match.file),
+		MatchStart: int32(match.start),
+		MatchEnd:   int32(match.end),
+	}
+}
+
+func NewProtoSearchResponse(matches []SearchMatch) *proto.SearchResponse {
+	search := &proto.SearchResponse{
+		Matches: make([]*proto.SearchMatch, 0, len(matches)),
 	}
 
-	descriptor := &proto.DirectoryDescriptor{
+	for _, match := range matches {
+		match := NewProtoSearchMatch(match)
+		search.Matches = append(search.Matches, match)
+	}
+
+	return search
+}
+
+func NewProtoDirectory(dir *Directory) *proto.Directory {
+	protoDir := &proto.Directory{
 		Id:    dir.id,
-		Files: make([]*proto.FileDescriptor, 0, len(dir.Files())),
+		Files: make([]*proto.File, 0, len(dir.files)),
+		Path:  NewProtoPath(dir.path),
 	}
 
-	for _, fs := range dir.Files() {
-		fileDescriptor := &proto.FileDescriptor{
-			Id:       fs.Id(),
-			Metadata: make([]*proto.FileMetadata, 0, len(fs.Metadata())),
-		}
-
-		for key, value := range fs.Metadata() {
-			fileDescriptor.Metadata = append(fileDescriptor.Metadata, &proto.FileMetadata{
-				Key:   key,
-				Value: value,
-			})
-		}
-
-		descriptor.Files = append(descriptor.Files, fileDescriptor)
+	for _, fs := range dir.files {
+		protoDir.Files = append(protoDir.Files, file.NewProtoFile(fs))
 	}
 
-	return descriptor, nil
+	return protoDir
 }
 
-func (server *DirectoryServer) Retrieve(ctx context.Context, req *proto.DirectoryLocator) (*proto.DirectoryDescriptor, error) {
-	uid, err := fb.GetUid(ctx, server.header, server.logger)
+func (server *DirectoryGrpcServer) Get(ctx context.Context, path *proto.Path) (*proto.Directory, error) {
+	uid, err := fb.GetUidFromGrpcCtx(ctx, server.uidHeader, server.logger)
 	if err != nil {
 		return nil, err
 	}
 
-	dir, err := server.app.Retrieve(ctx, uid, req.GetPath(), req.GetFilter())
+	dir, err := server.app.Get(ctx, uid, path.GetAbsolute())
 	if err != nil {
 		return nil, err
 	}
 
-	descriptor := &proto.DirectoryDescriptor{
-		Id:    dir.id,
-		Files: make([]*proto.FileDescriptor, 0, len(dir.Files())),
-	}
-
-	for _, fs := range dir.Files() {
-		descriptor.Files = append(descriptor.Files, file.NewFileDescriptor(fs))
-	}
-
-	return descriptor, nil
+	return NewProtoDirectory(dir), nil
 }
 
-func (server *DirectoryServer) Delete(ctx context.Context, req *proto.DirectoryLocator) (*proto.Empty, error) {
-	uid, err := fb.GetUid(ctx, server.header, server.logger)
+func (server *DirectoryGrpcServer) Delete(ctx context.Context, path *proto.Path) (*proto.Directory, error) {
+	uid, err := fb.GetUidFromGrpcCtx(ctx, server.uidHeader, server.logger)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := server.app.Delete(ctx, uid); err != nil {
+	dir, err := server.app.Delete(ctx, uid, path.GetAbsolute())
+	if err != nil {
 		return nil, err
 	}
 
-	return &proto.Empty{}, nil
+	return NewProtoDirectory(dir), nil
 }
 
-func (server *DirectoryServer) Relocate(ctx context.Context, req *proto.DirectoryLocator) (*proto.Empty, error) {
-	uid, err := fb.GetUid(ctx, server.header, server.logger)
+func (server *DirectoryGrpcServer) Move(ctx context.Context, req *proto.MoveRequest) (*proto.Directory, error) {
+	uid, err := fb.GetUidFromGrpcCtx(ctx, server.uidHeader, server.logger)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := server.app.Relocate(ctx, uid, req.GetPath(), req.GetFilter()); err != nil {
+	protoPaths := req.GetPaths()
+	paths := make([]string, 0, len(protoPaths))
+	for _, pp := range protoPaths {
+		paths = append(paths, pp.GetAbsolute())
+	}
+
+	dir, err := server.app.Move(ctx, uid, paths, req.GetDestination().GetAbsolute())
+	if err != nil {
 		return nil, err
 	}
 
-	return &proto.Empty{}, nil
+	return NewProtoDirectory(dir), nil
 }
 
-func (server *DirectoryServer) RemoveFiles(ctx context.Context, req *proto.DirectoryLocator) (*proto.Empty, error) {
-	uid, err := fb.GetUid(ctx, server.header, server.logger)
+func (server *DirectoryGrpcServer) Search(ctx context.Context, req *proto.SearchRequest) (*proto.SearchResponse, error) {
+	uid, err := fb.GetUidFromGrpcCtx(ctx, server.uidHeader, server.logger)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := server.app.RemoveFiles(ctx, uid, req.GetPath(), req.GetFilter()); err != nil {
+	search, err := server.app.Search(ctx, uid, req.GetSearch())
+	if err != nil {
 		return nil, err
 	}
 
-	return &proto.Empty{}, nil
+	return NewProtoSearchResponse(search), nil
 }

@@ -61,7 +61,7 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 		return nil, err
 	}
 
-	file.AddPermission(uid, fb.Owner)
+	file.AddPermission(uid, cert.Owner)
 	file.metadata = meta
 	file.data = data
 
@@ -90,8 +90,8 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 	return file, nil
 }
 
-func (app *FileApplication) Retrieve(ctx context.Context, uid int32, fid string) (*File, error) {
-	app.logger.Info("processing a \"retrieve\" file request",
+func (app *FileApplication) Get(ctx context.Context, uid int32, fid string) (*File, error) {
+	app.logger.Info("processing a \"get\" file request",
 		zap.String("file_id", fid),
 		zap.Int32("user_id", uid))
 
@@ -101,11 +101,11 @@ func (app *FileApplication) Retrieve(ctx context.Context, uid int32, fid string)
 	}
 
 	perm := file.Permission(uid)
-	if perm&(fb.Read|fb.Owner) == 0 {
+	if perm&(cert.Read|cert.Owner) == 0 {
 		return nil, fb.ErrNotAvailable
 	}
 
-	file.AuthorizedFieldsOnly(uid)
+	file.ProtectFields(uid)
 	return file, nil
 }
 
@@ -119,7 +119,7 @@ func (app *FileApplication) Update(ctx context.Context, uid int32, fid string, n
 		return nil, err
 	}
 
-	if file.Permission(uid)&(fb.Write|fb.Owner) == 0 {
+	if file.Permission(uid)&(cert.Write|cert.Owner) == 0 {
 		return nil, fb.ErrNotAvailable
 	}
 
@@ -160,7 +160,7 @@ func (app *FileApplication) Delete(ctx context.Context, uid int32, fid string) (
 		return nil, err
 	}
 
-	if f.Permission(uid)&fb.Owner != 0 && len(f.Owners()) == 1 {
+	if f.Permission(uid)&cert.Owner != 0 && len(f.Owners()) == 1 {
 		// uid is the only owner of file f
 		f.metadata[MetadataDeletedAtKey] = strconv.FormatInt(time.Now().Unix(), TimestampBase)
 		err = app.fileRepo.Delete(ctx, f)

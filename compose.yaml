@@ -19,9 +19,9 @@ services:
     security_opt:
       label: disable
 
-  filebrowser:
-    container_name: filebrowser-server
-    image: localhost/alvidir/filebrowser:latest
+  grpc:
+    container_name: filebrowser-grpc
+    image: localhost/alvidir/filebrowser:latest-grpc
     restart: always
     ports:
       - 8000:8000
@@ -31,6 +31,23 @@ services:
       - mongo
     env_file:
       - .env
+    environment:
+      - SERVICE_PORT=8000
+
+  rest:
+    container_name: filebrowser-rest
+    image: localhost/alvidir/filebrowser:latest-rest
+    restart: always
+    ports:
+      - 8090:8090
+    security_opt:
+      label: disable
+    depends_on:
+      - mongo
+    env_file:
+      - .env
+    environment:
+      - SERVICE_PORT=8090
 
   agent:
     container_name: filebrowser-agent

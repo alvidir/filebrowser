@@ -4,16 +4,12 @@ option go_package = "github.com/alvidir/filebrowser/proto";
 package proto;
 import "proto/file.proto";
 
-message CertificateLocator {
-    string fileId = 1;
-}
-
-message CertificateDescriptor {
+message Certificate {
     string id = 1;
     Permissions permissions = 2;
     string token = 3;
 }
 
-service Certificate {
-    rpc Retrieve(CertificateLocator) returns (CertificateDescriptor); 
+service CertificateService {
+    rpc Get(File) returns (Certificate); 
 }

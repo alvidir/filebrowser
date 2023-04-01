@@ -4,6 +4,7 @@ import (
 	"context"
 
 	fb "github.com/alvidir/filebrowser"
+	cert "github.com/alvidir/filebrowser/certificate"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -16,12 +17,12 @@ const (
 )
 
 type mongoFile struct {
-	ID          primitive.ObjectID      `bson:"_id,omitempty"`
-	Name        string                  `bson:"name"`
-	Flags       Flag                    `bson:"flags"`
-	Permissions map[int32]fb.Permission `bson:"permissions,omitempty"`
-	Metadata    map[string]string       `bson:"metadata,omitempty"`
-	Data        []byte                  `bson:"data,omitempty"`
+	ID          primitive.ObjectID        `bson:"_id,omitempty"`
+	Name        string                    `bson:"name"`
+	Flags       Flag                      `bson:"flags"`
+	Permissions map[int32]cert.Permission `bson:"permissions,omitempty"`
+	Metadata    map[string]string         `bson:"metadata,omitempty"`
+	Data        []byte                    `bson:"data,omitempty"`
 }
 
 func newMongoFile(f *File) (*mongoFile, error) {
@@ -154,10 +155,10 @@ func (repo *MongoFileRepository) FindAll(ctx context.Context, ids []string) ([]*
 }
 
 func (repo *MongoFileRepository) Save(ctx context.Context, file *File) error {
-	if file.flags&Blurred != 0 {
+	if file.protected {
 		repo.logger.Error("saving file",
 			zap.String("file_id", file.id),
-			zap.Error(fb.ErrBlurredContent))
+			zap.Error(fb.ErrProtectedContent))
 
 		return fb.ErrUnknown
 	}

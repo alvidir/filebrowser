@@ -2,6 +2,9 @@ package directory
 
 import (
 	"fmt"
+	"path"
+	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/alvidir/filebrowser/file"
@@ -85,7 +88,7 @@ func TestFiles(t *testing.T) {
 
 	want[1] = "/path/to/filename_1"
 
-	got := dir.Files()
+	got := dir.files
 	if len(got) != len(want) {
 		t.Errorf("got len = %v, want = %v", len(got), len(want))
 	}
@@ -94,5 +97,235 @@ func TestFiles(t *testing.T) {
 		if got, exists := got[path]; !exists || got.Id() != f.Id() {
 			t.Errorf("got file id = %v, want = %v", got, f.Id())
 		}
+	}
+}
+
+func TestAgregateFiles(t *testing.T) {
+	tests := []struct {
+		name  string
+		path  string
+		files []string
+		want  []string
+	}{
+		{
+			name: "get root files",
+			path: "/",
+			files: []string{
+				"/a_file",
+				"/another_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+				"/another_directory/a_file",
+			},
+			want: []string{
+				"/a_file",
+				"/another_file",
+				"/a_directory",
+				"/another_directory",
+			},
+		},
+		{
+			name: "get deeper directory files",
+			path: "/a_directory",
+			files: []string{
+				"/a_file",
+				"/another_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+				"/a_directory_here/a_file",
+			},
+			want: []string{
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t := t
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			dir := &Directory{
+				id:     "test",
+				userId: 999,
+				files:  make(map[string]*file.File),
+			}
+
+			for _, fileName := range test.files {
+				dir.files[fileName], _ = file.NewFile("test", "filename")
+			}
+
+			got := dir.AggregateFiles(test.path)
+			if len(test.want) != len(got) {
+				t.Fatalf("got files = %v, want = %v", got, test.want)
+			}
+
+			for _, expectedPath := range test.want {
+				if _, exists := got[expectedPath]; !exists {
+					t.Errorf("got files = %v, want = %v", got, expectedPath)
+				}
+			}
+		})
+	}
+}
+
+func TestAggregateUpdatedAt(t *testing.T) {
+	dir := NewDirectory(999)
+
+	f1, _ := file.NewFile("111", "test_1")
+	f1.AddMetadata(file.MetadataUpdatedAtKey, "1")
+	dir.files["/test_1"] = f1
+
+	f2, _ := file.NewFile("222", "test_2")
+	f2.AddMetadata(file.MetadataUpdatedAtKey, "2")
+	dir.files["/directory/test_2"] = f2
+
+	f3, _ := file.NewFile("333", "test_3")
+	f3.AddMetadata(file.MetadataUpdatedAtKey, "3")
+	dir.files["/directory/test_3"] = f3
+
+	if got := len(dir.AggregateFiles("/")); got != 2 {
+		t.Fatalf("got %v items, want  %v", got, 2)
+	}
+
+	folder, exists := dir.AggregateFiles("/")["/directory"]
+	if !exists {
+		t.Fatalf("directory does not exists")
+	}
+
+	updatedAt, exists := folder.Metadata()[file.MetadataUpdatedAtKey]
+	if !exists {
+		t.Fatalf("directory does not contains updated_at metadata")
+	}
+
+	want := "3"
+	if got := updatedAt; got != want {
+		t.Fatalf("got updatedAt = %v, want = %v", got, want)
+	}
+}
+
+func TestSearch(t *testing.T) {
+	tests := []struct {
+		name   string
+		search string
+		files  []string
+		want   []string
+	}{
+		{
+			name:   "search by filename",
+			search: "a_file",
+			files: []string{
+				"/a_file",
+				"/a_directory/a_file",
+			},
+			want: []string{
+				"/a_file",
+				"/a_directory/a_file",
+			},
+		},
+		{
+			name:   "search by directory name",
+			search: "a_directory",
+			files: []string{
+				"/a_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+			},
+			want: []string{
+				"/a_directory",
+			},
+		},
+		{
+			name:   "search by partial path",
+			search: "ry/a_",
+			files: []string{
+				"/a_file",
+				"/a_directory/a_file",
+				"/a_directory/another_file",
+			},
+			want: []string{
+				"/a_directory/a_file",
+			},
+		},
+		{
+			name:   "search by partial name",
+			search: "a_",
+			files: []string{
+				"/a_directory/with_a_dir/with_a_file",
+			},
+			want: []string{
+				"/a_directory",
+				"/a_directory/with_a_dir",
+				"/a_directory/with_a_dir/with_a_file",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t := t
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			dir := &Directory{
+				id:     "test",
+				userId: 999,
+				files:  make(map[string]*file.File),
+			}
+
+			for i, fp := range test.files {
+				id := strconv.Itoa(i)
+				dir.files[fp], _ = file.NewFile(id, path.Base(fp))
+				dir.files[fp].SetDirectory(path.Dir(fp))
+			}
+
+			matches := dir.Search(test.search)
+			if len(test.want) != len(matches) {
+				t.Errorf("got files = %+v, want = %v", matches, test.want)
+			}
+
+			for _, expectedPath := range test.want {
+				exists := false
+				for _, match := range matches {
+					fullpath := filepath.Join(match.file.Directory(), match.file.Name())
+					if exists = fullpath == expectedPath; exists {
+						break
+					}
+				}
+
+				if !exists {
+					t.Errorf("got files = %v, want = %v", matches, expectedPath)
+				}
+			}
+
+		})
+	}
+}
+
+func TestSearchRootpath(t *testing.T) {
+	dir := &Directory{
+		id:     "test",
+		userId: 999,
+		files:  make(map[string]*file.File),
+	}
+
+	files := []string{
+		"/a_file",
+	}
+
+	for i, fp := range files {
+		id := strconv.Itoa(i)
+		dir.files[fp], _ = file.NewFile(id, path.Base(fp))
+		dir.files[fp].SetDirectory(path.Dir(fp))
+	}
+
+	matches := dir.Search("/")
+	if len(matches) == 0 {
+		t.Fatal("got no files")
+	}
+
+	if matches[0].file.Flags()&file.Directory != 0 {
+		t.Errorf("got directory, want file")
 	}
 }

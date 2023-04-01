@@ -3,18 +3,22 @@ package directory
 import (
 	"context"
 	"path"
-	"regexp"
+	"path/filepath"
 	"strconv"
-	"sync"
 	"time"
 
 	fb "github.com/alvidir/filebrowser"
+	cert "github.com/alvidir/filebrowser/certificate"
 	"github.com/alvidir/filebrowser/file"
 	"go.uber.org/zap"
 )
 
+type RepoOptions struct {
+	LazyLoading bool
+}
+
 type DirectoryRepository interface {
-	FindByUserId(ctx context.Context, userId int32) (*Directory, error)
+	FindByUserId(ctx context.Context, userId int32, options *RepoOptions) (*Directory, error)
 	Create(ctx context.Context, directory *Directory) error
 	Save(ctx context.Context, directory *Directory) error
 	Delete(ctx context.Context, directory *Directory) error
@@ -34,11 +38,12 @@ func NewDirectoryApplication(dirRepo DirectoryRepository, fileRepo file.FileRepo
 	}
 }
 
+// Create creates a new directory if, and only if, there is no other for the given user uid. Otherwise returns an error.
 func (app *DirectoryApplication) Create(ctx context.Context, uid int32) (*Directory, error) {
 	app.logger.Info("processing a \"create\" directory request",
 		zap.Int32("user_id", uid))
 
-	if _, err := app.dirRepo.FindByUserId(ctx, uid); err == nil {
+	if _, err := app.dirRepo.FindByUserId(ctx, uid, &RepoOptions{}); err == nil {
 		return nil, fb.ErrAlreadyExists
 	}
 
@@ -50,215 +55,161 @@ func (app *DirectoryApplication) Create(ctx context.Context, uid int32) (*Direct
 	return directory, nil
 }
 
-func (app *DirectoryApplication) Retrieve(ctx context.Context, uid int32, path string, filter string) (*Directory, error) {
-	app.logger.Info("processing a \"retrieve\" directory request",
+// Get agregates into a list of files all those files matching the given path.
+func (app *DirectoryApplication) Get(ctx context.Context, uid int32, p string) (*Directory, error) {
+	app.logger.Info("processing a \"get\" directory request",
 		zap.Int32("user_id", uid),
-		zap.String("path", path),
-		zap.String("filter", filter))
+		zap.String("path", p))
 
-	dir, err := app.dirRepo.FindByUserId(ctx, uid)
+	dir, err := app.dirRepo.FindByUserId(ctx, uid, &RepoOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	filters := make([]filterFileFn, 0, 2)
-	if len(path) > 0 {
-		filterFn, err := newFilterByDirFn(path)
-		if err != nil {
-			return nil, err
-		}
+	absP := filepath.Join(PathSeparator, p)
 
-		filters = append(filters, filterFn)
-	}
+	selected := NewDirectory(uid)
+	selected.files = dir.AggregateFiles(absP)
+	selected.path = absP
+	selected.id = dir.id
 
-	if len(filter) > 0 {
-		filterFn, err := newFilterByRegexFn(filter)
-		if err != nil {
-			return nil, err
-		}
-
-		filters = append(filters, filterFn)
-	}
-
-	files, err := filterFiles(dir.Files(), filters)
-	if err != nil {
-		return nil, err
-	}
-
-	dir.files, err = files.Agregate()
-	if err != nil {
-		return nil, err
-	}
-
-	for p, f := range dir.Files() {
-		f.AuthorizedFieldsOnly(uid)
-		f.SetName(p)
-	}
-
-	return dir, nil
+	return selected, nil
 }
 
-// Delete hard deletes the user uid directory
-func (app *DirectoryApplication) Delete(ctx context.Context, uid int32) error {
+// Delete removes from the directory all those files whose path matches the given one.
+func (app *DirectoryApplication) Delete(ctx context.Context, uid int32, p string) (*Directory, error) {
 	app.logger.Info("processing a \"delete\" directory request",
-		zap.Int32("user_id", uid))
-
-	dir, err := app.dirRepo.FindByUserId(ctx, uid)
-	if err != nil {
-		return err
-	}
-
-	var wg sync.WaitGroup
-	for _, f := range dir.Files() {
-		wg.Add(1)
-		go func(ctx context.Context, wg *sync.WaitGroup, fid string) {
-			defer wg.Done()
-
-			f, err := app.fileRepo.Find(ctx, fid)
-			if err != nil {
-				return
-			}
-
-			if f.Permission(uid)&fb.Owner == 0 {
-				return
-			}
-
-			if len(f.Owners()) == 1 {
-				// uid is the only owner of file f
-				f.AddMetadata(file.MetadataDeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
-				app.fileRepo.Delete(ctx, f)
-			}
-		}(ctx, &wg, f.Id())
-	}
-
-	if err := app.dirRepo.Delete(ctx, dir); err != nil {
-		return err
-	}
-
-	wg.Wait()
-	return nil
-}
-
-// Relocate appends the target path at the beginning of all these file paths in the directory that matches the
-// filter's regex. If the regex contains more than one submatches, then the starting indexes of the first and
-// second submatches determines the substring to be removed before appending.
-func (app *DirectoryApplication) Relocate(ctx context.Context, uid int32, target string, filter string) error {
-	app.logger.Info("processing a \"relocate\" directory request",
 		zap.Int32("user_id", uid),
-		zap.String("path", target),
-		zap.String("filter", filter))
+		zap.String("path", p))
 
-	regex, err := regexp.Compile(filter)
+	dir, err := app.dirRepo.FindByUserId(ctx, uid, &RepoOptions{})
 	if err != nil {
-		return fb.ErrInvalidFormat
+		return nil, err
 	}
 
-	dir, err := app.dirRepo.FindByUserId(ctx, uid)
-	if err != nil {
-		return err
-	}
+	absP := filepath.Join(PathSeparator, p)
+	affected := NewDirectory(uid)
+	affected.files = dir.FilesByPath(absP)
+	affected.path = absP
 
-	target = fb.NormalizePath(target)
-	for p0, f := range dir.Files() {
-		subject := fb.NormalizePath(p0)
-
-		matches := regex.FindStringSubmatchIndex(subject)
-		if matches == nil {
+	for _, f := range affected.files {
+		dir.RemoveFile(f)
+		if f.Permission(uid)&cert.Owner == 0 {
 			continue
 		}
 
-		matchStart := matches[0] + 1
-		if regex.NumSubexp() > 0 && matches[2] > -1 {
-			matchStart = matches[2]
+		if len(f.Owners()) > 1 {
+			continue
 		}
 
-		index := len(fb.PathComponents(subject))
-		if matchStart > 0 {
-			index = len(fb.PathComponents(subject[:matchStart]))
+		f.AddMetadata(file.MetadataDeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
+		if err := app.fileRepo.Delete(ctx, f); err != nil {
+			return nil, err
 		}
 
-		p1 := path.Join(fb.PathComponents(subject)[index:]...)
-		p1 = fb.NormalizePath(path.Join(target, p1))
-
-		delete(dir.files, p0)
-		dir.AddFile(f, p1)
+		f.ProtectFields(uid)
 	}
 
 	if err := app.dirRepo.Save(ctx, dir); err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	for _, f := range affected.files {
+		f.ProtectFields(uid)
+	}
+
+	return affected, nil
 }
 
-// RemoveFiles removes, for given user, all these files whose path in the user's directory matches the path as
-// a prefix and the filter as a regex. If any of both is not defined (aka. empty string) then the corresponding
-// filter will be skipt.
-func (app *DirectoryApplication) RemoveFiles(ctx context.Context, uid int32, path string, filter string) error {
-	app.logger.Info("processing a \"remove files\" request",
-		zap.Int32("user_id", uid))
+// Move replaces the destination path to all these file paths in the directory matching any of the given paths.
+func (app *DirectoryApplication) Move(ctx context.Context, uid int32, paths []string, dest string) (*Directory, error) {
+	app.logger.Info("processing a directory's \"move\" request",
+		zap.Int32("user_id", uid),
+		zap.Strings("paths", paths),
+		zap.String("destination", dest))
 
-	dir, err := app.dirRepo.FindByUserId(ctx, uid)
+	dir, err := app.dirRepo.FindByUserId(ctx, uid, &RepoOptions{})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	filters := make([]filterFileFn, 0, 2)
-	if len(path) > 0 {
-		filterFn, err := newFilterByPrefixFn(path)
-		if err != nil {
-			return err
+	destDir := path.Dir(dest)
+	absDest := filepath.Join(PathSeparator, dest)
+
+	affected := NewDirectory(uid)
+	prefixes := make(map[string]string)
+	for _, p := range paths {
+		absP := filepath.Join(PathSeparator, p)
+		for absFp, f := range dir.FilesByPath(absP) {
+			affected.files[absFp] = f
+			prefixes[absFp] = absP
+		}
+	}
+
+	for absFp, f := range affected.files {
+		sufix := absFp[len(prefixes[absFp]):]
+		finalPath := path.Join(absDest, sufix)
+		if destDir == absDest {
+			finalPath = path.Join(absDest, path.Base(absFp))
 		}
 
-		filters = append(filters, filterFn)
-	}
-
-	if len(filter) > 0 {
-		filterFn, err := newFilterByRegexFn(filter)
-		if err != nil {
-			return err
-		}
-
-		filters = append(filters, filterFn)
-	}
-
-	files, err := filterFiles(dir.Files(), filters)
-	if err != nil {
-		return err
-	}
-
-	files.Range(func(p string, f *file.File) bool {
 		dir.RemoveFile(f)
-		err = app.dirRepo.Save(ctx, dir)
-		return err == nil
-	})
+		dir.AddFile(f, finalPath)
 
-	return err
+		delete(affected.files, absFp)
+		affected.files[finalPath] = f
+	}
+
+	if err := app.dirRepo.Save(ctx, dir); err != nil {
+		return nil, err
+	}
+
+	for _, f := range affected.files {
+		f.ProtectFields(uid)
+	}
+
+	return affected, nil
+}
+
+// Search returns alls these files whose path matches with the given regex
+func (app *DirectoryApplication) Search(ctx context.Context, uid int32, regex string) ([]SearchMatch, error) {
+	app.logger.Info("processing a \"search\" in directory request",
+		zap.Int32("user_id", uid),
+		zap.String("regex", regex))
+
+	dir, err := app.dirRepo.FindByUserId(ctx, uid, &RepoOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	return dir.Search(regex), nil
 }
 
 // RegisterFile registers the given file into the user uid directory. The given path may change if,
 // and only if, another file with the same name exists in the same path.
-func (app *DirectoryApplication) RegisterFile(ctx context.Context, file *file.File, uid int32, fpath string) (string, error) {
-	app.logger.Info("processing an \"register file\" request",
+func (app *DirectoryApplication) RegisterFile(ctx context.Context, file *file.File, uid int32, fp string) (string, error) {
+	app.logger.Info("processing a directory's \"register file\" request",
 		zap.Int32("user_id", uid),
-		zap.String("file_id", file.Id()))
+		zap.String("file_id", file.Id()),
+		zap.String("path", fp))
 
-	dir, err := app.dirRepo.FindByUserId(ctx, uid)
+	absFp := filepath.Join(PathSeparator, fp)
+	dir, err := app.dirRepo.FindByUserId(ctx, uid, &RepoOptions{})
 	if err != nil {
 		return "", err
 	}
 
-	name := dir.AddFile(file, fb.NormalizePath(fpath))
+	name := dir.AddFile(file, absFp)
 	return path.Base(name), app.dirRepo.Save(ctx, dir)
 }
 
 // UnregisterFile unregisters the given file from the directory. This action may trigger the file's
 // deletion if it becomes with no owner once unregistered.
 func (app *DirectoryApplication) UnregisterFile(ctx context.Context, f *file.File, uid int32) error {
-	app.logger.Info("processing a \"unregister file\" request",
+	app.logger.Info("processing a directory's \"unregister file\" request",
 		zap.Int32("user_id", uid))
 
-	dir, err := app.dirRepo.FindByUserId(ctx, uid)
+	dir, err := app.dirRepo.FindByUserId(ctx, uid, &RepoOptions{})
 	if err != nil {
 		return err
 	}

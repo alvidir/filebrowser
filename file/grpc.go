@@ -14,16 +14,17 @@ type EventBus interface {
 	EmitFileDeleted(uid int32, f *File) error
 }
 
-func NewPermissions(perm fb.Permission) *proto.Permissions {
-	return &proto.Permissions{
-		Read:  perm&fb.Read != 0,
-		Write: perm&fb.Write != 0,
-		Owner: perm&fb.Owner != 0,
-	}
+type FileGrpcServer struct {
+	proto.UnimplementedFileServiceServer
+	fileApp   *FileApplication
+	certApp   *cert.CertificateApplication
+	fileBus   EventBus
+	logger    *zap.Logger
+	uidHeader string
 }
 
-func NewFileServer(fileApp *FileApplication, certApp *cert.CertificateApplication, bus EventBus, authHeader string, logger *zap.Logger) *FileServer {
-	return &FileServer{
+func NewFileGrpcServer(fileApp *FileApplication, certApp *cert.CertificateApplication, bus EventBus, authHeader string, logger *zap.Logger) *FileGrpcServer {
+	return &FileGrpcServer{
 		fileApp:   fileApp,
 		certApp:   certApp,
 		fileBus:   bus,
@@ -32,44 +33,42 @@ func NewFileServer(fileApp *FileApplication, certApp *cert.CertificateApplicatio
 	}
 }
 
-func NewFileDescriptor(file *File) *proto.FileDescriptor {
-	descriptor := &proto.FileDescriptor{
+func NewPermissions(userId int32, perm cert.Permission) *proto.Permissions {
+	return &proto.Permissions{
+		UserId: userId,
+		Read:   perm&cert.Read != 0,
+		Write:  perm&cert.Write != 0,
+		Owner:  perm&cert.Owner != 0,
+	}
+}
+
+func NewProtoFile(file *File) *proto.File {
+	descriptor := &proto.File{
 		Id:          file.id,
 		Name:        file.name,
-		Metadata:    make([]*proto.FileMetadata, 0, len(file.metadata)),
-		Permissions: make([]*proto.FilePermissions, 0, len(file.permissions)),
+		Metadata:    make([]*proto.Metadata, 0, len(file.metadata)),
+		Directory:   file.directory,
+		Permissions: make([]*proto.Permissions, 0, len(file.permissions)),
 		Flags:       uint32(file.flags),
 		Data:        file.data,
 	}
 
 	for key, value := range file.metadata {
-		descriptor.Metadata = append(descriptor.Metadata, &proto.FileMetadata{
+		descriptor.Metadata = append(descriptor.Metadata, &proto.Metadata{
 			Key:   key,
 			Value: value,
 		})
 	}
 
 	for uid, perm := range file.permissions {
-		descriptor.Permissions = append(descriptor.Permissions, &proto.FilePermissions{
-			Uid:         uid,
-			Permissions: NewPermissions(perm),
-		})
+		descriptor.Permissions = append(descriptor.Permissions, NewPermissions(uid, perm))
 	}
 
 	return descriptor
 }
 
-type FileServer struct {
-	proto.UnimplementedFileServer
-	fileApp   *FileApplication
-	certApp   *cert.CertificateApplication
-	fileBus   EventBus
-	logger    *zap.Logger
-	uidHeader string
-}
-
-func (server *FileServer) Create(ctx context.Context, req *proto.FileConstructor) (*proto.FileDescriptor, error) {
-	uid, err := fb.GetUid(ctx, server.uidHeader, server.logger)
+func (server *FileGrpcServer) Create(ctx context.Context, req *proto.File) (*proto.File, error) {
+	uid, err := fb.GetUidFromGrpcCtx(ctx, server.uidHeader, server.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +78,7 @@ func (server *FileServer) Create(ctx context.Context, req *proto.FileConstructor
 		metadata[meta.GetKey()] = meta.GetValue()
 	}
 
-	file, err := server.fileApp.Create(ctx, uid, req.GetPath(), req.GetData(), metadata)
+	file, err := server.fileApp.Create(ctx, uid, req.GetDirectory(), req.GetData(), metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -91,25 +90,25 @@ func (server *FileServer) Create(ctx context.Context, req *proto.FileConstructor
 			zap.Error(err))
 	}
 
-	return NewFileDescriptor(file), nil
+	return NewProtoFile(file), nil
 }
 
-func (server *FileServer) Retrieve(ctx context.Context, req *proto.FileLocator) (*proto.FileDescriptor, error) {
-	uid, err := fb.GetUid(ctx, server.uidHeader, server.logger)
+func (server *FileGrpcServer) Get(ctx context.Context, req *proto.File) (*proto.File, error) {
+	uid, err := fb.GetUidFromGrpcCtx(ctx, server.uidHeader, server.logger)
 	if err != nil {
 		return nil, err
 	}
 
-	file, err := server.fileApp.Retrieve(ctx, uid, req.GetTarget())
+	file, err := server.fileApp.Get(ctx, uid, req.GetId())
 	if err != nil {
 		return nil, err
 	}
 
-	return NewFileDescriptor(file), nil
+	return NewProtoFile(file), nil
 }
 
-func (server *FileServer) Update(ctx context.Context, req *proto.FileDescriptor) (*proto.FileDescriptor, error) {
-	uid, err := fb.GetUid(ctx, server.uidHeader, server.logger)
+func (server *FileGrpcServer) Update(ctx context.Context, req *proto.File) (*proto.File, error) {
+	uid, err := fb.GetUidFromGrpcCtx(ctx, server.uidHeader, server.logger)
 	if err != nil {
 		return nil, err
 	}
@@ -124,16 +123,16 @@ func (server *FileServer) Update(ctx context.Context, req *proto.FileDescriptor)
 		return nil, err
 	}
 
-	return NewFileDescriptor(file), nil
+	return NewProtoFile(file), nil
 }
 
-func (server *FileServer) Delete(ctx context.Context, req *proto.FileLocator) (*proto.FileDescriptor, error) {
-	uid, err := fb.GetUid(ctx, server.uidHeader, server.logger)
+func (server *FileGrpcServer) Delete(ctx context.Context, req *proto.File) (*proto.File, error) {
+	uid, err := fb.GetUidFromGrpcCtx(ctx, server.uidHeader, server.logger)
 	if err != nil {
 		return nil, err
 	}
 
-	file, err := server.fileApp.Delete(ctx, uid, req.GetTarget())
+	file, err := server.fileApp.Delete(ctx, uid, req.GetId())
 	if err != nil {
 		return nil, err
 	}
@@ -147,5 +146,5 @@ func (server *FileServer) Delete(ctx context.Context, req *proto.FileLocator) (*
 		}
 	}
 
-	return NewFileDescriptor(file), nil
+	return NewProtoFile(file), nil
 }

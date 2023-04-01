@@ -2,6 +2,7 @@ package directory
 
 import (
 	"context"
+	"path"
 
 	fb "github.com/alvidir/filebrowser"
 	"github.com/alvidir/filebrowser/file"
@@ -63,7 +64,7 @@ func NewMongoDirectoryRepository(db *mongo.Database, fileRepo file.FileRepositor
 	}
 }
 
-func (repo *MongoDirectoryRepository) FindByUserId(ctx context.Context, userId int32) (*Directory, error) {
+func (repo *MongoDirectoryRepository) FindByUserId(ctx context.Context, userId int32, options *RepoOptions) (*Directory, error) {
 	var mdir mongoDirectory
 	err := repo.conn.FindOne(ctx, bson.M{"user_id": userId}).Decode(&mdir)
 	if err != nil {
@@ -74,7 +75,7 @@ func (repo *MongoDirectoryRepository) FindByUserId(ctx context.Context, userId i
 		return nil, fb.ErrUnknown
 	}
 
-	return repo.build(ctx, &mdir)
+	return repo.build(ctx, &mdir, options)
 }
 
 func (repo *MongoDirectoryRepository) Create(ctx context.Context, dir *Directory) error {
@@ -161,33 +162,39 @@ func (repo *MongoDirectoryRepository) Delete(ctx context.Context, dir *Directory
 	return nil
 }
 
-func (repo *MongoDirectoryRepository) build(ctx context.Context, mdir *mongoDirectory) (*Directory, error) {
+func (repo *MongoDirectoryRepository) build(ctx context.Context, mdir *mongoDirectory, options *RepoOptions) (*Directory, error) {
 	dir := &Directory{
 		id:     mdir.ID.Hex(),
 		userId: mdir.UserID,
 		files:  make(map[string]*file.File),
 	}
 
-	filesIds := make([]string, 0, len(mdir.Files))
-	pathByFileId := make(map[string]string)
-	for fpath, oid := range mdir.Files {
-		filesIds = append(filesIds, oid.Hex())
-		pathByFileId[oid.Hex()] = fpath
-	}
+	if options == nil || options.LazyLoading {
+		for fpath, oid := range mdir.Files {
+			f, _ := file.NewFile(oid.Hex(), path.Base(fpath))
+			dir.files[fpath] = f
+		}
+	} else {
 
-	files, err := repo.fileRepo.FindAll(ctx, filesIds)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, f := range files {
-		if f == nil {
-			dir.RemoveFile(f)
-			continue
+		filesIds := make([]string, 0, len(mdir.Files))
+		pathByFileId := make(map[string]string)
+		for fpath, oid := range mdir.Files {
+			filesIds = append(filesIds, oid.Hex())
+			pathByFileId[oid.Hex()] = fpath
 		}
 
-		p := fb.NormalizePath(pathByFileId[f.Id()])
-		dir.files[p] = f
+		files, err := repo.fileRepo.FindAll(ctx, filesIds)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, f := range files {
+			if f == nil {
+				continue
+			}
+
+			dir.files[pathByFileId[f.Id()]] = f
+		}
 	}
 
 	return dir, nil
