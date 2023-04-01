@@ -14,11 +14,12 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
+# configuration files
 *.env
 
+# makefile output
 *.pb.go
+secrets/
+bin/
 
 oryxBuildBinary
-
-# keys and secrets
-.ssh/
