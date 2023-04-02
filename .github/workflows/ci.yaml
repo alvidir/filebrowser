@@ -50,7 +50,7 @@ jobs:
           version: "3.x"
 
       - name: Test
-        run: PKG_MANAGER=apt make test
+        run: PKG_MANAGER=apt-get make test
 
   release_version:
     name: Release version
