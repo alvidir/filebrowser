@@ -21,7 +21,7 @@ else
 	-podman build -t alvidir/$(BINARY_NAME):latest-agent -f ./container/agent/containerfile .
 endif
 
-protobuf: install-deps
+protobuf:
 	@protoc --proto_path=. --go_out=. --go_opt=paths=source_relative \
 		--go-grpc_out=. --go-grpc_opt=paths=source_relative \
 		proto/*.proto
@@ -52,7 +52,7 @@ secrets:
 	@openssl pkcs8 -topk8 -nocrypt -in secrets/ec_key.pem -out secrets/pkcs8_key.pem
 	@cat secrets/pkcs8_key.pem | base64 | tr -d '\n' > secrets/pkcs8_key.base64
 
-deploy: images
+deploy:
 	@podman-compose -f compose.yaml up -d
 
 undeploy:
