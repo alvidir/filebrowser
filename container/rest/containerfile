@@ -8,7 +8,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 
-RUN PKG_MANAGER=apt make all target=rest
+RUN PKG_MANAGER=apt-get make all target=rest
 
 ######## Start a new stage from scratch #######
 FROM docker.io/alpine:3.17
