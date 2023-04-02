@@ -1,7 +1,7 @@
 BINARY_NAME=filebrowser
 PKG_MANAGER?=dnf
 
-all: install-deps binaries 
+all: binaries 
 
 binaries: protobuf
 ifdef target
