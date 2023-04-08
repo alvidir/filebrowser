@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -178,21 +177,39 @@ func (dir *Directory) AggregateFiles(p string) map[string]*file.File {
 	return files
 }
 
-func (dir *Directory) Search(regex string) []SearchMatch {
-	re := regexp.MustCompile(strings.ToLower(regex))
+func allSubstringOcurrences(s string, substr string) [][]int {
+	ocurrences := make([][]int, 0)
+	offset := 0
+
+	for len(s) >= len(substr) {
+		index := strings.Index(s, substr)
+		if index == -1 {
+			break
+		}
+
+		start := index + offset
+		ocurrences = append(ocurrences, []int{start, start + len(substr)})
+		offset += index + len(substr)
+		s = s[index+len(substr):]
+	}
+
+	return ocurrences
+}
+
+func (dir *Directory) Search(search string) []SearchMatch {
 	searchMatches := make([]SearchMatch, 0)
 	matchingfiles := make(map[string]*file.File)
 
 	for fp, f := range dir.files {
 		absFp := filepath.Join(PathSeparator, fp)
 
-		for _, match := range re.FindAllStringIndex(strings.ToLower(absFp), -1) {
-			matchingFile := f
+		offset := 0
+		if search == PathSeparator {
+			offset = 1
+		}
 
-			offset := 0
-			if regex == PathSeparator {
-				offset = 1
-			}
+		for _, match := range allSubstringOcurrences(strings.ToLower(absFp), search) {
+			matchingFile := f
 
 			if end := match[1]; end+offset <= len(path.Dir(absFp)) {
 				// the match occurs somewhere in the file's directory

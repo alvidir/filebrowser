@@ -1,5 +1,7 @@
 BINARY_NAME=filebrowser
+VERSION?=latest
 PKG_MANAGER?=dnf
+REGISTRY?=docker.io
 
 all: binaries 
 
@@ -14,11 +16,24 @@ endif
 
 images:
 ifdef target
-	podman build -t alvidir/$(BINARY_NAME):latest-$(target) -f ./container/$(target)/containerfile .
+	podman build -t alvidir/$(BINARY_NAME):$(VERSION)-$(target) -f ./container/$(target)/containerfile .
 else
-	-podman build -t alvidir/$(BINARY_NAME):latest-grpc -f ./container/grpc/containerfile .
-	-podman build -t alvidir/$(BINARY_NAME):latest-rest -f ./container/rest/containerfile .
-	-podman build -t alvidir/$(BINARY_NAME):latest-agent -f ./container/agent/containerfile .
+	-podman build -t alvidir/$(BINARY_NAME):$(VERSION)-grpc -f ./container/grpc/containerfile .
+	-podman build -t alvidir/$(BINARY_NAME):$(VERSION)-rest -f ./container/rest/containerfile .
+	-podman build -t alvidir/$(BINARY_NAME):$(VERSION)-agent -f ./container/agent/containerfile .
+endif
+
+push-images:
+ifdef target
+	@podman tag localhost/alvidir/$(BINARY_NAME):$(VERSION)-$(target) $(REGISTRY)/alvidir/$(BINARY_NAME):$(VERSION)-$(target)
+	@podman push $(REGISTRY)/alvidir/$(BINARY_NAME):$(VERSION)-$(target)
+else
+	@-podman tag localhost/alvidir/$(BINARY_NAME):$(VERSION)-grpc $(REGISTRY)/alvidir/$(BINARY_NAME):$(VERSION)-grpc
+	@-podman push $(REGISTRY)/alvidir/$(BINARY_NAME):$(VERSION)-grpc
+	@-podman tag localhost/alvidir/$(BINARY_NAME):$(VERSION)-rest $(REGISTRY)/alvidir/$(BINARY_NAME):$(VERSION)-rest
+	@-podman push $(REGISTRY)/alvidir/$(BINARY_NAME):$(VERSION)-rest
+	@-podman tag localhost/alvidir/$(BINARY_NAME):$(VERSION)-agent $(REGISTRY)/alvidir/$(BINARY_NAME):$(VERSION)-agent
+	@-podman push $(REGISTRY)/alvidir/$(BINARY_NAME):$(VERSION)-agent
 endif
 
 protobuf: install-deps
@@ -41,9 +56,9 @@ clean:
 	@-rm -rf secrets/
 
 clean-images:
-	@-podman image rm alvidir/$(BINARY_NAME):latest-grpc
-	@-podman image rm alvidir/$(BINARY_NAME):latest-rest
-	@-podman image rm alvidir/$(BINARY_NAME):latest-agent
+	@-podman image rm alvidir/$(BINARY_NAME):$(VERSION)-grpc
+	@-podman image rm alvidir/$(BINARY_NAME):$(VERSION)-rest
+	@-podman image rm alvidir/$(BINARY_NAME):$(VERSION)-agent
 
 test: protobuf
 	@go test -v -race ./...
