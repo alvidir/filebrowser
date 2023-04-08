@@ -23,22 +23,13 @@ else
 	-podman build -t alvidir/$(BINARY_NAME):$(VERSION)-agent -f ./container/agent/containerfile .
 endif
 
-tags:
+push-images:
 ifdef target
-	@podman tag alvidir/$(BINARY_NAME):$(VERSION)-$(target) $(REGISTRY)/alvidir/$(BINARY_NAME):$(VERSION)-$(target)
+	@podman push alvidir/$(BINARY_NAME):$(VERSION)-$(target)
 else
-	@-podman tag alvidir/$(BINARY_NAME):$(VERSION)-grpc $(REGISTRY)/alvidir/$(BINARY_NAME):$(VERSION)-grpc
-	@-podman tag alvidir/$(BINARY_NAME):$(VERSION)-rest $(REGISTRY)/alvidir/$(BINARY_NAME):$(VERSION)-rest
-	@-podman tag alvidir/$(BINARY_NAME):$(VERSION)-agent $(REGISTRY)/alvidir/$(BINARY_NAME):$(VERSION)-agent
-endif
-
-push-images: tags
-ifdef target
-	@podman push $(REGISTRY)/alvidir/$(BINARY_NAME):$(VERSION)-$(target)
-else
-	@-podman push $(REGISTRY)/alvidir/$(BINARY_NAME):$(VERSION)-grpc
-	@-podman push $(REGISTRY)/alvidir/$(BINARY_NAME):$(VERSION)-rest
-	@-podman push $(REGISTRY)/alvidir/$(BINARY_NAME):$(VERSION)-agent
+	@-podman push alvidir/$(BINARY_NAME):$(VERSION)-grpc
+	@-podman push alvidir/$(BINARY_NAME):$(VERSION)-rest
+	@-podman push alvidir/$(BINARY_NAME):$(VERSION)-agent
 endif
 
 protobuf: install-deps
