@@ -260,6 +260,18 @@ func TestSearch(t *testing.T) {
 				"/a_directory/with_a_dir/with_a_file",
 			},
 		},
+		{
+			name:   "search by special regex character",
+			search: ".",
+			files: []string{
+				"/a_directory/with_a_dir/with_a_file",
+				"/a_file",
+				".hidden_dir",
+			},
+			want: []string{
+				"/.hidden_dir",
+			},
+		},
 	}
 
 	for _, test := range tests {
