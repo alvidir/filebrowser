@@ -1,7 +1,6 @@
 BINARY_NAME=filebrowser
 VERSION?=latest
 PKG_MANAGER?=dnf
-REGISTRY?=docker.io
 
 all: binaries 
 
