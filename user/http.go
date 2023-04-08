@@ -18,6 +18,7 @@ type UserHttpServer struct {
 
 func NewUserHttpServer(app *UserApplication, logger *zap.Logger, authHeader string) *UserHttpServer {
 	server := &UserHttpServer{
+		app:       app,
 		router:    mux.NewRouter(),
 		logger:    logger,
 		uidHeader: authHeader,
