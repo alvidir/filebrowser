@@ -177,7 +177,12 @@ func (dir *Directory) AggregateFiles(p string) map[string]*file.File {
 	return files
 }
 
+// allSubstringOcurrences returns an array of pairs, one of each contains the start and end indexes of an ocurrence
+// of the string substr inside the string s. Notice this method IS NOT case-sensitive.
 func allSubstringOcurrences(s string, substr string) [][]int {
+	substr = strings.ToLower(substr)
+	s = strings.ToLower(s)
+
 	ocurrences := make([][]int, 0)
 	offset := 0
 
@@ -208,7 +213,7 @@ func (dir *Directory) Search(search string) []SearchMatch {
 			offset = 1
 		}
 
-		for _, match := range allSubstringOcurrences(strings.ToLower(absFp), search) {
+		for _, match := range allSubstringOcurrences(absFp, search) {
 			matchingFile := f
 
 			if end := match[1]; end+offset <= len(path.Dir(absFp)) {
