@@ -24,7 +24,7 @@ func NewUserHttpServer(app *UserApplication, logger *zap.Logger, authHeader stri
 		uidHeader: authHeader,
 	}
 
-	server.router.HandleFunc("/", server.getProfileHandler).Methods(http.MethodGet)
+	server.router.HandleFunc("/profile", server.getProfileHandler).Methods(http.MethodGet)
 	return server
 }
 
