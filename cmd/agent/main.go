@@ -90,9 +90,9 @@ func main() {
 	privateKey := cmd.GetPrivateKey(logger)
 	tokenTTL := cmd.GetTokenTTL(logger)
 	tokenIssuer := cmd.GetTokenIssuer(logger)
-	certSrv := cert.NewCertificateService(privateKey, tokenIssuer, tokenTTL, logger)
+	certService := cert.NewCertificateService(privateKey, tokenIssuer, tokenTTL, logger)
 	certRepo := cert.NewMongoCertificateRepository(mongoConn, logger)
-	certApp := cert.NewCertificateApplication(certRepo, certSrv, logger)
+	certApp := cert.NewCertificateApplication(certRepo, certService, logger)
 
 	conn := cmd.GetAmqpConnection(logger)
 	defer conn.Close()

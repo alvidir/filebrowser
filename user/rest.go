@@ -9,15 +9,15 @@ import (
 	"go.uber.org/zap"
 )
 
-type UserHttpServer struct {
+type UserRestService struct {
 	app       *UserApplication
 	router    *mux.Router
 	logger    *zap.Logger
 	uidHeader string
 }
 
-func NewUserHttpServer(app *UserApplication, logger *zap.Logger, authHeader string) *UserHttpServer {
-	server := &UserHttpServer{
+func NewUserRestServer(app *UserApplication, logger *zap.Logger, authHeader string) *UserRestService {
+	server := &UserRestService{
 		app:       app,
 		router:    mux.NewRouter(),
 		logger:    logger,
@@ -28,11 +28,11 @@ func NewUserHttpServer(app *UserApplication, logger *zap.Logger, authHeader stri
 	return server
 }
 
-func (server *UserHttpServer) Handler() http.Handler {
+func (server *UserRestService) Handler() http.Handler {
 	return server.router
 }
 
-func (server *UserHttpServer) getProfileHandler(w http.ResponseWriter, r *http.Request) {
+func (server *UserRestService) getProfileHandler(w http.ResponseWriter, r *http.Request) {
 	uid, err := fb.GetUidFromHttpRequest(r, server.uidHeader, server.logger)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)

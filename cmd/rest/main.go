@@ -30,14 +30,14 @@ func main() {
 
 	directoryRepo := dir.NewMongoDirectoryRepository(mongoConn, fileRepo, logger)
 	userApp := user.NewUserApplication(directoryRepo, fileRepo, logger)
-	userServer := user.NewUserHttpServer(userApp, logger, cmd.UidHeader)
+	userService := user.NewUserRestServer(userApp, logger, cmd.UidHeader)
 
 	lis := cmd.GetNetworkListener(logger)
 
 	logger.Info("server ready to accept connections",
 		zap.String("address", cmd.ServiceAddr))
 
-	if err := http.Serve(lis, userServer.Handler()); err != nil {
+	if err := http.Serve(lis, userService.Handler()); err != nil {
 		logger.Fatal("server terminated with errors",
 			zap.Error(err))
 	}

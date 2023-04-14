@@ -32,15 +32,15 @@ func main() {
 
 	directoryRepo := dir.NewMongoDirectoryRepository(mongoConn, fileRepo, logger)
 	directoryApp := dir.NewDirectoryApplication(directoryRepo, fileRepo, logger)
-	directoryServer := dir.NewDirectoryGrpcServer(directoryApp, logger, cmd.UidHeader)
+	directoryGrpcService := dir.NewDirectoryGrpcServer(directoryApp, logger, cmd.UidHeader)
 
 	privateKey := cmd.GetPrivateKey(logger)
 	tokenTTL := cmd.GetTokenTTL(logger)
 	tokenIssuer := cmd.GetTokenIssuer(logger)
-	certSrv := cert.NewCertificateService(privateKey, tokenIssuer, tokenTTL, logger)
+	certService := cert.NewCertificateService(privateKey, tokenIssuer, tokenTTL, logger)
 	certRepo := cert.NewMongoCertificateRepository(mongoConn, logger)
-	certApp := cert.NewCertificateApplication(certRepo, certSrv, logger)
-	certServer := cert.NewCertificateGrpcServer(certApp, logger, cmd.UidHeader)
+	certApp := cert.NewCertificateApplication(certRepo, certService, logger)
+	certGrpcService := cert.NewCertificateGrpcServer(certApp, logger, cmd.UidHeader)
 
 	conn := cmd.GetAmqpConnection(logger)
 	defer conn.Close()
@@ -55,12 +55,12 @@ func main() {
 	fileBus := file.NewFileEventBus(bus, fileExchange, eventIssuer)
 
 	fileApp := file.NewFileApplication(fileRepo, directoryApp, certApp, logger)
-	fileServer := file.NewFileGrpcServer(fileApp, certApp, fileBus, cmd.UidHeader, logger)
+	fileGrpcService := file.NewFileGrpcServer(fileApp, certApp, fileBus, cmd.UidHeader, logger)
 
 	grpcServer := grpc.NewServer()
-	proto.RegisterDirectoryServiceServer(grpcServer, directoryServer)
-	proto.RegisterFileServiceServer(grpcServer, fileServer)
-	proto.RegisterCertificateServiceServer(grpcServer, certServer)
+	proto.RegisterDirectoryServiceServer(grpcServer, directoryGrpcService)
+	proto.RegisterFileServiceServer(grpcServer, fileGrpcService)
+	proto.RegisterCertificateServiceServer(grpcServer, certGrpcService)
 	lis := cmd.GetNetworkListener(logger)
 
 	logger.Info("server ready to accept connections",
