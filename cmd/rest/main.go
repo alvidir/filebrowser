@@ -37,7 +37,7 @@ func main() {
 	logger.Info("server ready to accept connections",
 		zap.String("address", cmd.ServiceAddr))
 
-	if err := http.Serve(lis, userService.Handler()); err != nil {
+	if err := http.Serve(lis, userService); err != nil {
 		logger.Fatal("server terminated with errors",
 			zap.Error(err))
 	}

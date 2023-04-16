@@ -5,13 +5,12 @@ import (
 	"net/http"
 
 	fb "github.com/alvidir/filebrowser"
-	"github.com/gorilla/mux"
 	"go.uber.org/zap"
 )
 
 type UserRestService struct {
 	app       *UserApplication
-	router    *mux.Router
+	handler   *http.ServeMux
 	logger    *zap.Logger
 	uidHeader string
 }
@@ -19,17 +18,17 @@ type UserRestService struct {
 func NewUserRestServer(app *UserApplication, logger *zap.Logger, authHeader string) *UserRestService {
 	server := &UserRestService{
 		app:       app,
-		router:    mux.NewRouter(),
+		handler:   http.NewServeMux(),
 		logger:    logger,
 		uidHeader: authHeader,
 	}
 
-	server.router.HandleFunc("/profile", server.getProfileHandler).Methods(http.MethodGet)
+	server.handler.HandleFunc("/profile", server.getProfileHandler)
 	return server
 }
 
-func (server *UserRestService) Handler() http.Handler {
-	return server.router
+func (server *UserRestService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	server.handler.ServeHTTP(w, r)
 }
 
 func (server *UserRestService) getProfileHandler(w http.ResponseWriter, r *http.Request) {
