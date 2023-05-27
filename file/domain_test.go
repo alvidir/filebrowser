@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	fb "github.com/alvidir/filebrowser"
-	cert "github.com/alvidir/filebrowser/certificate"
 )
 
 func TestNewFile(t *testing.T) {
@@ -23,42 +22,42 @@ func TestNewFile(t *testing.T) {
 	} else if file.metadata == nil {
 		t.Errorf("got metadata = %v, want = %v", file.metadata, Metadata{})
 	} else if file.permissions == nil {
-		t.Errorf("got permissions = %v, want = %v", file.permissions, map[int32]cert.Permission{})
+		t.Errorf("got permissions = %v, want = %v", file.permissions, map[int32]Permission{})
 	} else if file.data == nil || len(file.data) > 0 {
 		t.Errorf("got data = %v, want = %v", file.data, []byte{})
 	}
 
 	filename = "/filename"
-	if _, err := NewFile(id, filename); !errors.Is(err, fb.ErrInvalidFormat) {
-		t.Errorf("got error = %v, want = %v", err, fb.ErrInvalidFormat)
+	if _, err := NewFile(id, filename); !errors.Is(err, fb.ErrRegexNotMatch) {
+		t.Errorf("got error = %v, want = %v", err, fb.ErrRegexNotMatch)
 	}
 
 	filename = "file/name"
-	if _, err := NewFile(id, filename); !errors.Is(err, fb.ErrInvalidFormat) {
-		t.Errorf("got error = %v, want = %v", err, fb.ErrInvalidFormat)
+	if _, err := NewFile(id, filename); !errors.Is(err, fb.ErrRegexNotMatch) {
+		t.Errorf("got error = %v, want = %v", err, fb.ErrRegexNotMatch)
 	}
 
 	filename = "filename/"
-	if _, err := NewFile(id, filename); !errors.Is(err, fb.ErrInvalidFormat) {
-		t.Errorf("got error = %v, want = %v", err, fb.ErrInvalidFormat)
+	if _, err := NewFile(id, filename); !errors.Is(err, fb.ErrRegexNotMatch) {
+		t.Errorf("got error = %v, want = %v", err, fb.ErrRegexNotMatch)
 	}
 }
 
 func TestNewFile_WithInvalidName(t *testing.T) {
 	id := "id"
 	filename := "/filename"
-	if _, err := NewFile(id, filename); !errors.Is(err, fb.ErrInvalidFormat) {
-		t.Errorf("got error = %v, want = %v", err, fb.ErrInvalidFormat)
+	if _, err := NewFile(id, filename); !errors.Is(err, fb.ErrRegexNotMatch) {
+		t.Errorf("got error = %v, want = %v", err, fb.ErrRegexNotMatch)
 	}
 
 	filename = "file/name"
-	if _, err := NewFile(id, filename); !errors.Is(err, fb.ErrInvalidFormat) {
-		t.Errorf("got error = %v, want = %v", err, fb.ErrInvalidFormat)
+	if _, err := NewFile(id, filename); !errors.Is(err, fb.ErrRegexNotMatch) {
+		t.Errorf("got error = %v, want = %v", err, fb.ErrRegexNotMatch)
 	}
 
 	filename = "filename/"
-	if _, err := NewFile(id, filename); !errors.Is(err, fb.ErrInvalidFormat) {
-		t.Errorf("got error = %v, want = %v", err, fb.ErrInvalidFormat)
+	if _, err := NewFile(id, filename); !errors.Is(err, fb.ErrRegexNotMatch) {
+		t.Errorf("got error = %v, want = %v", err, fb.ErrRegexNotMatch)
 	}
 }
 
@@ -73,16 +72,16 @@ func TestAddPermissions(t *testing.T) {
 	}
 
 	var uid int32 = 999
-	file.AddPermission(uid, cert.Read)
+	file.AddPermission(uid, Read)
 
-	want := cert.Read
+	want := Read
 	if got, exists := file.permissions[uid]; !exists || got != want {
 		t.Errorf("got permissions = %v, want = %v", got, want)
 	}
 
-	file.AddPermission(uid, cert.Write)
+	file.AddPermission(uid, Write)
 
-	want = cert.Write | cert.Read
+	want = Write | Read
 	if got, exists := file.permissions[uid]; !exists || got != want {
 		t.Errorf("got permissions = %v, want = %v", got, want)
 	}
@@ -99,12 +98,12 @@ func TestPermissions(t *testing.T) {
 	}
 
 	var uid int32 = 999
-	var want cert.Permission = 0
+	var want Permission = 0
 	if got := file.Permission(uid); got != want {
 		t.Errorf("got permissions = %v, want = %v", got, want)
 	}
 
-	want = cert.Write | cert.Read
+	want = Write | Read
 	file.AddPermission(uid, want)
 
 	if got := file.Permission(uid); got != want {
@@ -123,15 +122,15 @@ func TestRevokePermissions(t *testing.T) {
 	}
 
 	var uid int32 = 999
-	file.AddPermission(uid, cert.Write|cert.Read)
-	file.RevokePermission(uid, cert.Write)
+	file.AddPermission(uid, Write|Read)
+	file.RevokePermission(uid, Write)
 
-	want := cert.Read
+	want := Read
 	if got, exists := file.permissions[uid]; !exists || got != want {
 		t.Errorf("got permissions = %v, want = %v", got, want)
 	}
 
-	file.RevokePermission(uid, cert.Owner)
+	file.RevokePermission(uid, Owner)
 	if got, exists := file.permissions[uid]; !exists || got != want {
 		t.Errorf("got permissions = %v, want = %v", got, want)
 	}
@@ -152,7 +151,7 @@ func TestRevokeAccess(t *testing.T) {
 		t.Errorf("got ok = %v, want = %v", ok, false)
 	}
 
-	file.AddPermission(uid, cert.Write|cert.Read)
+	file.AddPermission(uid, Write|Read)
 	if ok := file.RevokeAccess(uid); !ok {
 		t.Errorf("got ok = %v, want = %v", ok, true)
 	}
@@ -174,7 +173,7 @@ func TestSharedWith(t *testing.T) {
 
 	want := []int32{777, 888, 999}
 	for _, uid := range want {
-		file.AddPermission(uid, cert.Read)
+		file.AddPermission(uid, Read)
 	}
 
 	got := file.SharedWith()
@@ -207,9 +206,9 @@ func TestOwners(t *testing.T) {
 		return
 	}
 
-	file.AddPermission(777, cert.Read)
-	file.AddPermission(888, cert.Write|cert.Owner)
-	file.AddPermission(999, cert.Owner)
+	file.AddPermission(777, Read)
+	file.AddPermission(888, Write|Owner)
+	file.AddPermission(999, Owner)
 
 	want := []int32{888, 999}
 	got := file.Owners()

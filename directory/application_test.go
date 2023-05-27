@@ -10,7 +10,6 @@ import (
 	"time"
 
 	fb "github.com/alvidir/filebrowser"
-	cert "github.com/alvidir/filebrowser/certificate"
 	"github.com/alvidir/filebrowser/file"
 	"go.uber.org/zap"
 )
@@ -275,7 +274,7 @@ func TestDeleteWhenUserIsSingleOwner(t *testing.T) {
 	defer logger.Sync()
 
 	f, _ := file.NewFile("test", "filename")
-	f.AddPermission(999, cert.Owner)
+	f.AddPermission(999, file.Owner)
 
 	dirRepo := &directoryRepositoryMock{
 		delete: func(ctx context.Context, dir *Directory) error {
@@ -325,8 +324,8 @@ func TestDeleteWhenUserIsNotSingleOwner(t *testing.T) {
 	defer logger.Sync()
 
 	f, _ := file.NewFile("test", "filename")
-	f.AddPermission(999, cert.Owner)
-	f.AddPermission(888, cert.Owner)
+	f.AddPermission(999, file.Owner)
+	f.AddPermission(888, file.Owner)
 
 	dirRepo := &directoryRepositoryMock{
 		delete: func(ctx context.Context, dir *Directory) error {
@@ -474,7 +473,7 @@ func TestUnregisterFileWhenUserIsNoOwner(t *testing.T) {
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
 	f, _ := file.NewFile("test", "filename")
-	f.AddPermission(999, cert.Read)
+	f.AddPermission(999, file.Read)
 	d.AddFile(f, "path/to/file")
 
 	if err := app.UnregisterFile(context.TODO(), f, 999); err != nil {
@@ -502,7 +501,7 @@ func TestUnregisterFileWhenFileIsDeleted(t *testing.T) {
 
 	f, _ := file.NewFile("test", "filename")
 	f.AddMetadata(file.MetadataDeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
-	f.AddPermission(999, cert.Owner)
+	f.AddPermission(999, file.Owner)
 	d.AddFile(f, "path/to/file")
 
 	if err := app.UnregisterFile(context.TODO(), f, 999); err != nil {
@@ -539,8 +538,8 @@ func TestUnregisterFileWhenFileIsShared(t *testing.T) {
 
 	f, _ := file.NewFile("test", "filename")
 	f.AddMetadata(file.MetadataDeletedAtKey, strconv.FormatInt(time.Now().Unix(), file.TimestampBase))
-	f.AddPermission(999, cert.Owner)
-	f.AddPermission(888, cert.Read|cert.Write)
+	f.AddPermission(999, file.Owner)
+	f.AddPermission(888, file.Read|file.Write)
 
 	d1.AddFile(f, "path/to/file")
 	d2.AddFile(f, "path/to/file")

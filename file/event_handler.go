@@ -5,21 +5,18 @@ import (
 	"encoding/json"
 
 	fb "github.com/alvidir/filebrowser"
-	cert "github.com/alvidir/filebrowser/certificate"
 	"go.uber.org/zap"
 )
 
 type FileEventHandler struct {
 	fileApp *FileApplication
-	certApp *cert.CertificateApplication
 	issuers map[string]bool
 	logger  *zap.Logger
 }
 
-func NewFileEventHandler(fileApp *FileApplication, certApp *cert.CertificateApplication, logger *zap.Logger) *FileEventHandler {
+func NewFileEventHandler(fileApp *FileApplication, logger *zap.Logger) *FileEventHandler {
 	return &FileEventHandler{
 		fileApp: fileApp,
-		certApp: certApp,
 		issuers: make(map[string]bool),
 		logger:  logger,
 	}

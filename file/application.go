@@ -7,7 +7,6 @@ import (
 	"time"
 
 	fb "github.com/alvidir/filebrowser"
-	cert "github.com/alvidir/filebrowser/certificate"
 	"go.uber.org/zap"
 )
 
@@ -24,22 +23,16 @@ type DirectoryApplication interface {
 	UnregisterFile(ctx context.Context, file *File, uid int32) error
 }
 
-type CertificateApplication interface {
-	CreateFileAccessCertificate(ctx context.Context, uid int32, file cert.File) (*cert.FileAccessCertificate, error)
-}
-
 type FileApplication struct {
 	fileRepo FileRepository
 	dirApp   DirectoryApplication
-	certApp  CertificateApplication
 	logger   *zap.Logger
 }
 
-func NewFileApplication(repo FileRepository, dirApp DirectoryApplication, certApp CertificateApplication, logger *zap.Logger) *FileApplication {
+func NewFileApplication(repo FileRepository, dirApp DirectoryApplication, logger *zap.Logger) *FileApplication {
 	return &FileApplication{
 		fileRepo: repo,
 		dirApp:   dirApp,
-		certApp:  certApp,
 		logger:   logger,
 	}
 }
@@ -61,7 +54,7 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 		return nil, err
 	}
 
-	file.AddPermission(uid, cert.Owner)
+	file.AddPermission(uid, Owner)
 	file.metadata = meta
 	file.data = data
 
@@ -75,18 +68,6 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string,
 	}
 
 	file.SetName(name)
-
-	_, err = app.certApp.CreateFileAccessCertificate(ctx, uid, file)
-	if err != nil {
-		app.logger.Error("creating file access certificate",
-			zap.String("file_name", file.Name()),
-			zap.String("file_id", file.Id()),
-			zap.Int32("user_id", uid),
-			zap.Error(err))
-
-		return nil, err
-	}
-
 	return file, nil
 }
 
@@ -101,7 +82,7 @@ func (app *FileApplication) Get(ctx context.Context, uid int32, fid string) (*Fi
 	}
 
 	perm := file.Permission(uid)
-	if perm&(cert.Read|cert.Owner) == 0 {
+	if perm&(Read|Owner) == 0 {
 		return nil, fb.ErrNotAvailable
 	}
 
@@ -119,7 +100,7 @@ func (app *FileApplication) Update(ctx context.Context, uid int32, fid string, n
 		return nil, err
 	}
 
-	if file.Permission(uid)&(cert.Write|cert.Owner) == 0 {
+	if file.Permission(uid)&(Write|Owner) == 0 {
 		return nil, fb.ErrNotAvailable
 	}
 
@@ -160,7 +141,7 @@ func (app *FileApplication) Delete(ctx context.Context, uid int32, fid string) (
 		return nil, err
 	}
 
-	if f.Permission(uid)&cert.Owner != 0 && len(f.Owners()) == 1 {
+	if f.Permission(uid)&Owner != 0 && len(f.Owners()) == 1 {
 		// uid is the only owner of file f
 		f.metadata[MetadataDeletedAtKey] = strconv.FormatInt(time.Now().Unix(), TimestampBase)
 		err = app.fileRepo.Delete(ctx, f)

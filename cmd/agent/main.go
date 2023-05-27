@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	fb "github.com/alvidir/filebrowser"
-	cert "github.com/alvidir/filebrowser/certificate"
 	"github.com/alvidir/filebrowser/cmd"
 	dir "github.com/alvidir/filebrowser/directory"
 	"github.com/alvidir/filebrowser/file"
@@ -87,22 +86,15 @@ func main() {
 	directoryRepo := dir.NewMongoDirectoryRepository(mongoConn, fileRepo, logger)
 	directoryApp := dir.NewDirectoryApplication(directoryRepo, fileRepo, logger)
 
-	privateKey := cmd.GetPrivateKey(logger)
-	tokenTTL := cmd.GetTokenTTL(logger)
-	tokenIssuer := cmd.GetTokenIssuer(logger)
-	certService := cert.NewCertificateService(privateKey, tokenIssuer, tokenTTL, logger)
-	certRepo := cert.NewMongoCertificateRepository(mongoConn, logger)
-	certApp := cert.NewCertificateApplication(certRepo, certService, logger)
-
 	conn := cmd.GetAmqpConnection(logger)
 	defer conn.Close()
 
 	ch := cmd.GetAmqpChannel(conn, logger)
 	defer ch.Close()
 
-	fileApp := file.NewFileApplication(fileRepo, directoryApp, certApp, logger)
+	fileApp := file.NewFileApplication(fileRepo, directoryApp, logger)
 	userEventHandler := user.NewUserEventHandler(directoryApp, fileApp, logger)
-	fileEventHandler := file.NewFileEventHandler(fileApp, certApp, logger)
+	fileEventHandler := file.NewFileEventHandler(fileApp, logger)
 
 	eventIssuer := cmd.GetEventIssuer(logger)
 	fileEventHandler.DiscardIssuer(eventIssuer)

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	fb "github.com/alvidir/filebrowser"
-	cert "github.com/alvidir/filebrowser/certificate"
 	"github.com/alvidir/filebrowser/file"
 	"go.uber.org/zap"
 )
@@ -94,7 +93,7 @@ func (app *DirectoryApplication) Delete(ctx context.Context, uid int32, p string
 
 	for _, f := range affected.files {
 		dir.RemoveFile(f)
-		if f.Permission(uid)&cert.Owner == 0 {
+		if f.Permission(uid)&file.Owner == 0 {
 			continue
 		}
 

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	fb "github.com/alvidir/filebrowser"
-	cert "github.com/alvidir/filebrowser/certificate"
 	"github.com/alvidir/filebrowser/proto"
 	"go.uber.org/zap"
 )
@@ -17,28 +16,26 @@ type EventBus interface {
 type FileGrpcService struct {
 	proto.UnimplementedFileServiceServer
 	fileApp   *FileApplication
-	certApp   *cert.CertificateApplication
 	fileBus   EventBus
 	logger    *zap.Logger
 	uidHeader string
 }
 
-func NewFileGrpcServer(fileApp *FileApplication, certApp *cert.CertificateApplication, bus EventBus, authHeader string, logger *zap.Logger) *FileGrpcService {
+func NewFileGrpcServer(fileApp *FileApplication, bus EventBus, authHeader string, logger *zap.Logger) *FileGrpcService {
 	return &FileGrpcService{
 		fileApp:   fileApp,
-		certApp:   certApp,
 		fileBus:   bus,
 		logger:    logger,
 		uidHeader: authHeader,
 	}
 }
 
-func NewPermissions(userId int32, perm cert.Permission) *proto.Permissions {
+func NewPermissions(userId int32, perm Permission) *proto.Permissions {
 	return &proto.Permissions{
 		UserId: userId,
-		Read:   perm&cert.Read != 0,
-		Write:  perm&cert.Write != 0,
-		Owner:  perm&cert.Owner != 0,
+		Read:   perm&Read != 0,
+		Write:  perm&Write != 0,
+		Owner:  perm&Owner != 0,
 	}
 }
 
