@@ -1,7 +1,8 @@
 package user
 
 const (
-	profilePath = ".profile"
+	profileFilename  = ".profile"
+	profileDirectory = "/"
 )
 
 type Profile struct {

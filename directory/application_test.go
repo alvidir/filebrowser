@@ -409,7 +409,9 @@ func TestRegisterFileWhenDirectoryDoesNotExists(t *testing.T) {
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
 	f, _ := file.NewFile("test", "filename")
-	if _, err := app.RegisterFile(context.TODO(), f, 999, "path/to/file"); !errors.Is(err, fb.ErrNotFound) {
+	f.SetDirectory("path/to/file")
+
+	if _, err := app.RegisterFile(context.TODO(), 999, f); !errors.Is(err, fb.ErrNotFound) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 }
@@ -429,13 +431,15 @@ func TestRegisterFile(t *testing.T) {
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
 	f, _ := file.NewFile("test", "filename")
-	if _, err := app.RegisterFile(context.TODO(), f, 999, "path/to/file"); err != nil {
+	f.SetDirectory("path/to")
+
+	if _, err := app.RegisterFile(context.TODO(), 999, f); err != nil {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 
 	if got := d.files; len(got) != 1 {
 		t.Errorf("got list len = %v, want = %v", len(got), 1)
-	} else if got, exists := got["/path/to/file"]; !exists || got.Id() != "test" {
+	} else if got, exists := got["/path/to/filename"]; !exists || got.Id() != "test" {
 		t.Errorf("got file = %v, want = %v", got, "test")
 	}
 }
@@ -453,7 +457,7 @@ func TestUnregisterFileWhenDirectoryDoesNotExists(t *testing.T) {
 	app := NewDirectoryApplication(dirRepo, fileRepo, logger)
 
 	f, _ := file.NewFile("test", "filename")
-	if err := app.UnregisterFile(context.TODO(), f, 999); !errors.Is(err, fb.ErrNotFound) {
+	if err := app.UnregisterFile(context.TODO(), 999, f); !errors.Is(err, fb.ErrNotFound) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 }
@@ -476,7 +480,7 @@ func TestUnregisterFileWhenUserIsNoOwner(t *testing.T) {
 	f.AddPermission(999, file.Read)
 	d.AddFile(f, "path/to/file")
 
-	if err := app.UnregisterFile(context.TODO(), f, 999); err != nil {
+	if err := app.UnregisterFile(context.TODO(), 999, f); err != nil {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 
@@ -504,7 +508,7 @@ func TestUnregisterFileWhenFileIsDeleted(t *testing.T) {
 	f.AddPermission(999, file.Owner)
 	d.AddFile(f, "path/to/file")
 
-	if err := app.UnregisterFile(context.TODO(), f, 999); err != nil {
+	if err := app.UnregisterFile(context.TODO(), 999, f); err != nil {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 
@@ -544,7 +548,7 @@ func TestUnregisterFileWhenFileIsShared(t *testing.T) {
 	d1.AddFile(f, "path/to/file")
 	d2.AddFile(f, "path/to/file")
 
-	if err := app.UnregisterFile(context.TODO(), f, 999); err != nil {
+	if err := app.UnregisterFile(context.TODO(), 999, f); err != nil {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 

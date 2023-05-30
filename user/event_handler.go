@@ -70,10 +70,16 @@ func (handler *UserEventHandler) onUserCreatedEvent(ctx context.Context, event *
 		return
 	}
 
-	_, err = handler.fileApp.Create(ctx, event.UserID, profilePath, data, nil)
+	options := file.CreateOptions{
+		Name:      profileFilename,
+		Directory: profileDirectory,
+		Data:      data,
+	}
+
+	_, err = handler.fileApp.Create(ctx, event.UserID, &options)
 	if err != nil {
 		handler.logger.Error("creating file",
-			zap.String("file_path", profilePath),
+			zap.String("file_path", profileFilename),
 			zap.Int32("user_id", event.UserID),
 			zap.ByteString("data", data),
 			zap.Error(err))

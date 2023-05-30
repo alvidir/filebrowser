@@ -70,12 +70,18 @@ func (server *FileGrpcService) Create(ctx context.Context, req *proto.File) (*pr
 		return nil, err
 	}
 
-	metadata := make(Metadata)
-	for _, meta := range req.GetMetadata() {
-		metadata[meta.GetKey()] = meta.GetValue()
+	options := CreateOptions{
+		Name:      req.GetName(),
+		Directory: req.GetDirectory(),
+		Meta:      make(Metadata),
+		Data:      req.GetData(),
 	}
 
-	file, err := server.fileApp.Create(ctx, uid, req.GetDirectory(), req.GetData(), metadata)
+	for _, meta := range req.GetMetadata() {
+		options.Meta[meta.GetKey()] = meta.GetValue()
+	}
+
+	file, err := server.fileApp.Create(ctx, uid, &options)
 	if err != nil {
 		return nil, err
 	}
@@ -110,12 +116,18 @@ func (server *FileGrpcService) Update(ctx context.Context, req *proto.File) (*pr
 		return nil, err
 	}
 
+	options := UpdateOptions{
+		Name: req.GetName(),
+		Meta: make(Metadata),
+		Data: req.GetData(),
+	}
+
 	metadata := make(Metadata)
 	for _, meta := range req.GetMetadata() {
 		metadata[meta.Key] = meta.Value
 	}
 
-	file, err := server.fileApp.Update(ctx, uid, req.GetId(), req.GetName(), req.GetData(), metadata)
+	file, err := server.fileApp.Update(ctx, uid, req.GetId(), &options)
 	if err != nil {
 		return nil, err
 	}

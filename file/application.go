@@ -2,7 +2,6 @@ package file
 
 import (
 	"context"
-	"path"
 	"strconv"
 	"time"
 
@@ -19,8 +18,8 @@ type FileRepository interface {
 }
 
 type DirectoryApplication interface {
-	RegisterFile(ctx context.Context, file *File, uid int32, path string) (string, error)
-	UnregisterFile(ctx context.Context, file *File, uid int32) error
+	RegisterFile(ctx context.Context, uid int32, file *File) (string, error)
+	UnregisterFile(ctx context.Context, uid int32, file *File) error
 }
 
 type FileApplication struct {
@@ -37,32 +36,41 @@ func NewFileApplication(repo FileRepository, dirApp DirectoryApplication, logger
 	}
 }
 
-func (app *FileApplication) Create(ctx context.Context, uid int32, fpath string, data []byte, meta Metadata) (*File, error) {
+type CreateOptions struct {
+	Name      string
+	Directory string
+	Meta      Metadata
+	Data      []byte
+}
+
+func (app *FileApplication) Create(ctx context.Context, uid int32, options *CreateOptions) (*File, error) {
 	app.logger.Info("processing a \"create\" file request",
-		zap.String("file_path", fpath),
+		zap.String("name", options.Name),
+		zap.String("directory", options.Directory),
 		zap.Any("user_id", uid))
 
-	if meta == nil {
-		meta = make(Metadata)
+	if options.Meta == nil {
+		options.Meta = make(Metadata)
 	}
 
-	meta[MetadataCreatedAtKey] = strconv.FormatInt(time.Now().Unix(), TimestampBase)
-	meta[MetadataUpdatedAtKey] = meta[MetadataCreatedAtKey]
+	options.Meta[MetadataCreatedAtKey] = strconv.FormatInt(time.Now().Unix(), TimestampBase)
+	options.Meta[MetadataUpdatedAtKey] = options.Meta[MetadataCreatedAtKey]
 
-	file, err := NewFile("", path.Base(fpath))
+	file, err := NewFile("", options.Name)
 	if err != nil {
 		return nil, err
 	}
 
 	file.AddPermission(uid, Owner)
-	file.metadata = meta
-	file.data = data
+	file.metadata = options.Meta
+	file.data = options.Data
 
 	if err := app.fileRepo.Create(ctx, file); err != nil {
 		return nil, err
 	}
 
-	name, err := app.dirApp.RegisterFile(ctx, file, uid, fpath)
+	file.directory = options.Directory
+	name, err := app.dirApp.RegisterFile(ctx, uid, file)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +98,13 @@ func (app *FileApplication) Get(ctx context.Context, uid int32, fid string) (*Fi
 	return file, nil
 }
 
-func (app *FileApplication) Update(ctx context.Context, uid int32, fid string, name string, data []byte, meta Metadata) (*File, error) {
+type UpdateOptions struct {
+	Name string
+	Meta Metadata
+	Data []byte
+}
+
+func (app *FileApplication) Update(ctx context.Context, uid int32, fid string, options *UpdateOptions) (*File, error) {
 	app.logger.Info("processing an \"update\" file request",
 		zap.String("file_id", fid),
 		zap.Int32("user_id", uid))
@@ -104,18 +118,18 @@ func (app *FileApplication) Update(ctx context.Context, uid int32, fid string, n
 		return nil, fb.ErrNotAvailable
 	}
 
-	if len(name) > 0 {
-		file.name = name
+	if len(options.Name) > 0 {
+		file.name = options.Name
 	}
 
-	if data != nil {
-		file.data = data
+	if options.Data != nil {
+		file.data = options.Data
 	}
 
-	if meta != nil {
+	if options.Meta != nil {
 		// ensure immutable data is not overwrited
-		meta[MetadataCreatedAtKey] = file.metadata[MetadataCreatedAtKey]
-		file.metadata = meta
+		options.Meta[MetadataCreatedAtKey] = file.metadata[MetadataCreatedAtKey]
+		file.metadata = options.Meta
 	}
 
 	file.metadata[MetadataUpdatedAtKey] = strconv.FormatInt(time.Now().Unix(), TimestampBase)
@@ -137,7 +151,7 @@ func (app *FileApplication) Delete(ctx context.Context, uid int32, fid string) (
 		return nil, err
 	}
 
-	if err = app.dirApp.UnregisterFile(ctx, f, uid); err != nil {
+	if err = app.dirApp.UnregisterFile(ctx, uid, f); err != nil {
 		return nil, err
 	}
 

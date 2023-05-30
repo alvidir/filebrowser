@@ -38,11 +38,11 @@ func (app *UserApplication) GetProfile(ctx context.Context, uid int32) (*Profile
 		return nil, err
 	}
 
-	f := dir.FileByPath(profilePath)
+	f := dir.FileByPath(profileFilename)
 	if f == nil {
 		app.logger.Error("getting profile file from directory",
 			zap.Int32("user_id", uid),
-			zap.String("path", profilePath),
+			zap.String("path", profileFilename),
 			zap.Error(fb.ErrNotFound))
 
 		return nil, fb.ErrNotFound
