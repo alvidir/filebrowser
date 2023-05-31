@@ -8,23 +8,16 @@ import (
 	"go.uber.org/zap"
 )
 
-type EventBus interface {
-	EmitFileCreated(uid int32, f *File) error
-	EmitFileDeleted(uid int32, f *File) error
-}
-
 type FileGrpcService struct {
 	proto.UnimplementedFileServiceServer
 	fileApp   *FileApplication
-	fileBus   EventBus
 	logger    *zap.Logger
 	uidHeader string
 }
 
-func NewFileGrpcServer(fileApp *FileApplication, bus EventBus, authHeader string, logger *zap.Logger) *FileGrpcService {
+func NewFileGrpcServer(fileApp *FileApplication, authHeader string, logger *zap.Logger) *FileGrpcService {
 	return &FileGrpcService{
 		fileApp:   fileApp,
-		fileBus:   bus,
 		logger:    logger,
 		uidHeader: authHeader,
 	}
@@ -86,13 +79,6 @@ func (server *FileGrpcService) Create(ctx context.Context, req *proto.File) (*pr
 		return nil, err
 	}
 
-	if err := server.fileBus.EmitFileCreated(uid, file); err != nil {
-		server.logger.Error("emiting file created event",
-			zap.String("file_id", file.id),
-			zap.Int32("user_id", uid),
-			zap.Error(err))
-	}
-
 	return NewProtoFile(file), nil
 }
 
@@ -144,15 +130,6 @@ func (server *FileGrpcService) Delete(ctx context.Context, req *proto.File) (*pr
 	file, err := server.fileApp.Delete(ctx, uid, req.GetId())
 	if err != nil {
 		return nil, err
-	}
-
-	if _, exists := file.metadata[MetadataDeletedAtKey]; exists {
-		if err := server.fileBus.EmitFileDeleted(uid, file); err != nil {
-			server.logger.Error("emiting file deleted event",
-				zap.String("file_id", file.id),
-				zap.Int32("user_id", uid),
-				zap.Error(err))
-		}
 	}
 
 	return NewProtoFile(file), nil

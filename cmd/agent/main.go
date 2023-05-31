@@ -92,15 +92,18 @@ func main() {
 	ch := cmd.GetAmqpChannel(conn, logger)
 	defer ch.Close()
 
-	fileApp := file.NewFileApplication(fileRepo, directoryApp, logger)
+	ctx, cancel := context.WithCancel(context.Background())
+	bus := fb.NewRabbitMqEventBus(ch, logger)
+
+	eventIssuer := cmd.GetEventIssuer(logger)
+	fileExchange := cmd.GetFileExchange(logger)
+	fileBus := file.NewFileEventBus(bus, fileExchange, eventIssuer)
+
+	fileApp := file.NewFileApplication(fileRepo, directoryApp, fileBus, logger)
 	userEventHandler := user.NewUserEventHandler(directoryApp, fileApp, logger)
 	fileEventHandler := file.NewFileEventHandler(fileApp, logger)
 
-	eventIssuer := cmd.GetEventIssuer(logger)
 	fileEventHandler.DiscardIssuer(eventIssuer)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	bus := fb.NewRabbitMqEventBus(ch, logger)
 
 	var wg sync.WaitGroup
 	wg.Add(2)

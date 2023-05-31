@@ -45,8 +45,8 @@ func main() {
 
 	fileBus := file.NewFileEventBus(bus, fileExchange, eventIssuer)
 
-	fileApp := file.NewFileApplication(fileRepo, directoryApp, logger)
-	fileGrpcService := file.NewFileGrpcServer(fileApp, fileBus, cmd.UidHeader, logger)
+	fileApp := file.NewFileApplication(fileRepo, directoryApp, fileBus, logger)
+	fileGrpcService := file.NewFileGrpcServer(fileApp, cmd.UidHeader, logger)
 
 	grpcServer := grpc.NewServer()
 	proto.RegisterDirectoryServiceServer(grpcServer, directoryGrpcService)

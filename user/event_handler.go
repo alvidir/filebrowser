@@ -11,8 +11,9 @@ import (
 )
 
 type UserEventPayload struct {
-	UserID int32  `json:"id"`
-	Kind   string `json:"kind"`
+	UserID int32  `json:"user_id"`
+	Issuer string `json:"event_issuer"`
+	Kind   string `json:"event_kind"`
 	Profile
 }
 

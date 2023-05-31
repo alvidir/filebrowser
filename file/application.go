@@ -22,16 +22,23 @@ type DirectoryApplication interface {
 	UnregisterFile(ctx context.Context, uid int32, file *File) error
 }
 
+type EventBus interface {
+	EmitFileCreated(uid int32, f *File) error
+	EmitFileDeleted(uid int32, f *File) error
+}
+
 type FileApplication struct {
 	fileRepo FileRepository
 	dirApp   DirectoryApplication
+	fileBus  EventBus
 	logger   *zap.Logger
 }
 
-func NewFileApplication(repo FileRepository, dirApp DirectoryApplication, logger *zap.Logger) *FileApplication {
+func NewFileApplication(repo FileRepository, dirApp DirectoryApplication, bus EventBus, logger *zap.Logger) *FileApplication {
 	return &FileApplication{
 		fileRepo: repo,
 		dirApp:   dirApp,
+		fileBus:  bus,
 		logger:   logger,
 	}
 }
@@ -67,6 +74,13 @@ func (app *FileApplication) Create(ctx context.Context, uid int32, options *Crea
 
 	if err := app.fileRepo.Create(ctx, file); err != nil {
 		return nil, err
+	}
+
+	if err := app.fileBus.EmitFileCreated(uid, file); err != nil {
+		app.logger.Error("emiting file created event",
+			zap.String("file_id", file.id),
+			zap.Int32("user_id", uid),
+			zap.Error(err))
 	}
 
 	file.directory = options.Directory
@@ -156,17 +170,32 @@ func (app *FileApplication) Delete(ctx context.Context, uid int32, fid string) (
 	}
 
 	if f.Permission(uid)&Owner != 0 && len(f.Owners()) == 1 {
-		// uid is the only owner of file f
+		// uid is the only owner of file f, and so it must be hard deleted
 		f.metadata[MetadataDeletedAtKey] = strconv.FormatInt(time.Now().Unix(), TimestampBase)
-		err = app.fileRepo.Delete(ctx, f)
-	} else if f.RevokeAccess(uid) {
-		err = app.fileRepo.Save(ctx, f)
-	} else {
-		app.logger.Warn("unauthorized \"delete\" file request",
-			zap.String("file_id", fid),
-			zap.Int32("user_id", uid))
-		return nil, fb.ErrNotAvailable
+
+		if err := app.fileRepo.Delete(ctx, f); err != nil {
+			return f, err
+		}
+
+		if err := app.fileBus.EmitFileDeleted(uid, f); err != nil {
+			app.logger.Error("emiting file deleted event",
+				zap.String("file_id", f.id),
+				zap.Int32("user_id", uid),
+				zap.Error(err))
+		}
+
+		return f, nil
 	}
 
-	return f, err
+	if f.RevokeAccess(uid) {
+		err = app.fileRepo.Save(ctx, f)
+		return f, err
+	}
+
+	app.logger.Warn("unauthorized \"delete\" file request",
+		zap.String("file_id", fid),
+		zap.Int32("user_id", uid))
+
+	return nil, fb.ErrNotAvailable
+
 }
