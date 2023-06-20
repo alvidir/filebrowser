@@ -7,7 +7,7 @@ require (
 	github.com/streadway/amqp v1.1.0
 	go.mongodb.org/mongo-driver v1.11.6
 	go.uber.org/zap v1.24.0
-	google.golang.org/grpc v1.55.0
+	google.golang.org/grpc v1.56.0
 )
 
 require (
