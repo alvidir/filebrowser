@@ -22,7 +22,7 @@ jobs:
 
       - name: Get changed files
         id: changed-files
-        uses: tj-actions/changed-files@v35.7.12
+        uses: tj-actions/changed-files@v36.4.0
 
   run_unitary_tests:
     name: Run unitary tests
@@ -51,31 +51,3 @@ jobs:
 
       - name: Test
         run: PKG_MANAGER=apt-get make test
-
-  release_version:
-    name: Release version
-    runs-on: ubuntu-latest
-
-    needs: run_unitary_tests
-    if: |
-      github.ref == 'refs/heads/main' &&
-      contains(github.event.head_commit.message, 'Release')
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Create tag
-        id: tagging
-        uses: anothrNick/github-tag-action@1.62.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DEFAULT_BUMP: patch
-
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ steps.tagging.outputs.new_tag }}
-          token: ${{ secrets.PAT }}

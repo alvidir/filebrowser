@@ -4,41 +4,31 @@ import (
 	"context"
 
 	fb "github.com/alvidir/filebrowser"
-	cert "github.com/alvidir/filebrowser/certificate"
 	"github.com/alvidir/filebrowser/proto"
 	"go.uber.org/zap"
 )
 
-type EventBus interface {
-	EmitFileCreated(uid int32, f *File) error
-	EmitFileDeleted(uid int32, f *File) error
-}
-
 type FileGrpcService struct {
 	proto.UnimplementedFileServiceServer
 	fileApp   *FileApplication
-	certApp   *cert.CertificateApplication
-	fileBus   EventBus
 	logger    *zap.Logger
 	uidHeader string
 }
 
-func NewFileGrpcServer(fileApp *FileApplication, certApp *cert.CertificateApplication, bus EventBus, authHeader string, logger *zap.Logger) *FileGrpcService {
+func NewFileGrpcServer(fileApp *FileApplication, authHeader string, logger *zap.Logger) *FileGrpcService {
 	return &FileGrpcService{
 		fileApp:   fileApp,
-		certApp:   certApp,
-		fileBus:   bus,
 		logger:    logger,
 		uidHeader: authHeader,
 	}
 }
 
-func NewPermissions(userId int32, perm cert.Permission) *proto.Permissions {
+func NewPermissions(userId int32, perm Permission) *proto.Permissions {
 	return &proto.Permissions{
 		UserId: userId,
-		Read:   perm&cert.Read != 0,
-		Write:  perm&cert.Write != 0,
-		Owner:  perm&cert.Owner != 0,
+		Read:   perm&Read != 0,
+		Write:  perm&Write != 0,
+		Owner:  perm&Owner != 0,
 	}
 }
 
@@ -73,21 +63,20 @@ func (server *FileGrpcService) Create(ctx context.Context, req *proto.File) (*pr
 		return nil, err
 	}
 
-	metadata := make(Metadata)
-	for _, meta := range req.GetMetadata() {
-		metadata[meta.GetKey()] = meta.GetValue()
+	options := CreateOptions{
+		Name:      req.GetName(),
+		Directory: req.GetDirectory(),
+		Meta:      make(Metadata),
+		Data:      req.GetData(),
 	}
 
-	file, err := server.fileApp.Create(ctx, uid, req.GetDirectory(), req.GetData(), metadata)
+	for _, meta := range req.GetMetadata() {
+		options.Meta[meta.GetKey()] = meta.GetValue()
+	}
+
+	file, err := server.fileApp.Create(ctx, uid, &options)
 	if err != nil {
 		return nil, err
-	}
-
-	if err := server.fileBus.EmitFileCreated(uid, file); err != nil {
-		server.logger.Error("emiting file created event",
-			zap.String("file_id", file.id),
-			zap.Int32("user_id", uid),
-			zap.Error(err))
 	}
 
 	return NewProtoFile(file), nil
@@ -113,12 +102,18 @@ func (server *FileGrpcService) Update(ctx context.Context, req *proto.File) (*pr
 		return nil, err
 	}
 
+	options := UpdateOptions{
+		Name: req.GetName(),
+		Meta: make(Metadata),
+		Data: req.GetData(),
+	}
+
 	metadata := make(Metadata)
 	for _, meta := range req.GetMetadata() {
 		metadata[meta.Key] = meta.Value
 	}
 
-	file, err := server.fileApp.Update(ctx, uid, req.GetId(), req.GetName(), req.GetData(), metadata)
+	file, err := server.fileApp.Update(ctx, uid, req.GetId(), &options)
 	if err != nil {
 		return nil, err
 	}
@@ -135,15 +130,6 @@ func (server *FileGrpcService) Delete(ctx context.Context, req *proto.File) (*pr
 	file, err := server.fileApp.Delete(ctx, uid, req.GetId())
 	if err != nil {
 		return nil, err
-	}
-
-	if _, exists := file.metadata[MetadataDeletedAtKey]; exists {
-		if err := server.fileBus.EmitFileDeleted(uid, file); err != nil {
-			server.logger.Error("emiting file deleted event",
-				zap.String("file_id", file.id),
-				zap.Int32("user_id", uid),
-				zap.Error(err))
-		}
 	}
 
 	return NewProtoFile(file), nil

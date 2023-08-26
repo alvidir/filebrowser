@@ -8,7 +8,6 @@ import (
 	"time"
 
 	fb "github.com/alvidir/filebrowser"
-	cert "github.com/alvidir/filebrowser/certificate"
 	"github.com/alvidir/filebrowser/file"
 	"go.uber.org/zap"
 )
@@ -94,7 +93,7 @@ func (app *DirectoryApplication) Delete(ctx context.Context, uid int32, p string
 
 	for _, f := range affected.files {
 		dir.RemoveFile(f)
-		if f.Permission(uid)&cert.Owner == 0 {
+		if f.Permission(uid)&file.Owner == 0 {
 			continue
 		}
 
@@ -187,13 +186,14 @@ func (app *DirectoryApplication) Search(ctx context.Context, uid int32, regex st
 
 // RegisterFile registers the given file into the user uid directory. The given path may change if,
 // and only if, another file with the same name exists in the same path.
-func (app *DirectoryApplication) RegisterFile(ctx context.Context, file *file.File, uid int32, fp string) (string, error) {
+func (app *DirectoryApplication) RegisterFile(ctx context.Context, uid int32, file *file.File) (string, error) {
 	app.logger.Info("processing a directory's \"register file\" request",
 		zap.Int32("user_id", uid),
 		zap.String("file_id", file.Id()),
-		zap.String("path", fp))
+		zap.String("file_name", file.Name()),
+		zap.String("directory", file.Directory()))
 
-	absFp := filepath.Join(PathSeparator, fp)
+	absFp := filepath.Join(PathSeparator, file.Directory(), file.Name())
 	dir, err := app.dirRepo.FindByUserId(ctx, uid, &RepoOptions{})
 	if err != nil {
 		return "", err
@@ -205,7 +205,7 @@ func (app *DirectoryApplication) RegisterFile(ctx context.Context, file *file.Fi
 
 // UnregisterFile unregisters the given file from the directory. This action may trigger the file's
 // deletion if it becomes with no owner once unregistered.
-func (app *DirectoryApplication) UnregisterFile(ctx context.Context, f *file.File, uid int32) error {
+func (app *DirectoryApplication) UnregisterFile(ctx context.Context, uid int32, f *file.File) error {
 	app.logger.Info("processing a directory's \"unregister file\" request",
 		zap.Int32("user_id", uid))
 

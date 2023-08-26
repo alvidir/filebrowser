@@ -23,8 +23,6 @@ services:
     container_name: filebrowser-grpc
     image: localhost/alvidir/filebrowser:latest-grpc
     restart: always
-    ports:
-      - 8000:8000
     security_opt:
       label: disable
     depends_on:
@@ -38,8 +36,6 @@ services:
     container_name: filebrowser-rest
     image: localhost/alvidir/filebrowser:latest-rest
     restart: always
-    ports:
-      - 8090:8090
     security_opt:
       label: disable
     depends_on:
@@ -64,16 +60,27 @@ services:
     container_name: filebrowser-envoy
     image: docker.io/envoyproxy/envoy-alpine:v1.21-latest
     restart: always
-    ports:
-      - 8080:8080
-      - 9901:9901
     volumes:
       - ./envoy:/etc/envoy:ro
     security_opt:
       label: disable
     depends_on:
-      - filebrowser
+      - grpc
     command: /usr/local/bin/envoy --log-level debug -c /etc/envoy/envoy.yaml
+
+  nginx:
+    container_name: filebrowser-nginx
+    image: docker.io/nginx:1.23.2-alpine
+    restart: always
+    ports:
+      - 8080:80
+      - 8443:443
+    volumes:
+      - ./nginx:/etc/nginx/conf.d:ro
+    security_opt:
+        label: disable
+    depends_on:
+      - envoy
 
 volumes:
   dbdata:

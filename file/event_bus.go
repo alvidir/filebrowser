@@ -8,12 +8,13 @@ import (
 )
 
 type FileEventPayload struct {
-	Issuer   string `json:"issuer"`
-	UserID   int32  `json:"user_id"`
-	AppID    string `json:"app_id"`
-	FileName string `json:"file_name"`
-	FileID   string `json:"file_id"`
-	Kind     string `json:"kind"`
+	UserID    int32  `json:"user_id"`
+	AppID     string `json:"app_id"`
+	FileName  string `json:"file_name"`
+	FileID    string `json:"file_id"`
+	Reference string `json:"file_reference"`
+	Issuer    string `json:"event_issuer"`
+	Kind      string `json:"event_kind"`
 }
 
 type FileEventBus struct {

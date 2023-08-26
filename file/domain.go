@@ -6,11 +6,14 @@ import (
 	"time"
 
 	fb "github.com/alvidir/filebrowser"
-	cert "github.com/alvidir/filebrowser/certificate"
 )
 
 const (
 	Directory Flag = 0x01
+
+	Read  Permission = 0x01
+	Write Permission = 0x02
+	Owner Permission = 0x04
 
 	FilenameRegex string = "^[^/]+$"
 
@@ -28,6 +31,7 @@ var (
 	r, _ = regexp.Compile(FilenameRegex)
 )
 
+type Permission uint8
 type Metadata map[string]string
 type Flag uint8
 type Ctrl uint8
@@ -37,7 +41,7 @@ type File struct {
 	name        string
 	metadata    Metadata
 	directory   string
-	permissions map[int32]cert.Permission
+	permissions map[int32]Permission
 	protected   bool // true avoids the file from saving
 	flags       Flag
 	data        []byte
@@ -45,7 +49,7 @@ type File struct {
 
 func NewFile(id string, filename string) (*File, error) {
 	if !r.MatchString(filename) {
-		return nil, fb.ErrInvalidFormat
+		return nil, fb.ErrRegexNotMatch
 	}
 
 	meta := make(Metadata)
@@ -57,7 +61,7 @@ func NewFile(id string, filename string) (*File, error) {
 		id:          id,
 		name:        filename,
 		metadata:    meta,
-		permissions: make(map[int32]cert.Permission),
+		permissions: make(map[int32]Permission),
 		flags:       0,
 		data:        make([]byte, 0),
 	}, nil
@@ -94,7 +98,7 @@ func (file *File) Directory() string {
 func (file *File) Owners() []int32 {
 	owners := make([]int32, 1) // a file has, for sure, at least one owner
 	for uid, perm := range file.permissions {
-		if perm&cert.Owner == 0 {
+		if perm&Owner == 0 {
 			continue
 		}
 
@@ -128,7 +132,7 @@ func (file *File) SetName(name string) {
 	file.name = name
 }
 
-func (file *File) Permission(uid int32) (perm cert.Permission) {
+func (file *File) Permission(uid int32) (perm Permission) {
 	if file.permissions != nil {
 		perm = file.permissions[uid]
 	}
@@ -136,15 +140,15 @@ func (file *File) Permission(uid int32) (perm cert.Permission) {
 	return
 }
 
-func (file *File) AddPermission(uid int32, perm cert.Permission) {
+func (file *File) AddPermission(uid int32, perm Permission) {
 	if file.permissions == nil {
-		file.permissions = make(map[int32]cert.Permission)
+		file.permissions = make(map[int32]Permission)
 	}
 
 	file.permissions[uid] |= perm
 }
 
-func (file *File) RevokePermission(uid int32, perm cert.Permission) {
+func (file *File) RevokePermission(uid int32, perm Permission) {
 	if file.permissions == nil {
 		return
 	}
@@ -202,7 +206,7 @@ func (file *File) ProtectFields(uid int32) {
 	for id, p := range file.permissions {
 		// if the user has read-only permissions it has the right to know
 		// who are the contributors of the file
-		if id != uid && p&(cert.Owner|cert.Write) == 0 {
+		if id != uid && p&(Owner|Write) == 0 {
 			delete(file.permissions, id)
 		}
 	}
@@ -214,7 +218,7 @@ func (file *File) MarkAsProtected() {
 
 func (file *File) IsContributor(uid int32) bool {
 	// is contributor if, and only if, the user is owner or has write permissions
-	return file.permissions[uid]&(cert.Owner|cert.Write) != 0
+	return file.permissions[uid]&(Owner|Write) != 0
 }
 
 func (file *File) SetFlag(flag Flag) {

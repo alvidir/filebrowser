@@ -5,21 +5,18 @@ import (
 	"encoding/json"
 
 	fb "github.com/alvidir/filebrowser"
-	cert "github.com/alvidir/filebrowser/certificate"
 	"go.uber.org/zap"
 )
 
 type FileEventHandler struct {
 	fileApp *FileApplication
-	certApp *cert.CertificateApplication
 	issuers map[string]bool
 	logger  *zap.Logger
 }
 
-func NewFileEventHandler(fileApp *FileApplication, certApp *cert.CertificateApplication, logger *zap.Logger) *FileEventHandler {
+func NewFileEventHandler(fileApp *FileApplication, logger *zap.Logger) *FileEventHandler {
 	return &FileEventHandler{
 		fileApp: fileApp,
-		certApp: certApp,
 		issuers: make(map[string]bool),
 		logger:  logger,
 	}
@@ -65,17 +62,52 @@ func (handler *FileEventHandler) OnEvent(ctx context.Context, body []byte) {
 }
 
 func (handler *FileEventHandler) onFileCreatedEvent(ctx context.Context, event *FileEventPayload) {
-	handler.logger.Info("handling a file \"created\" event")
-
-	meta := Metadata{
-		MetadataAppKey: event.AppID,
-		MetadataRefKey: event.FileID,
+	if len(event.Reference) > 0 {
+		// if reference is set the file already exists
+		handler.onFileUpdatedEvent(ctx, event)
+		return
 	}
 
-	_, err := handler.fileApp.Create(ctx, event.UserID, event.FileName, nil, meta)
+	handler.logger.Info("handling a file \"created\" event")
+
+	options := CreateOptions{
+		Name: event.FileName,
+		Meta: Metadata{
+			MetadataAppKey: event.AppID,
+			MetadataRefKey: event.FileID,
+		},
+	}
+
+	_, err := handler.fileApp.Create(ctx, event.UserID, &options)
 	if err != nil {
 		handler.logger.Error("creating file",
 			zap.String("issuer", event.Issuer),
+			zap.String("app_id", event.AppID),
+			zap.String("file_name", event.FileName),
+			zap.String("file_id", event.FileID),
+			zap.Int32("user_id", event.UserID),
+			zap.Error(err))
+
+		return
+	}
+}
+
+func (handler *FileEventHandler) onFileUpdatedEvent(ctx context.Context, event *FileEventPayload) {
+	handler.logger.Info("handling a file \"updated\" event")
+
+	options := UpdateOptions{
+		Name: event.FileName,
+		Meta: Metadata{
+			MetadataAppKey: event.AppID,
+			MetadataRefKey: event.FileID,
+		},
+	}
+
+	_, err := handler.fileApp.Update(ctx, event.UserID, event.Reference, &options)
+	if err != nil {
+		handler.logger.Error("updating file",
+			zap.String("issuer", event.Issuer),
+			zap.String("reference", event.Reference),
 			zap.String("app_id", event.AppID),
 			zap.String("file_name", event.FileName),
 			zap.String("file_id", event.FileID),

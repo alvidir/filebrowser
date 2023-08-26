@@ -1,14 +1,12 @@
 package cmd
 
 import (
-	"crypto/ecdsa"
 	"fmt"
 	"net"
 	"os"
 	"time"
 
 	fb "github.com/alvidir/filebrowser"
-	cert "github.com/alvidir/filebrowser/certificate"
 	"github.com/streadway/amqp"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
@@ -84,22 +82,6 @@ func GetMongoConnection(logger *zap.Logger) *mongo.Database {
 	}
 
 	return mongoConn
-}
-
-func GetPrivateKey(logger *zap.Logger) *ecdsa.PrivateKey {
-	secret, exists := os.LookupEnv(ENV_JWT_SECRET)
-	if !exists {
-		logger.Fatal("must be set",
-			zap.String("varname", ENV_JWT_SECRET))
-	}
-
-	privateKey, err := cert.ParsePKCS8PrivateKey(secret)
-	if err != nil {
-		logger.Fatal("parsing PKCS8 private key",
-			zap.Error(err))
-	}
-
-	return privateKey
 }
 
 func GetTokenTTL(logger *zap.Logger) *time.Duration {

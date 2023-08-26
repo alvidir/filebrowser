@@ -4,7 +4,6 @@ import (
 	"os"
 
 	fb "github.com/alvidir/filebrowser"
-	cert "github.com/alvidir/filebrowser/certificate"
 	"github.com/alvidir/filebrowser/cmd"
 	dir "github.com/alvidir/filebrowser/directory"
 	"github.com/alvidir/filebrowser/file"
@@ -34,14 +33,6 @@ func main() {
 	directoryApp := dir.NewDirectoryApplication(directoryRepo, fileRepo, logger)
 	directoryGrpcService := dir.NewDirectoryGrpcServer(directoryApp, logger, cmd.UidHeader)
 
-	privateKey := cmd.GetPrivateKey(logger)
-	tokenTTL := cmd.GetTokenTTL(logger)
-	tokenIssuer := cmd.GetTokenIssuer(logger)
-	certService := cert.NewCertificateService(privateKey, tokenIssuer, tokenTTL, logger)
-	certRepo := cert.NewMongoCertificateRepository(mongoConn, logger)
-	certApp := cert.NewCertificateApplication(certRepo, certService, logger)
-	certGrpcService := cert.NewCertificateGrpcServer(certApp, logger, cmd.UidHeader)
-
 	conn := cmd.GetAmqpConnection(logger)
 	defer conn.Close()
 
@@ -54,13 +45,12 @@ func main() {
 
 	fileBus := file.NewFileEventBus(bus, fileExchange, eventIssuer)
 
-	fileApp := file.NewFileApplication(fileRepo, directoryApp, certApp, logger)
-	fileGrpcService := file.NewFileGrpcServer(fileApp, certApp, fileBus, cmd.UidHeader, logger)
+	fileApp := file.NewFileApplication(fileRepo, directoryApp, fileBus, logger)
+	fileGrpcService := file.NewFileGrpcServer(fileApp, cmd.UidHeader, logger)
 
 	grpcServer := grpc.NewServer()
 	proto.RegisterDirectoryServiceServer(grpcServer, directoryGrpcService)
 	proto.RegisterFileServiceServer(grpcServer, fileGrpcService)
-	proto.RegisterCertificateServiceServer(grpcServer, certGrpcService)
 	lis := cmd.GetNetworkListener(logger)
 
 	logger.Info("server ready to accept connections",

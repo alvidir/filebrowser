@@ -3,39 +3,30 @@ package file
 import (
 	"context"
 	"errors"
-	"path"
 	"strconv"
 	"testing"
 	"time"
 
 	fb "github.com/alvidir/filebrowser"
-	cert "github.com/alvidir/filebrowser/certificate"
 	"go.uber.org/zap"
 )
 
-type certificateApplicationMock struct{}
-
-func (app *certificateApplicationMock) CreateFileAccessCertificate(ctx context.Context, uid int32, file cert.File) (*cert.FileAccessCertificate, error) {
-	cert := cert.NewFileAccessCertificate(1, file)
-	return cert, nil
-}
-
 type directoryApplicationMock struct {
-	registerFile   func(ctx context.Context, file *File, uid int32, path string) (string, error)
-	unregisterFile func(ctx context.Context, file *File, uid int32) error
+	registerFile   func(ctx context.Context, uid int32, file *File) (string, error)
+	unregisterFile func(ctx context.Context, uid int32, file *File) error
 }
 
-func (app *directoryApplicationMock) RegisterFile(ctx context.Context, file *File, uid int32, path string) (string, error) {
+func (app *directoryApplicationMock) RegisterFile(ctx context.Context, uid int32, file *File) (string, error) {
 	if app.registerFile != nil {
-		return app.registerFile(ctx, file, uid, path)
+		return app.registerFile(ctx, uid, file)
 	}
 
 	return "", fb.ErrUnknown
 }
 
-func (app *directoryApplicationMock) UnregisterFile(ctx context.Context, file *File, uid int32) error {
+func (app *directoryApplicationMock) UnregisterFile(ctx context.Context, uid int32, file *File) error {
 	if app.unregisterFile != nil {
-		return app.unregisterFile(ctx, file, uid)
+		return app.unregisterFile(ctx, uid, file)
 	}
 
 	return fb.ErrUnknown
@@ -43,6 +34,27 @@ func (app *directoryApplicationMock) UnregisterFile(ctx context.Context, file *F
 
 func (app *directoryApplicationMock) FileSearch(ctx context.Context, uid int32, search string) ([]*File, error) {
 	return nil, fb.ErrUnknown
+}
+
+type EventBusMock struct {
+	emitFileCreated func(repo *EventBusMock, uid int32, f *File) error
+	emitFileDeleted func(repo *EventBusMock, uid int32, f *File) error
+}
+
+func (bus *EventBusMock) EmitFileCreated(uid int32, f *File) error {
+	if bus.emitFileCreated != nil {
+		return bus.emitFileCreated(bus, uid, f)
+	}
+
+	return nil
+}
+
+func (bus *EventBusMock) EmitFileDeleted(uid int32, f *File) error {
+	if bus.emitFileDeleted != nil {
+		return bus.emitFileDeleted(bus, uid, f)
+	}
+
+	return nil
 }
 
 type fileRepositoryMock struct {
@@ -73,7 +85,7 @@ func (mock *fileRepositoryMock) FindAll(context.Context, []string) ([]*File, err
 	return nil, errors.New("unimplemented")
 }
 
-func (mock *fileRepositoryMock) FindPermissions(context.Context, string) (map[int32]cert.Permission, error) {
+func (mock *fileRepositoryMock) FindPermissions(context.Context, string) (map[int32]Permission, error) {
 	return nil, errors.New("unimplemented")
 }
 
@@ -98,18 +110,21 @@ func TestCreateWhenFileAlreadyExists(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		registerFile: func(ctx context.Context, file *File, uid int32, path string) (string, error) {
+		registerFile: func(ctx context.Context, uid int32, file *File) (string, error) {
 			return "", nil
 		},
 	}
 
 	fileRepo := &fileRepositoryMock{}
-	app := NewFileApplication(fileRepo, dirApp, &certificateApplicationMock{}, logger)
+	app := NewFileApplication(fileRepo, dirApp, &EventBusMock{}, logger)
 
 	userId := int32(999)
-	fpath := "path/to/example.test"
+	options := CreateOptions{
+		Name:      "example.test",
+		Directory: "path/to",
+	}
 
-	if _, err := app.Create(context.Background(), userId, fpath, nil, nil); !errors.Is(err, fb.ErrAlreadyExists) {
+	if _, err := app.Create(context.Background(), userId, &options); !errors.Is(err, fb.ErrAlreadyExists) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrAlreadyExists)
 	}
 }
@@ -119,13 +134,13 @@ func TestReadWhenFileDoesNotExists(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		registerFile: func(ctx context.Context, file *File, uid int32, path string) (string, error) {
+		registerFile: func(ctx context.Context, uid int32, file *File) (string, error) {
 			return "", nil
 		},
 	}
 
 	fileRepo := &fileRepositoryMock{}
-	app := NewFileApplication(fileRepo, dirApp, &certificateApplicationMock{}, logger)
+	app := NewFileApplication(fileRepo, dirApp, &EventBusMock{}, logger)
 
 	userId := int32(999)
 	fid := "testing"
@@ -141,7 +156,7 @@ func TestCreate(t *testing.T) {
 
 	directoryAddFileMethodExecuted := false
 	dirApp := &directoryApplicationMock{
-		registerFile: func(ctx context.Context, file *File, uid int32, path string) (string, error) {
+		registerFile: func(ctx context.Context, uid int32, file *File) (string, error) {
 			directoryAddFileMethodExecuted = true
 			return file.name, nil
 		},
@@ -154,14 +169,17 @@ func TestCreate(t *testing.T) {
 			return nil
 		},
 	}
-	app := NewFileApplication(fileRepo, dirApp, &certificateApplicationMock{}, logger)
+	app := NewFileApplication(fileRepo, dirApp, &EventBusMock{}, logger)
 
 	userId := int32(999)
-	fpath := "path/to/example.test"
-	data := []byte("hello world")
+	options := CreateOptions{
+		Name:      "example.test",
+		Directory: "path/to",
+		Data:      []byte("hello world"),
+	}
 
 	before := time.Now().Unix()
-	file, err := app.Create(context.Background(), userId, fpath, data, nil)
+	file, err := app.Create(context.Background(), userId, &options)
 	after := time.Now().Unix()
 
 	if err != nil {
@@ -173,12 +191,12 @@ func TestCreate(t *testing.T) {
 		t.Errorf("got id = %v, want = %v", got, fileId)
 	}
 
-	if want := path.Base(fpath); want != file.Name() {
+	if want := options.Name; want != file.Name() {
 		t.Errorf("got name = %v, want = %v", file.name, want)
 	}
 
-	if got := file.Data(); string(got) != string(data) {
-		t.Errorf("got data = %v, want = %v", got, data)
+	if got := file.Data(); string(got) != string(options.Data) {
+		t.Errorf("got data = %v, want = %v", got, options.Data)
 	}
 
 	if createdAt, exists := file.metadata[MetadataCreatedAtKey]; !exists {
@@ -199,7 +217,7 @@ func TestCreateWithCustomMetadata(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		registerFile: func(ctx context.Context, file *File, uid int32, path string) (string, error) {
+		registerFile: func(ctx context.Context, uid int32, file *File) (string, error) {
 			return "", nil
 		},
 	}
@@ -211,19 +229,22 @@ func TestCreateWithCustomMetadata(t *testing.T) {
 			return nil
 		},
 	}
-	app := NewFileApplication(fileRepo, dirApp, &certificateApplicationMock{}, logger)
+	app := NewFileApplication(fileRepo, dirApp, &EventBusMock{}, logger)
 
 	userId := int32(999)
-	fpath := "path/to/example.test"
-	meta := make(Metadata)
+	options := CreateOptions{
+		Name:      "example.test",
+		Directory: "path/to",
+		Meta:      make(Metadata),
+	}
 
 	customFieldKey := "custom_field"
 	customFieldValue := "custom value"
-	meta[customFieldKey] = customFieldValue
-	meta[MetadataCreatedAtKey] = strconv.FormatInt(time.Now().Add(time.Hour*24).Unix(), TimestampBase)
+	options.Meta[customFieldKey] = customFieldValue
+	options.Meta[MetadataCreatedAtKey] = strconv.FormatInt(time.Now().Add(time.Hour*24).Unix(), TimestampBase)
 
 	before := time.Now().Unix()
-	file, err := app.Create(context.Background(), userId, fpath, nil, meta)
+	file, err := app.Create(context.Background(), userId, &options)
 	after := time.Now().Unix()
 
 	if err != nil {
@@ -249,13 +270,13 @@ func TestReadWhenHasNoPermissions(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		registerFile: func(ctx context.Context, file *File, uid int32, path string) (string, error) {
+		registerFile: func(ctx context.Context, uid int32, file *File) (string, error) {
 			return "", nil
 		},
 	}
 
 	fileRepo := &fileRepositoryMock{}
-	app := NewFileApplication(fileRepo, dirApp, &certificateApplicationMock{}, logger)
+	app := NewFileApplication(fileRepo, dirApp, &EventBusMock{}, logger)
 
 	userId := int32(999)
 	fid := "testing"
@@ -275,7 +296,7 @@ func TestRead(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    make(Metadata),
-				permissions: map[int32]cert.Permission{111: cert.Owner, 222: cert.Read, 333: cert.Write | cert.Read, 444: cert.Read},
+				permissions: map[int32]Permission{111: Owner, 222: Read, 333: Write | Read, 444: Read},
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil
@@ -283,14 +304,14 @@ func TestRead(t *testing.T) {
 	}
 
 	dirApp := &directoryApplicationMock{}
-	app := NewFileApplication(repo, dirApp, &certificateApplicationMock{}, logger)
+	app := NewFileApplication(repo, dirApp, &EventBusMock{}, logger)
 	file, err := app.Get(context.Background(), 111, "")
 	if err != nil {
 		t.Errorf("got error = %v, want = %v", err, nil)
 		return
 	}
 
-	want := map[int32]cert.Permission{111: cert.Owner, 222: cert.Read, 333: cert.Write | cert.Read, 444: cert.Read}
+	want := map[int32]Permission{111: Owner, 222: Read, 333: Write | Read, 444: Read}
 	if len(file.permissions) != len(want) {
 		t.Errorf("got permissions = %+v, want = %+v", file.permissions, want)
 	}
@@ -301,7 +322,7 @@ func TestRead(t *testing.T) {
 		return
 	}
 
-	want = map[int32]cert.Permission{111: cert.Owner, 222: cert.Read, 333: cert.Write | cert.Read, 444: cert.Read}
+	want = map[int32]Permission{111: Owner, 222: Read, 333: Write | Read, 444: Read}
 	if len(file.permissions) != len(want) {
 		t.Errorf("got permissions = %+v, want = %+v", file.permissions, want)
 	}
@@ -312,7 +333,7 @@ func TestRead(t *testing.T) {
 		return
 	}
 
-	want = map[int32]cert.Permission{111: cert.Owner, 222: cert.Read, 333: cert.Write | cert.Read}
+	want = map[int32]Permission{111: Owner, 222: Read, 333: Write | Read}
 	if _, exists := file.permissions[444]; exists {
 		t.Errorf("got permission = %v, want = %v", file.permissions, want)
 	}
@@ -329,18 +350,18 @@ func TestWriteWhenFileDoesNotExists(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		registerFile: func(ctx context.Context, file *File, uid int32, path string) (string, error) {
+		registerFile: func(ctx context.Context, uid int32, file *File) (string, error) {
 			return "", nil
 		},
 	}
 
 	fileRepo := &fileRepositoryMock{}
-	app := NewFileApplication(fileRepo, dirApp, &certificateApplicationMock{}, logger)
+	app := NewFileApplication(fileRepo, dirApp, &EventBusMock{}, logger)
 
 	userId := int32(999)
 	fid := "testing"
 
-	if _, err := app.Update(context.Background(), userId, fid, "", nil, nil); !errors.Is(err, fb.ErrNotFound) {
+	if _, err := app.Update(context.Background(), userId, fid, &UpdateOptions{}); !errors.Is(err, fb.ErrNotFound) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotFound)
 	}
 }
@@ -350,7 +371,7 @@ func TestWriteWhenHasNoPermissions(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		registerFile: func(ctx context.Context, file *File, uid int32, path string) (string, error) {
+		registerFile: func(ctx context.Context, uid int32, file *File) (string, error) {
 			return "", nil
 		},
 	}
@@ -361,20 +382,20 @@ func TestWriteWhenHasNoPermissions(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    make(Metadata),
-				permissions: map[int32]cert.Permission{111: cert.Owner, 222: cert.Read, 333: cert.Write | cert.Read},
+				permissions: map[int32]Permission{111: Owner, 222: Read, 333: Write | Read},
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil
 		},
 	}
-	app := NewFileApplication(repo, dirApp, &certificateApplicationMock{}, logger)
+	app := NewFileApplication(repo, dirApp, &EventBusMock{}, logger)
 
 	fid := "testing"
-	if _, err := app.Update(context.Background(), 222, fid, "", nil, nil); !errors.Is(err, fb.ErrNotAvailable) {
+	if _, err := app.Update(context.Background(), 222, fid, &UpdateOptions{}); !errors.Is(err, fb.ErrNotAvailable) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)
 	}
 
-	if _, err := app.Update(context.Background(), 999, fid, "", nil, nil); !errors.Is(err, fb.ErrNotAvailable) {
+	if _, err := app.Update(context.Background(), 999, fid, &UpdateOptions{}); !errors.Is(err, fb.ErrNotAvailable) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)
 	}
 }
@@ -389,7 +410,7 @@ func TestWriteWhenCannotSave(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    make(Metadata),
-				permissions: map[int32]cert.Permission{111: cert.Owner, 222: cert.Read, 333: cert.Write | cert.Read},
+				permissions: map[int32]Permission{111: Owner, 222: Read, 333: Write | Read},
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil
@@ -397,10 +418,10 @@ func TestWriteWhenCannotSave(t *testing.T) {
 	}
 
 	dirApp := &directoryApplicationMock{}
-	app := NewFileApplication(repo, dirApp, &certificateApplicationMock{}, logger)
+	app := NewFileApplication(repo, dirApp, &EventBusMock{}, logger)
 
 	fid := "testing"
-	if _, err := app.Update(context.Background(), 111, fid, "", nil, nil); !errors.Is(err, fb.ErrUnknown) {
+	if _, err := app.Update(context.Background(), 111, fid, &UpdateOptions{}); !errors.Is(err, fb.ErrUnknown) {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrUnknown)
 	}
 }
@@ -419,7 +440,7 @@ func TestWrite(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    meta,
-				permissions: map[int32]cert.Permission{111: cert.Owner, 222: cert.Read, 333: cert.Write | cert.Read},
+				permissions: map[int32]Permission{111: Owner, 222: Read, 333: Write | Read},
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil
@@ -431,13 +452,15 @@ func TestWrite(t *testing.T) {
 	}
 
 	dirApp := &directoryApplicationMock{}
-	app := NewFileApplication(repo, dirApp, &certificateApplicationMock{}, logger)
+	app := NewFileApplication(repo, dirApp, &EventBusMock{}, logger)
 
 	fid := "testing"
-	data := []byte{1, 2, 3}
+	options := UpdateOptions{
+		Data: []byte{1, 2, 3},
+	}
 
 	before := time.Now().Unix()
-	file, err := app.Update(context.Background(), 111, fid, "", data, nil)
+	file, err := app.Update(context.Background(), 111, fid, &options)
 	after := time.Now().Unix()
 
 	if err != nil {
@@ -471,7 +494,7 @@ func TestWriteWithCustomMetadata(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    meta,
-				permissions: map[int32]cert.Permission{111: cert.Owner, 222: cert.Read, 333: cert.Write | cert.Read},
+				permissions: map[int32]Permission{111: Owner, 222: Read, 333: Write | Read},
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil
@@ -483,18 +506,20 @@ func TestWriteWithCustomMetadata(t *testing.T) {
 	}
 
 	dirApp := &directoryApplicationMock{}
-	app := NewFileApplication(repo, dirApp, &certificateApplicationMock{}, logger)
+	app := NewFileApplication(repo, dirApp, &EventBusMock{}, logger)
 
 	fid := "testing"
-	data := []byte{1, 2, 3}
+	options := UpdateOptions{
+		Meta: make(Metadata),
+		Data: []byte{1, 2, 3},
+	}
+
 	customFieldKey := "custom_field"
 	customFieldValue := "custom value"
+	options.Meta[customFieldKey] = customFieldValue
+	options.Meta[MetadataCreatedAtKey] = strconv.FormatInt(time.Now().Add(time.Hour*24).Unix(), TimestampBase)
 
-	customMeta := make(Metadata)
-	customMeta[customFieldKey] = customFieldValue
-	customMeta[MetadataCreatedAtKey] = strconv.FormatInt(time.Now().Add(time.Hour*24).Unix(), TimestampBase)
-
-	file, err := app.Update(context.Background(), 111, fid, "", data, customMeta)
+	file, err := app.Update(context.Background(), 111, fid, &options)
 
 	if err != nil {
 		t.Errorf("got error = %v, want = %v", err, fb.ErrNotAvailable)
@@ -514,13 +539,13 @@ func TestDeleteWhenFileDoesNotExists(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		registerFile: func(ctx context.Context, file *File, uid int32, path string) (string, error) {
+		registerFile: func(ctx context.Context, uid int32, file *File) (string, error) {
 			return "", nil
 		},
 	}
 
 	fileRepo := &fileRepositoryMock{}
-	app := NewFileApplication(fileRepo, dirApp, &certificateApplicationMock{}, logger)
+	app := NewFileApplication(fileRepo, dirApp, &EventBusMock{}, logger)
 
 	userId := int32(999)
 	fid := "testing"
@@ -535,7 +560,7 @@ func TestDeleteWhenHasNoPermissions(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		unregisterFile: func(ctx context.Context, file *File, uid int32) error {
+		unregisterFile: func(ctx context.Context, uid int32, file *File) error {
 			return nil
 		},
 	}
@@ -546,13 +571,13 @@ func TestDeleteWhenHasNoPermissions(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    make(Metadata),
-				permissions: make(map[int32]cert.Permission),
+				permissions: make(map[int32]Permission),
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil
 		},
 	}
-	app := NewFileApplication(repo, dirApp, &certificateApplicationMock{}, logger)
+	app := NewFileApplication(repo, dirApp, &EventBusMock{}, logger)
 
 	fid := "testing"
 	if _, err := app.Delete(context.Background(), 999, fid); !errors.Is(err, fb.ErrNotAvailable) {
@@ -565,7 +590,7 @@ func TestDeleteWhenCannotSave(t *testing.T) {
 	defer logger.Sync()
 
 	dirApp := &directoryApplicationMock{
-		unregisterFile: func(ctx context.Context, file *File, uid int32) error {
+		unregisterFile: func(ctx context.Context, uid int32, file *File) error {
 			return nil
 		},
 	}
@@ -576,14 +601,14 @@ func TestDeleteWhenCannotSave(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    make(Metadata),
-				permissions: map[int32]cert.Permission{222: cert.Read},
+				permissions: map[int32]Permission{222: Read},
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil
 		},
 	}
 
-	app := NewFileApplication(repo, dirApp, &certificateApplicationMock{}, logger)
+	app := NewFileApplication(repo, dirApp, &EventBusMock{}, logger)
 
 	fid := "testing"
 	if _, err := app.Delete(context.Background(), 222, fid); !errors.Is(err, fb.ErrUnknown) {
@@ -597,7 +622,7 @@ func TestDeleteWhenIsNotOwner(t *testing.T) {
 
 	directoryRemoveFileMethodExecuted := false
 	dirApp := &directoryApplicationMock{
-		unregisterFile: func(ctx context.Context, file *File, uid int32) error {
+		unregisterFile: func(ctx context.Context, uid int32, file *File) error {
 			directoryRemoveFileMethodExecuted = true
 			return nil
 		},
@@ -609,7 +634,7 @@ func TestDeleteWhenIsNotOwner(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    make(Metadata),
-				permissions: map[int32]cert.Permission{111: cert.Read},
+				permissions: map[int32]Permission{111: Read},
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil
@@ -620,7 +645,7 @@ func TestDeleteWhenIsNotOwner(t *testing.T) {
 		},
 	}
 
-	app := NewFileApplication(repo, dirApp, &certificateApplicationMock{}, logger)
+	app := NewFileApplication(repo, dirApp, &EventBusMock{}, logger)
 
 	fid := "testing"
 	file, err := app.Delete(context.Background(), 111, fid)
@@ -647,7 +672,7 @@ func TestDeleteWhenMoreThanOneOwner(t *testing.T) {
 
 	directoryRemoveFileMethodExecuted := false
 	dirApp := &directoryApplicationMock{
-		unregisterFile: func(ctx context.Context, file *File, uid int32) error {
+		unregisterFile: func(ctx context.Context, uid int32, file *File) error {
 			directoryRemoveFileMethodExecuted = true
 			return nil
 		},
@@ -659,7 +684,7 @@ func TestDeleteWhenMoreThanOneOwner(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    make(Metadata),
-				permissions: map[int32]cert.Permission{111: cert.Owner, 222: cert.Owner},
+				permissions: map[int32]Permission{111: Owner, 222: Owner},
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil
@@ -670,7 +695,7 @@ func TestDeleteWhenMoreThanOneOwner(t *testing.T) {
 		},
 	}
 
-	app := NewFileApplication(repo, dirApp, &certificateApplicationMock{}, logger)
+	app := NewFileApplication(repo, dirApp, &EventBusMock{}, logger)
 
 	fid := "testing"
 	file, err := app.Delete(context.Background(), 111, fid)
@@ -686,8 +711,8 @@ func TestDeleteWhenMoreThanOneOwner(t *testing.T) {
 		t.Errorf("got permissions = %v, want = %v", perm, nil)
 	}
 
-	if perm, exists := file.permissions[222]; !exists || perm != cert.Owner {
-		t.Errorf("got permissions = %v, want = %v", perm, cert.Owner)
+	if perm, exists := file.permissions[222]; !exists || perm != Owner {
+		t.Errorf("got permissions = %v, want = %v", perm, Owner)
 	}
 
 	if !directoryRemoveFileMethodExecuted {
@@ -701,7 +726,7 @@ func TestDeleteWhenSingleOwner(t *testing.T) {
 
 	directoryRemoveFileMethodExecuted := false
 	dirApp := &directoryApplicationMock{
-		unregisterFile: func(ctx context.Context, file *File, uid int32) error {
+		unregisterFile: func(ctx context.Context, uid int32, file *File) error {
 			directoryRemoveFileMethodExecuted = true
 			return nil
 		},
@@ -713,7 +738,7 @@ func TestDeleteWhenSingleOwner(t *testing.T) {
 				id:          "123",
 				name:        "testing",
 				metadata:    make(Metadata),
-				permissions: map[int32]cert.Permission{111: cert.Owner},
+				permissions: map[int32]Permission{111: Owner},
 				data:        []byte{},
 				flags:       repo.flags,
 			}, nil
@@ -724,7 +749,7 @@ func TestDeleteWhenSingleOwner(t *testing.T) {
 		},
 	}
 
-	app := NewFileApplication(repo, dirApp, &certificateApplicationMock{}, logger)
+	app := NewFileApplication(repo, dirApp, &EventBusMock{}, logger)
 
 	fid := "testing"
 	before := time.Now().Unix()
@@ -744,7 +769,7 @@ func TestDeleteWhenSingleOwner(t *testing.T) {
 	}
 
 	if perm, exists := file.permissions[111]; !exists {
-		t.Errorf("got permissions = %v, want = %v", perm, cert.Owner)
+		t.Errorf("got permissions = %v, want = %v", perm, Owner)
 	}
 
 	if !directoryRemoveFileMethodExecuted {

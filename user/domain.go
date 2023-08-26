@@ -1,10 +1,11 @@
 package user
 
 const (
-	profilePath = ".profile"
+	profileFilename  = ".profile"
+	profileDirectory = "/"
 )
 
 type Profile struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	Name  string `json:"user_name"`
+	Email string `json:"user_email"`
 }
